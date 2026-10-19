@@ -1,9 +1,23 @@
+{% extends "base.html" %}
 {% load static %}
+
+{% block title %}Choose your Emirate — ManzilCart{% endblock %}
+{% block meta_description %}Buy and sell new and refurbished furniture in the UAE. Select your emirate to discover local listings in your community.{% endblock %}
+
+{% block content %}
+{% if request.GET.invalid_emirate %}
+  <div class="container" style="padding-top: 1.5rem;">
+    <div class="message message-warning" role="alert">
+      <span data-i18n="invalid_emirate_alert">That marketplace is not currently available. Please select an active emirate below.</span>
+    </div>
+  </div>
+{% endif %}
+
 <section class="hero hero-landing">
   <div class="container hero-inner">
-    <p class="eyebrow">Furniture marketplace · UAE</p>
-    <h1>Give good furniture<br>a second home.</h1>
-    <p class="hero-lede">
+    <p class="eyebrow" data-i18n="hero_eyebrow">Furniture marketplace · UAE</p>
+    <h1 data-i18n="hero_title">Give good furniture<br>a second home.</h1>
+    <p class="hero-lede" data-i18n="hero_lede">
       Buy and sell new and refurbished furniture with people in your own community.
       Choose your emirate to see what is available near you.
     </p>
@@ -12,32 +26,33 @@
 
 <section class="container section emirate-picker" aria-labelledby="choose-emirate">
   <div class="section-heading">
-    <h2 id="choose-emirate">Where are you looking?</h2>
-    <p class="muted">You can switch at any time. We never guess your location.</p>
+    <h2 id="choose-emirate" data-i18n="picker_title">Where are you looking?</h2>
+    <p class="muted" data-i18n="picker_subtitle">You can switch at any time. We never guess your location.</p>
   </div>
 
   {% if no_emirates_available %}
     <div class="empty-state">
-      <h3>No marketplaces are open right now</h3>
-      <p>We are preparing our launch. Please check back soon.</p>
+      <h3 data-i18n="no_marketplaces_title">No marketplaces are open right now</h3>
+      <p data-i18n="no_marketplaces_desc">We are preparing our launch. Please check back soon.</p>
     </div>
   {% else %}
     <div class="emirate-grid">
       {% for emirate in emirates %}
         <a class="emirate-card{% if remembered_emirate and remembered_emirate.id == emirate.id %} emirate-card-remembered{% endif %}"
-           href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">
-          <span class="emirate-card-eyebrow">
+           href="{% url 'marketplace:home' emirate_slug=emirate.slug %}"
+           data-emirate-slug="{{ emirate.slug }}">
+          <span class="emirate-card-eyebrow" data-i18n="{% if remembered_emirate and remembered_emirate.id == emirate.id %}card_continue{% else %}card_marketplace{% endif %}">
             {% if remembered_emirate and remembered_emirate.id == emirate.id %}
               Continue where you left off
             {% else %}
               Marketplace
             {% endif %}
           </span>
-          <span class="emirate-card-name">{{ emirate.name }}</span>
-          <span class="emirate-card-areas">{{ emirate.service_areas.count }} neighbourhoods</span>
+          <span class="emirate-card-name" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span>
+          <span class="emirate-card-areas"><span class="areas-count">{{ emirate.service_areas.count }}</span> <span data-i18n="neighbourhoods">neighbourhood{{ emirate.service_areas.count|pluralize }}</span></span>
           <span class="emirate-card-cta">
-            Enter {{ emirate.name }}
-            <span aria-hidden="true">→</span>
+            <span data-i18n="enter_emirate" data-emirate="{{ emirate.name }}">Enter {{ emirate.name }}</span>
+            <span aria-hidden="true" class="arrow-icon">→</span>
           </span>
         </a>
       {% endfor %}
@@ -46,22 +61,23 @@
 
   {% if remembered_emirate %}
     <p class="remembered-note">
-      Last time you were browsing <strong>{{ remembered_emirate.name }}</strong>.
+      <span data-i18n="remembered_note_prefix">Last time you were browsing</span> <strong data-emirate-name="{{ remembered_emirate.name }}">{{ remembered_emirate.name }}</strong>.
     </p>
   {% endif %}
 </section>
 
 <section class="container section landing-values">
   <div class="value-card">
-    <h3>Moderated listings</h3>
-    <p>Every item is reviewed before it appears, so what you see is real furniture from real people.</p>
+    <h3 data-i18n="val_moderated_title">Moderated listings</h3>
+    <p data-i18n="val_moderated_desc">Every item is reviewed before it appears, so what you see is real furniture from real people.</p>
   </div>
   <div class="value-card">
-    <h3>Talk directly</h3>
-    <p>Message the seller, ask questions and agree a price without leaving the platform.</p>
+    <h3 data-i18n="val_direct_title">Talk directly</h3>
+    <p data-i18n="val_direct_desc">Message the seller, ask questions and agree a price without leaving the platform.</p>
   </div>
   <div class="value-card">
-    <h3>Local by design</h3>
-    <p>Your marketplace is your emirate. Optional delivery and assembly help can be requested with a deal.</p>
+    <h3 data-i18n="val_local_title">Local by design</h3>
+    <p data-i18n="val_local_desc">Your marketplace is your emirate. Optional delivery and assembly help can be requested with a deal.</p>
   </div>
 </section>
+{% endblock %}

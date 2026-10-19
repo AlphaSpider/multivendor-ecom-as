@@ -181,7 +181,7 @@
 .chat-bubble.is-mine {
   align-self: flex-end;
   background: var(--brand-soft);
-  border-color: #cfe1d5;
+  border-color: rgba(220, 38, 38, 0.25);
 }
 
 .chat-bubble.is-theirs {

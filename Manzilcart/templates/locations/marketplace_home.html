@@ -7,17 +7,17 @@
 {% block content %}
 <section class="hero hero-market">
   <div class="container hero-inner">
-    <p class="eyebrow">Marketplace · {{ emirate.name }}</p>
-    <h1>Furniture looking for<br>its next home.</h1>
-    <p class="hero-lede">
+    <p class="eyebrow"><span data-i18n="marketplace_label">Marketplace</span> · <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span></p>
+    <h1 data-i18n="market_hero_title">Furniture looking for<br>its next home.</h1>
+    <p class="hero-lede" data-i18n="market_hero_lede">
       New and refurbished pieces from sellers across {{ emirate.name }}.
       Every listing is reviewed before it goes live.
     </p>
 
     <form class="search-bar" method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" role="search">
-      <label class="sr-only" for="market-search">Search furniture</label>
-      <input id="market-search" type="search" name="q" placeholder="Search sofas, desks, beds…" autocomplete="off">
-      <button class="btn btn-primary" type="submit">Search</button>
+      <label class="sr-only" for="market-search" data-i18n="search_furniture">Search furniture</label>
+      <input id="market-search" type="search" name="q" placeholder="Search sofas, desks, beds…" autocomplete="off" data-placeholder-i18n="search_placeholder">
+      <button class="btn btn-primary" type="submit" data-i18n="btn_search">Search</button>
     </form>
   </div>
 </section>
@@ -25,10 +25,10 @@
 <section class="container section">
   <div class="section-heading section-heading-row">
     <div>
-      <h2>Browse by category</h2>
-      <p class="muted">Find the piece that finishes the room.</p>
+      <h2 data-i18n="browse_category">Browse by category</h2>
+      <p class="muted" data-i18n="category_tagline">Find the piece that finishes the room.</p>
     </div>
-    <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">All listings</a>
+    <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="all_listings">All listings</a>
   </div>
 
   {% if categories %}
@@ -42,7 +42,7 @@
     </div>
   {% else %}
     <div class="empty-state compact">
-      <p>Categories are being set up.</p>
+      <p data-i18n="categories_setting_up">Categories are being set up.</p>
     </div>
   {% endif %}
 </section>
@@ -50,8 +50,8 @@
 <section class="container section">
   <div class="section-heading section-heading-row">
     <div>
-      <h2>Fresh in {{ emirate.name }}</h2>
-      <p class="muted">The newest approved listings.</p>
+      <h2><span data-i18n="fresh_in">Fresh in</span> <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span></h2>
+      <p class="muted" data-i18n="fresh_tagline">The newest approved listings.</p>
     </div>
   </div>
 
@@ -63,12 +63,12 @@
     </div>
   {% else %}
     <div class="empty-state">
-      <h3>No listings yet</h3>
-      <p>Be the first to list a piece of furniture in {{ emirate.name }}.</p>
+      <h3 data-i18n="no_listings_title">No listings yet</h3>
+      <p data-i18n="no_listings_desc">Be the first to list a piece of furniture in {{ emirate.name }}.</p>
       {% if user.is_authenticated %}
-        <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}">Sell an item</a>
+        <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}" data-i18n="sell_an_item">Sell an item</a>
       {% else %}
-        <a class="btn btn-primary" href="{% url 'accounts:start' %}">Join to sell</a>
+        <a class="btn btn-primary" href="{% url 'accounts:start' %}" data-i18n="join_to_sell">Join to sell</a>
       {% endif %}
     </div>
   {% endif %}
@@ -77,10 +77,10 @@
 <section class="container section">
   <div class="section-heading section-heading-row">
     <div>
-      <h2>Selling in {{ emirate.name }}</h2>
-      <p class="muted">We operate in {{ service_areas|length }} neighbourhoods here.</p>
+      <h2><span data-i18n="selling_in">Selling in</span> <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span></h2>
+      <p class="muted"><span data-i18n="operate_neighbourhoods_prefix">We operate in</span> {{ service_areas|length }} <span data-i18n="operate_neighbourhoods_suffix">neighbourhoods here.</span></p>
     </div>
-    <a class="btn btn-primary" href="{% if user.is_authenticated %}{% url 'catalog:listing_create' emirate_slug=emirate.slug %}{% else %}{% url 'accounts:start' %}{% endif %}">
+    <a class="btn btn-primary" href="{% if user.is_authenticated %}{% url 'catalog:listing_create' emirate_slug=emirate.slug %}{% else %}{% url 'accounts:start' %}{% endif %}" data-i18n="list_an_item">
       List an item
     </a>
   </div>
@@ -88,7 +88,7 @@
     {% for area in service_areas %}
       <li>{{ area.name }}</li>
     {% empty %}
-      <li class="muted">No neighbourhoods are currently active.</li>
+      <li class="muted" data-i18n="no_active_neighbourhoods">No neighbourhoods are currently active.</li>
     {% endfor %}
   </ul>
 </section>

@@ -310,8 +310,8 @@
 }
 
 .status-auction-awarded {
-  background: #e7f0ea;
-  color: #0a3b24;
+  background: var(--brand-soft);
+  color: var(--brand);
 }
 
 .status-auction-unsold,
