@@ -1,0 +1,67 @@
+{% load static %}
+<section class="hero hero-landing">
+  <div class="container hero-inner">
+    <p class="eyebrow">Furniture marketplace · UAE</p>
+    <h1>Give good furniture<br>a second home.</h1>
+    <p class="hero-lede">
+      Buy and sell new and refurbished furniture with people in your own community.
+      Choose your emirate to see what is available near you.
+    </p>
+  </div>
+</section>
+
+<section class="container section emirate-picker" aria-labelledby="choose-emirate">
+  <div class="section-heading">
+    <h2 id="choose-emirate">Where are you looking?</h2>
+    <p class="muted">You can switch at any time. We never guess your location.</p>
+  </div>
+
+  {% if no_emirates_available %}
+    <div class="empty-state">
+      <h3>No marketplaces are open right now</h3>
+      <p>We are preparing our launch. Please check back soon.</p>
+    </div>
+  {% else %}
+    <div class="emirate-grid">
+      {% for emirate in emirates %}
+        <a class="emirate-card{% if remembered_emirate and remembered_emirate.id == emirate.id %} emirate-card-remembered{% endif %}"
+           href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">
+          <span class="emirate-card-eyebrow">
+            {% if remembered_emirate and remembered_emirate.id == emirate.id %}
+              Continue where you left off
+            {% else %}
+              Marketplace
+            {% endif %}
+          </span>
+          <span class="emirate-card-name">{{ emirate.name }}</span>
+          <span class="emirate-card-areas">{{ emirate.service_areas.count }} neighbourhoods</span>
+          <span class="emirate-card-cta">
+            Enter {{ emirate.name }}
+            <span aria-hidden="true">→</span>
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if remembered_emirate %}
+    <p class="remembered-note">
+      Last time you were browsing <strong>{{ remembered_emirate.name }}</strong>.
+    </p>
+  {% endif %}
+</section>
+
+<section class="container section landing-values">
+  <div class="value-card">
+    <h3>Moderated listings</h3>
+    <p>Every item is reviewed before it appears, so what you see is real furniture from real people.</p>
+  </div>
+  <div class="value-card">
+    <h3>Talk directly</h3>
+    <p>Message the seller, ask questions and agree a price without leaving the platform.</p>
+  </div>
+  <div class="value-card">
+    <h3>Local by design</h3>
+    <p>Your marketplace is your emirate. Optional delivery and assembly help can be requested with a deal.</p>
+  </div>
+</section>

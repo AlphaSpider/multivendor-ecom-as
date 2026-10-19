@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ listing.title }} — ManzilCart{% endblock %}
+{% block meta_description %}{{ listing.description|truncatechars:155 }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/deals.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}">{{ listing.category.name }}</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ listing.title }}</span>
+  </nav>
+
+  {% if not listing.is_public %}
+    <div class="form-alert" role="status">
+      <p>
+        <strong>Not public.</strong> Status: {{ listing.get_status_display }}.
+        {% if listing.status == "pending" %}This listing is waiting for moderator approval.{% endif %}
+        {% if listing.status == "rejected" and listing.moderation_note %}Moderator note: {{ listing.moderation_note }}{% endif %}
+        {% if listing.status == "draft" %}Submit it for review when you are ready.{% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+  {% if active_auction %}
+    <div class="form-alert" role="status">
+      <p>
+        <strong>This item is in an auction.</strong>
+        Bidding is open in the marketplace.
+        <a href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}">View the auction and current bids</a>.
+      </p>
+    </div>
+  {% endif %}
+
+  <div class="detail-layout">
+    <div class="detail-gallery">
+      {% if listing.images.all %}
+        <div class="gallery-main">
+          {% with cover=listing.cover_image %}
+            <img src="{{ cover.image.url }}" alt="{{ cover.caption|default:listing.title }}" width="{{ cover.width }}" height="{{ cover.height }}">
+          {% endwith %}
+        </div>
+        {% if listing.images.count > 1 %}
+          <div class="gallery-thumbs">
+            {% for image in listing.images.all %}
+              <a href="{{ image.image.url }}" target="_blank" rel="noopener" aria-label="Open photo {{ forloop.counter }}">
+                <img src="{{ image.image.url }}" alt="" loading="lazy">
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="gallery-main gallery-empty">
+          <span>No photos yet</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="detail-panel">
+      <div class="detail-badges">
+        <span class="badge">{{ listing.get_condition_display }}</span>
+        {% if listing.status == "reserved" %}<span class="status-pill status-reserved">Reserved</span>{% endif %}
+        {% if listing.status == "sold" %}<span class="status-pill status-sold">Sold</span>{% endif %}
+      </div>
+
+      <h1>{{ listing.title }}</h1>
+      <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+
+      <dl class="detail-list">
+        <div><dt>Category</dt><dd>{{ listing.category.name }}</dd></div>
+        <div><dt>Area</dt><dd>{{ listing.service_area.name }}</dd></div>
+        <div><dt>Emirate</dt><dd>{{ listing.emirate.name }}</dd></div>
+        <div><dt>Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
+      </dl>
+
+      <div class="seller-card">
+        <span class="seller-avatar" aria-hidden="true">{{ listing.seller.short_name|slice:":1"|upper }}</span>
+        <div>
+          <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong>
+          <span class="muted small">Member since {{ listing.seller.date_joined|date:"M Y" }}</span>
+        </div>
+      </div>
+
+      {% if is_owner %}
+        <div class="form-actions">
+          {% if can_edit %}
+            <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}">Edit listing</a>
+          {% endif %}
+          {% if listing.is_public %}
+            {% if active_auction %}
+              <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}">View auction</a>
+            {% else %}
+              <a class="btn btn-quiet" href="{% url 'auction_marketplace:create' emirate_slug=emirate.slug listing_slug=listing.slug %}">Create auction</a>
+            {% endif %}
+          {% endif %}
+          <a class="btn btn-quiet" href="{% url 'accounts:listings' %}">All my listings</a>
+        </div>
+      {% else %}
+        <div class="contact-panel">
+          {% if user.is_authenticated %}
+            <form method="post" action="{% url 'conversations:start' listing_id=listing.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-primary" type="submit">Message the seller</button>
+            </form>
+            <p class="muted small">Ask questions, then agree a price in chat.</p>
+
+            <form class="offer-form" method="post" action="{% url 'deals:start' listing_id=listing.pk %}">
+              {% csrf_token %}
+              <label class="field-label" for="offer-amount">Or make an offer (AED)</label>
+              <div class="offer-form-row">
+                <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" placeholder="{{ listing.asking_price|floatformat:0 }}" required>
+                <button class="btn btn-primary" type="submit">Make offer</button>
+              </div>
+            </form>
+            <p class="muted small">There is no online payment. You agree handover and payment directly.</p>
+          {% else %}
+            <a class="btn btn-primary" href="{% url 'accounts:start' %}">Sign in to message the seller</a>
+            <p class="muted small">Chat is available to verified members.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <p class="safety-note">
+        <strong>Stay safe.</strong> View the furniture before paying. ManzilCart does not
+        process, hold or guarantee the purchase price — payment is agreed directly
+        between buyer and seller.
+      </p>
+    </aside>
+  </div>
+
+  <div class="panel detail-description">
+    <h2>About this piece</h2>
+    {{ listing.description|linebreaks }}
+  </div>
+</section>
+{% endblock %}

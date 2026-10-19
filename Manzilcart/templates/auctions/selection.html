@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Confirm your winning bid — {{ auction.reference }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'auctions:mine' %}">My auctions</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ auction.reference }}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction confirmation · {{ auction.reference }}</p>
+      <h1>{{ listing.title }}</h1>
+      <p class="muted">
+        {{ listing.service_area.name }}, {{ auction.emirate.name }} ·
+        Your locked bid
+        <strong>AED {{ bid.amount|floatformat:0|intcomma }}</strong>
+      </p>
+    </div>
+    <span class="status-pill status-selection-{{ selection.status }}">{{ selection.get_status_display }}</span>
+  </div>
+
+  {% if can_respond %}
+    <div class="panel">
+      <h2>Confirm your bid</h2>
+      <p>
+        The seller locked your bid. If you confirm before
+        <strong>{{ selection.confirmation_deadline|date:"j M Y, H:i" }}</strong>,
+        an accepted deal is created at <strong>AED {{ bid.amount|floatformat:0|intcomma }}</strong>
+        — your own bid amount.
+      </p>
+      <p class="muted small">
+        This is not a payment request. ManzilCart does not process or hold the purchase
+        price. You and the seller arrange payment and handover directly.
+      </p>
+      <p class="muted small">
+        If you decline or do not respond in time, the auction is offered to the next
+        highest eligible bidder. You will not be offered this auction again.
+      </p>
+
+      <div class="auction-selection-actions">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="confirm">
+          <button class="btn btn-primary" type="submit">Confirm and create the deal</button>
+        </form>
+
+        <form class="auction-decline-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="decline">
+          <label class="field-label" for="decline-reason">Reason (optional)</label>
+          <textarea class="input" id="decline-reason" name="reason" rows="2" maxlength="255"></textarea>
+          <button class="btn btn-quiet" type="submit">Decline this offer</button>
+        </form>
+      </div>
+    </div>
+  {% elif selection.status == "confirmed" %}
+    <div class="form-alert" role="status">
+      <p><strong>You confirmed this auction.</strong> The deal was created at your bid price.</p>
+    </div>
+    <div class="panel">
+      <h2>Accepted deal</h2>
+      {% if deal %}
+        <p>Deal {{ deal.reference }} · AED {{ deal.agreed_price|floatformat:0|intcomma }}</p>
+        <p class="muted small">Arrange payment and handover directly with the seller.</p>
+        <a class="btn btn-primary" href="{% url 'deals:detail' pk=deal.pk %}">Open the deal</a>
+      {% else %}
+        <p class="muted">The deal is being finalised.</p>
+      {% endif %}
+    </div>
+  {% elif selection.status == "declined" %}
+    <div class="form-alert" role="status">
+      <p><strong>You declined this offer.</strong> The auction may be offered to the next highest eligible bidder. You will not be offered it again.</p>
+    </div>
+    <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=auction.emirate.slug pk=auction.pk %}">View the auction</a>
+  {% elif selection.status == "timed_out" %}
+    <div class="form-alert" role="status">
+      <p><strong>The confirmation deadline passed.</strong> The auction may be offered to the next highest eligible bidder.</p>
+    </div>
+    <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=auction.emirate.slug pk=auction.pk %}">View the auction</a>
+  {% else %}
+    {% if not is_bidder %}
+      <div class="form-alert" role="status">
+        <p><strong>Staff view.</strong> Only the invited bidder can confirm or decline this offer.</p>
+      </div>
+    {% elif now > selection.confirmation_deadline %}
+      <div class="form-alert" role="status">
+        <p><strong>The confirmation deadline has passed.</strong> No further action is possible here. The auction will move to the next eligible bidder or close unsold.</p>
+      </div>
+    {% else %}
+      <div class="form-alert" role="status">
+        <p><strong>This offer is no longer active.</strong> The auction has moved on or closed.</p>
+      </div>
+    {% endif %}
+    <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=auction.emirate.slug pk=auction.pk %}">View the auction</a>
+  {% endif %}
+
+  <p class="safety-note">
+    <strong>Stay safe.</strong> View the furniture before paying. ManzilCart does not
+    process or hold the purchase price.
+  </p>
+</section>
+{% endblock %}

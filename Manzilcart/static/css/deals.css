@@ -1,0 +1,245 @@
+/* Deals: list rows, offer history and cancellation panels. */
+
+.deal-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.deal-row {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  align-items: center;
+}
+
+.deal-thumb {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--sand);
+  display: grid;
+  place-items: center;
+}
+
+.deal-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deal-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.deal-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.deal-row-head h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.15rem;
+}
+
+.deal-row-price {
+  margin: 0.35rem 0 0;
+}
+
+.deal-row-actions {
+  flex: 0 0 auto;
+}
+
+/* -- detail -------------------------------------------------------------- */
+
+.deal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.deal-main {
+  display: grid;
+  gap: 1rem;
+}
+
+.deal-main .panel,
+.deal-sidebar {
+  padding: 1.25rem;
+}
+
+.deal-agreed-price {
+  font-size: 1.15rem;
+}
+
+.offer-history,
+.deal-events,
+.plain-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.offer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.offer-row:last-child {
+  border-bottom: 0;
+}
+
+.offer-row.is-pending {
+  background: var(--brand-soft);
+  margin: 0 -0.5rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--radius-sm);
+  border-bottom-color: transparent;
+}
+
+.offer-row p {
+  margin: 0.2rem 0 0;
+}
+
+.deal-response {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.deal-inline-forms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.deal-inline-forms form {
+  margin: 0;
+}
+
+.deal-form {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 440px;
+}
+
+.deal-form .field {
+  margin: 0;
+}
+
+.service-choice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.45rem 0;
+}
+
+.service-choice input {
+  margin-top: 0.3rem;
+}
+
+.service-choice span span {
+  display: block;
+}
+
+.deal-staff-panel {
+  margin-top: 1rem;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem;
+}
+
+.deal-events li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.deal-events li:last-child {
+  border-bottom: 0;
+}
+
+.deal-event-date {
+  display: inline-block;
+  min-width: 118px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.deal-sidebar-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.6rem;
+}
+
+.deal-sidebar h2 {
+  font-size: 1.05rem;
+  margin-top: 1rem;
+}
+
+.deal-sidebar h2:first-child {
+  margin-top: 0;
+}
+
+.offer-form {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.offer-form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.offer-form-row .input {
+  min-width: 0;
+}
+
+/* -- status pills -------------------------------------------------------- */
+
+.status-negotiating,
+.status-cancellation_requested,
+.status-offer-pending {
+  background: #fdf3d9;
+  color: #725418;
+}
+
+.status-accepted,
+.status-offer-accepted {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.status-cancelled,
+.status-offer-rejected,
+.status-offer-withdrawn {
+  background: #e8e8e8;
+  color: #4a4a4a;
+}
+
+.status-offer-countered {
+  background: var(--sand);
+  color: var(--ink-soft);
+}
+
+@media (max-width: 860px) {
+  .deal-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .deal-row { flex-wrap: wrap; }
+  .deal-thumb { width: 72px; height: 72px; flex-basis: 72px; }
+  .deal-event-date { display: block; }
+}

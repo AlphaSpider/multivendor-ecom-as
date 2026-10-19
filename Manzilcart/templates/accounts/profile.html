@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Profile — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Profile</p>
+      <h1>Your details</h1>
+      <p class="muted">Changing your area applies to future browsing and listings.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.display_name %}
+      {% include "partials/field.html" with field=form.service_area %}
+      {% include "partials/field.html" with field=form.email %}
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Save changes</button>
+        <a class="btn btn-quiet" href="{% url 'accounts:dashboard' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Mobile number</h2>
+    <p>
+      <strong>{{ member.phone }}</strong>
+      {% if member.is_mobile_verified %}<span class="status-pill status-approved">Verified</span>{% endif %}
+    </p>
+    <p class="muted small">
+      To change your number, sign out and register again with the new number. This keeps
+      account ownership verifiable.
+    </p>
+  </div>
+</section>
+{% endblock %}

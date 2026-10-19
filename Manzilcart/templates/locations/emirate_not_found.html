@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Marketplace not found — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <div class="empty-state">
+    <p class="eyebrow">404</p>
+    <h1>That marketplace isn’t available</h1>
+    <p>
+      The link may be old, or the marketplace may have closed. Your account and any
+      listings you saved elsewhere are unaffected.
+    </p>
+    {% if emirates %}
+      <div class="button-row">
+        {% for emirate in emirates %}
+          <a class="btn btn-primary" href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <a class="btn btn-primary" href="{% url 'locations:landing' %}">Back to the home page</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My listings — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Seller area</p>
+      <h1>My listings</h1>
+      <p class="muted">Drafts, items in review, and everything you have sold.</p>
+    </div>
+    {% if emirate %}
+      <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}">Sell an item</a>
+    {% endif %}
+  </div>
+
+  {% if listings %}
+    <div class="my-listings">
+      {% for listing in listings %}
+        <article class="panel my-listing">
+          <div class="my-listing-thumb">
+            {% with cover=listing.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy">
+              {% else %}
+                <span class="muted small">No photo</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+
+          <div class="my-listing-body">
+            <div class="my-listing-head">
+              <div>
+                <h2>
+                  {% if listing.is_public %}
+                    <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+                  {% else %}
+                    {{ listing.title }}
+                  {% endif %}
+                </h2>
+                <p class="muted small">
+                  {{ listing.category.name }} · {{ listing.service_area.name }}, {{ listing.emirate.name }}
+                </p>
+              </div>
+              <span class="status-pill status-{{ listing.status }}">{{ listing.get_status_display }}</span>
+            </div>
+
+            <p class="my-listing-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+
+            {% if listing.status == "rejected" and listing.moderation_note %}
+              <p class="form-alert small"><strong>Moderator note:</strong> {{ listing.moderation_note }}</p>
+            {% elif listing.status == "pending" %}
+              <p class="muted small">Waiting for a moderator. You can still edit it, which re-submits it.</p>
+            {% elif listing.status == "draft" %}
+              <p class="muted small">Not submitted yet. Submit it for review when you are ready.</p>
+            {% elif listing.status == "archived" %}
+              <p class="muted small">Archived listings are hidden from buyers.</p>
+            {% endif %}
+
+            <div class="my-listing-actions">
+              {% if listing.is_public %}
+                <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View</a>
+              {% endif %}
+
+              {% if listing.is_editable_by_owner %}
+                <a class="btn btn-quiet btn-small" href="{% url 'catalog:listing_edit' emirate_slug=listing.emirate.slug slug=listing.slug %}">Edit</a>
+              {% endif %}
+
+              {% if listing.status == "draft" or listing.status == "rejected" %}
+                <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="submit">
+                  <button class="btn btn-primary btn-small" type="submit">Submit for review</button>
+                </form>
+              {% endif %}
+
+              {% if listing.status == "approved" or listing.status == "reserved" %}
+                <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="sold">
+                  <button class="btn btn-quiet btn-small" type="submit">Mark as sold</button>
+                </form>
+              {% endif %}
+
+              {% if listing.status == "draft" or listing.status == "rejected" or listing.status == "approved" or listing.status == "reserved" %}
+                <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="archive">
+                  <button class="btn btn-quiet btn-small" type="submit">Archive</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h3>You have not listed anything yet</h3>
+      <p>Clear some space and turn unused furniture into cash.</p>
+      {% if emirate %}
+        <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}">Create your first listing</a>
+      {% else %}
+        <a class="btn btn-primary" href="{% url 'locations:landing' %}">Choose your emirate</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

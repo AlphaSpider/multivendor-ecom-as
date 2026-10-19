@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}My account — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">My account</p>
+      <h1>{{ member.short_name }}</h1>
+      <p class="muted">
+        {% if service_area %}{{ service_area.name }}, {{ member.emirate.name }}{% else %}No marketplace set{% endif %}
+        · {{ member.phone }}
+      </p>
+    </div>
+    <a class="btn btn-quiet" href="{% url 'accounts:profile' %}">Edit profile</a>
+  </div>
+
+  <div class="dashboard-grid">
+    <a class="dashboard-tile" href="{% if emirate %}{% url 'marketplace:home' emirate_slug=emirate.slug %}{% else %}{% url 'locations:landing' %}{% endif %}">
+      <span class="tile-eyebrow">Marketplace</span>
+      <strong>Browse listings</strong>
+      <span class="muted">See what is new in your emirate.</span>
+    </a>
+
+    <a class="dashboard-tile" href="{% url 'accounts:listings' %}">
+      <span class="tile-eyebrow">Selling</span>
+      <strong>My listings</strong>
+      <span class="muted">Drafts, reviews and items you have sold.</span>
+    </a>
+
+    <a class="dashboard-tile" href="{% url 'conversations:list' %}">
+      <span class="tile-eyebrow">Messages</span>
+      <strong>Conversations</strong>
+      <span class="muted">Chat with buyers and sellers.</span>
+    </a>
+
+    <a class="dashboard-tile" href="{% url 'deals:list' %}">
+      <span class="tile-eyebrow">Deals</span>
+      <strong>Offers and deals</strong>
+      <span class="muted">Track negotiations and accepted deals.</span>
+    </a>
+
+    <a class="dashboard-tile" href="{% url 'auctions:mine' %}">
+      <span class="tile-eyebrow">Auctions</span>
+      <strong>My auctions</strong>
+      <span class="muted">Bids you placed and items you are auctioning.</span>
+    </a>
+  </div>
+
+  <div class="panel">
+    <h2>Account status</h2>
+    <dl class="detail-list">
+      <div><dt>Mobile number</dt><dd>{{ member.phone }}{% if member.is_mobile_verified %} <span class="status-pill status-approved">Verified</span>{% endif %}</dd></div>
+      <div><dt>Email</dt><dd>{{ member.email|default:"Not provided" }}</dd></div>
+      <div><dt>Member since</dt><dd>{{ member.date_joined|date:"j F Y" }}</dd></div>
+    </dl>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit listing{% else %}Sell an item{% endif %} — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'accounts:listings' %}">My listings</a>
+    <span aria-hidden="true">/</span>
+    <span>{% if mode == "edit" %}Edit{% else %}New listing{% endif %}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">{{ emirate.name }}</p>
+      <h1>{% if mode == "edit" %}Edit your listing{% else %}Sell an item{% endif %}</h1>
+      <p class="muted">
+        Listings are reviewed before they go live. You will see the status in
+        <a href="{% url 'accounts:listings' %}">My listings</a>.
+      </p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.title %}
+      <div class="field-row">
+        {% include "partials/field.html" with field=form.category %}
+        {% include "partials/field.html" with field=form.condition %}
+      </div>
+      <div class="field-row">
+        {% include "partials/field.html" with field=form.asking_price %}
+        {% include "partials/field.html" with field=form.service_area %}
+      </div>
+      {% include "partials/field.html" with field=form.description %}
+      {% include "partials/field.html" with field=form.images %}
+
+      <div id="image-preview" class="image-preview" hidden></div>
+
+      {% if mode == "edit" and listing.images.all %}
+        <div class="existing-images">
+          <h2>Current photos</h2>
+          <p class="muted small">Choose the cover photo or remove a photo.</p>
+          <div class="existing-image-grid">
+            {% for image in listing.images.all %}
+              <figure class="existing-image{% if image.is_cover %} is-cover{% endif %}">
+                <img src="{{ image.image.url }}" alt="" loading="lazy">
+                {% if image.is_cover %}<figcaption>Cover photo</figcaption>{% endif %}
+                <div class="existing-image-actions">
+                  {% if not image.is_cover %}
+                    <form method="post" action="{% url 'catalog:listing_image_action' emirate_slug=emirate.slug image_id=image.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="cover">
+                      <button class="link-button" type="submit">Make cover</button>
+                    </form>
+                  {% endif %}
+                  <form method="post" action="{% url 'catalog:listing_image_action' emirate_slug=emirate.slug image_id=image.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete">
+                    <button class="link-button link-danger" type="submit">Remove</button>
+                  </form>
+                </div>
+              </figure>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">
+          {% if mode == "edit" %}Save and submit for review{% else %}Submit for review{% endif %}
+        </button>
+        <a class="btn btn-quiet" href="{% url 'accounts:listings' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel panel-muted">
+    <h2>Tips for a quick sale</h2>
+    <ul>
+      <li>Use daylight photos from a few angles, including any marks.</li>
+      <li>Give dimensions — buyers measure before they travel.</li>
+      <li>Be honest about condition; it builds trust and avoids disputes.</li>
+      <li>Set a realistic asking price. Negotiation happens in chat.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

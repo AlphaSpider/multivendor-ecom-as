@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Choose your area — ManzilCart{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<section class="container auth-layout">
+  <div class="auth-card">
+    <p class="eyebrow">Step 3 of 3 · {{ emirate.name }}</p>
+    <h1>Where is home?</h1>
+    <p class="muted">
+      Your area decides which listings you see first and which optional services are
+      available with a deal. You can change it later in your profile.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.display_name %}
+      {% include "partials/field.html" with field=form.service_area %}
+      {% include "partials/field.html" with field=form.email %}
+
+      <button class="btn btn-primary btn-block" type="submit">Create my account</button>
+    </form>
+
+    <p class="field-help">
+      Verified number: <strong>{{ masked_phone }}</strong>
+    </p>
+  </div>
+
+  <aside class="auth-aside">
+    <h2>Your marketplace</h2>
+    <p>
+      <strong>{{ emirate.name }}</strong> is selected. If you chose the wrong emirate,
+      go back to the home page and pick the right one before creating your account.
+    </p>
+    <a href="{% url 'locations:landing' %}">Change marketplace</a>
+  </aside>
+</section>
+{% endblock %}

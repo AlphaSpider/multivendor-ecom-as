@@ -1,0 +1,129 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ManzilCart — furniture marketplace{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Buy and sell new and refurbished furniture in Abu Dhabi and Ras Al Khaimah.{% endblock %}">
+  <meta name="theme-color" content="#0f5132">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{% url 'locations:landing' %}" aria-label="ManzilCart home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-text">Manzil<span>Cart</span></span>
+      </a>
+
+      {% if current_emirate %}
+        <div class="marketplace-chip">
+          <span class="chip-dot" aria-hidden="true"></span>
+          <span class="chip-name">{{ current_emirate.name }}</span>
+          {% if show_emirate_switcher %}
+            <form method="post" action="{% url 'locations:switch_marketplace' %}" class="switcher-form">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <label class="sr-only" for="emirate-switch">Switch emirate</label>
+              <select id="emirate-switch" name="emirate" data-autosubmit>
+                {% for emirate in active_emirates %}
+                  <option value="{{ emirate.slug }}"{% if emirate.slug == current_emirate.slug %} selected{% endif %}>{{ emirate.name }}</option>
+                {% endfor %}
+              </select>
+              <noscript><button class="btn btn-small btn-quiet" type="submit">Switch</button></noscript>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+        <span class="sr-only">Toggle navigation</span>
+        <span aria-hidden="true"></span>
+      </button>
+
+      <nav class="main-nav" id="primary-nav" aria-label="Primary">
+        {% if current_emirate %}
+          <a href="{% url 'marketplace:home' emirate_slug=current_emirate.slug %}">Browse</a>
+          <a href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}">Sell</a>
+          <a href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Auctions</a>
+        {% endif %}
+
+        {% if user.is_authenticated %}
+          <a href="{% url 'conversations:list' %}">Messages</a>
+          <a href="{% url 'deals:list' %}">Deals</a>
+          <a href="{% url 'accounts:dashboard' %}">My account</a>
+          <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
+            {% csrf_token %}
+            <button type="submit" class="link-button">Sign out</button>
+          </form>
+        {% else %}
+          <a href="{% url 'accounts:login' %}">Sign in</a>
+          {% if current_emirate %}
+            <a class="btn btn-small btn-primary" href="{% url 'accounts:start' %}">Join ManzilCart</a>
+          {% endif %}
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% if messages %}
+    <div class="container">
+      <div class="message-stack" role="status" aria-live="polite">
+        {% for message in messages %}
+          <div class="message message-{{ message.tags|default:'info' }}" data-dismissible>
+            <span>{{ message }}</span>
+            <button type="button" class="message-close" data-dismiss aria-label="Dismiss">&times;</button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <strong>ManzilCart</strong>
+        <p>New and refurbished furniture, from homes in the UAE to homes in the UAE.</p>
+      </div>
+      <div class="footer-links">
+        <span class="footer-heading">Marketplaces</span>
+        {% for emirate in active_emirates %}
+          <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+        {% empty %}
+          <span class="muted">No marketplaces are currently open.</span>
+        {% endfor %}
+      </div>
+      <div class="footer-links">
+        <span class="footer-heading">Account</span>
+        {% if user.is_authenticated %}
+          <a href="{% url 'accounts:dashboard' %}">My account</a>
+          <a href="{% url 'conversations:list' %}">Messages</a>
+          <a href="{% url 'deals:list' %}">Deals</a>
+          <a href="{% url 'auctions:mine' %}">My auctions</a>
+          <a href="{% url 'accounts:profile' %}">Profile</a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}">Sign in</a>
+          <a href="{% url 'accounts:start' %}">Create an account</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="container footer-legal">
+      <p>
+        Payments for furniture are arranged directly between buyer and seller.
+        ManzilCart does not process or hold the purchase price.
+      </p>
+      <p class="muted">© {% now "Y" %} ManzilCart. United Arab Emirates.</p>
+    </div>
+  </footer>
+
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

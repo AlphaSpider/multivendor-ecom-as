@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Page not found — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <div class="empty-state">
+    <p class="eyebrow">404</p>
+    <h1>We couldn’t find that page</h1>
+    <p>The link may be incomplete, or the item may no longer be listed.</p>
+    <a class="btn btn-primary" href="{% url 'locations:landing' %}">Go to the home page</a>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My auctions — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Your account</p>
+      <h1>My auctions</h1>
+      <p class="muted">Auctions you are selling in, bidding on, or have been offered.</p>
+    </div>
+    {% if current_emirate %}
+      <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+    <div class="deal-list">
+      {% for row in rows %}
+        <article class="panel deal-row auction-mine-row">
+          <div class="deal-thumb">
+            {% with cover=row.auction.listing.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy">
+              {% else %}
+                <span class="muted small">No photo</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+
+          <div class="deal-row-body">
+            <div class="deal-row-head">
+              <div>
+                <h2>
+                  <a href="{% url 'auction_marketplace:detail' emirate_slug=row.auction.emirate.slug pk=row.auction.pk %}">
+                    {{ row.auction.listing.title }}
+                  </a>
+                </h2>
+                <p class="muted small">
+                  {{ row.auction.reference }} · {{ row.auction.listing.service_area.name }}, {{ row.auction.emirate.name }}
+                  · {% if row.is_seller %}You are selling{% else %}You are bidding{% endif %}
+                </p>
+              </div>
+              <span class="status-pill status-auction-{{ row.auction.status }}">{{ row.auction.get_status_display }}</span>
+            </div>
+
+            <p class="deal-row-price">
+              {% if row.auction.top_bid %}
+                Highest bid: <strong>AED {{ row.auction.top_bid|floatformat:0|intcomma }}</strong>
+              {% else %}
+                No bids yet
+              {% endif %}
+              <span class="muted small">
+                · {% if row.auction.status == "live" %}Ends {{ row.auction.end_at|date:"j M Y, H:i" }}{% else %}{{ row.auction.end_at|date:"j M Y, H:i" }}{% endif %}
+              </span>
+            </p>
+
+            {% if row.pending_selection %}
+              <div class="auction-mine-callout">
+                <strong>You have been selected.</strong>
+                Confirm or decline your bid of AED {{ row.pending_selection.bid.amount|floatformat:0|intcomma }}
+                by {{ row.pending_selection.confirmation_deadline|date:"j M Y, H:i" }}.
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="deal-row-actions">
+            {% if row.pending_selection and row.selection_url %}
+              <a class="btn btn-primary btn-small" href="{{ row.selection_url }}">Confirm bid</a>
+            {% else %}
+              <a class="btn btn-quiet btn-small" href="{% url 'auction_marketplace:detail' emirate_slug=row.auction.emirate.slug pk=row.auction.pk %}">Open</a>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h3>No auctions yet</h3>
+      <p>Bid on an auction from the marketplace, or start one from one of your listings.</p>
+      {% if current_emirate %}
+        <a class="btn btn-primary" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

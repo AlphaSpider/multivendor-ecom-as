@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ deal.reference }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/deals.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'deals:list' %}">Deals</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ deal.reference }}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">{{ deal.get_status_display }}</p>
+      <h1>{{ deal.listing.title }}</h1>
+      <p class="muted">
+        {{ deal.reference }} · {{ deal.listing.service_area.name }}, {{ deal.emirate.name }}
+        · {% if is_buyer %}You are the buyer{% else %}You are the seller{% endif %}
+      </p>
+    </div>
+    <span class="status-pill status-{{ deal.status }}">{{ deal.get_status_display }}</span>
+  </div>
+
+  {% if deal.status == "cancelled" %}
+    <div class="form-alert" role="status">
+      <p><strong>This deal was cancelled.</strong> The full offer and cancellation history is kept below.</p>
+    </div>
+  {% endif %}
+
+  <div class="deal-layout">
+    <div class="deal-main">
+      <section class="panel">
+        <h2>Price</h2>
+        <p class="deal-agreed-price">
+          {% if deal.agreed_price %}
+            Agreed at <strong>AED {{ deal.agreed_price|floatformat:0|intcomma }}</strong>
+          {% else %}
+            Asking price <strong>AED {{ deal.listing.asking_price|floatformat:0|intcomma }}</strong>
+          {% endif %}
+        </p>
+        <p class="muted small">
+          Payment is made directly between buyer and seller. ManzilCart does not hold or
+          process the purchase price.
+        </p>
+
+        <h2>Offer history</h2>
+        <ol class="offer-history">
+          {% for offer in offers %}
+            <li class="offer-row{% if offer.status == 'pending' %} is-pending{% endif %}">
+              <div>
+                <strong>AED {{ offer.amount|floatformat:0|intcomma }}</strong>
+                <span class="muted small">
+                  by {% if offer.sender_id == user.pk %}you{% else %}{{ offer.sender.display_name|default:"the other party" }}{% endif %}
+                  · {{ offer.created_at|date:"j M Y H:i" }}
+                </span>
+                {% if offer.note %}<p class="muted small">{{ offer.note }}</p>{% endif %}
+              </div>
+              <span class="status-pill status-offer-{{ offer.status }}">{{ offer.get_status_display }}</span>
+            </li>
+          {% empty %}
+            <li class="muted">No offers recorded.</li>
+          {% endfor %}
+        </ol>
+
+        {% if can_respond_to_offer %}
+          <div class="deal-response">
+            <h3>Respond to the current offer</h3>
+            <div class="deal-inline-forms">
+              <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="accept">
+                <button class="btn btn-primary" type="submit">Accept offer</button>
+              </form>
+              <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <button class="btn btn-quiet" type="submit">Reject</button>
+              </form>
+            </div>
+
+            <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="counter">
+              <div class="field">
+                <label class="field-label" for="counter-amount">Counter with (AED)</label>
+                <input class="input" id="counter-amount" type="number" name="amount" min="1" step="1" required>
+              </div>
+              <div class="field">
+                <label class="field-label" for="counter-note">Note (optional)</label>
+                <input class="input" id="counter-note" type="text" name="note" maxlength="280">
+              </div>
+              <button class="btn btn-quiet" type="submit">Send counteroffer</button>
+            </form>
+          </div>
+        {% elif pending_offer and pending_offer.sender_id == user.pk %}
+          <p class="muted small">Your offer is waiting for the other party to respond.</p>
+        {% elif can_offer %}
+          <div class="deal-response">
+            <h3>Make an offer</h3>
+            <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="offer">
+              <div class="field">
+                <label class="field-label" for="offer-amount">Amount (AED)</label>
+                <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" required>
+              </div>
+              <div class="field">
+                <label class="field-label" for="offer-note">Note (optional)</label>
+                <input class="input" id="offer-note" type="text" name="note" maxlength="280">
+              </div>
+              <button class="btn btn-primary" type="submit">Send offer</button>
+            </form>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Optional services</h2>
+        <p class="muted small">
+          ManzilCart records your choices and asks the operations team to contact both
+          parties. Services are coordinated and paid offline — there is no automatic
+          booking, tracking or fee calculation here.
+        </p>
+
+        {% if can_select_services %}
+          <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="services">
+            {% for option in available_services %}
+              <label class="service-choice">
+                <input type="checkbox" name="services" value="{{ option.pk }}"{% if option.pk in selected_service_ids %} checked{% endif %}>
+                <span>
+                  <strong>{{ option.name }}</strong>
+                  {% if option.description %}<span class="muted small">{{ option.description }}</span>{% endif %}
+                </span>
+              </label>
+            {% empty %}
+              <p class="muted small">No optional services are offered in this area.</p>
+            {% endfor %}
+            <button class="btn btn-quiet btn-small" type="submit">Save service selections</button>
+          </form>
+        {% else %}
+          {% if deal.service_selections.all %}
+            <ul class="plain-list">
+              {% for selection in deal.service_selections.all %}
+                <li>{{ selection.service_option.name }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted small">No optional services selected.</p>
+          {% endif %}
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Cancellation</h2>
+
+        {% if open_cancellation %}
+          <p>
+            <strong>{{ open_cancellation.get_status_display }}</strong>
+            — requested by
+            {% if open_cancellation.requested_by_id == user.pk %}you{% else %}{{ open_cancellation.requested_by.display_name|default:"the other party" }}{% endif %}
+            on {{ open_cancellation.created_at|date:"j M Y H:i" }}.
+          </p>
+          <p class="muted">{{ open_cancellation.reason }}</p>
+
+          {% if can_respond_to_cancellation %}
+            <div class="deal-inline-forms">
+              <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="respond_cancellation">
+                <input type="hidden" name="cancellation_id" value="{{ open_cancellation.pk }}">
+                <input type="hidden" name="decision" value="accept">
+                <button class="btn btn-primary" type="submit">Accept cancellation</button>
+              </form>
+              <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="respond_cancellation">
+                <input type="hidden" name="cancellation_id" value="{{ open_cancellation.pk }}">
+                <input type="hidden" name="decision" value="reject">
+                <button class="btn btn-quiet" type="submit">Reject cancellation</button>
+              </form>
+            </div>
+          {% endif %}
+
+          {% if can_escalate %}
+            <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="escalate">
+              <input type="hidden" name="cancellation_id" value="{{ open_cancellation.pk }}">
+              <div class="field">
+                <label class="field-label" for="escalate-note">Why should operations step in?</label>
+                <textarea class="input" id="escalate-note" name="note" rows="2"></textarea>
+              </div>
+              <button class="btn btn-quiet btn-small" type="submit">Escalate to operations</button>
+            </form>
+          {% endif %}
+
+        {% elif latest_cancellation and latest_cancellation.status == "rejected" %}
+          <p><strong>Cancellation declined.</strong></p>
+          <p class="muted">{{ latest_cancellation.response_note|default:"The other party declined the request." }}</p>
+          {% if can_escalate %}
+            <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="escalate">
+              <input type="hidden" name="cancellation_id" value="{{ latest_cancellation.pk }}">
+              <div class="field">
+                <label class="field-label" for="escalate-note">Why should operations step in?</label>
+                <textarea class="input" id="escalate-note" name="note" rows="2"></textarea>
+              </div>
+              <button class="btn btn-quiet btn-small" type="submit">Escalate to operations</button>
+            </form>
+          {% endif %}
+        {% elif can_request_cancellation %}
+          <p class="muted small">
+            A cancellation request does not cancel the deal immediately. The other party
+            must respond, and unresolved disputes can be escalated to operations.
+          </p>
+          <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="request_cancellation">
+            <div class="field">
+              <label class="field-label" for="cancel-reason">Reason</label>
+              <textarea class="input" id="cancel-reason" name="reason" rows="3" required></textarea>
+            </div>
+            <button class="btn btn-quiet" type="submit">Request cancellation</button>
+          </form>
+        {% else %}
+          <p class="muted small">Cancellation is available after the deal is accepted.</p>
+        {% endif %}
+
+        {% if can_finalize %}
+          <div class="deal-staff-panel">
+            <h3>Operations decision</h3>
+            <form class="deal-form" method="post" action="{% url 'deals:action' pk=deal.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="finalize">
+              <div class="field">
+                <label class="field-label" for="finalize-note">Internal note</label>
+                <textarea class="input" id="finalize-note" name="note" rows="2"></textarea>
+              </div>
+              <button class="btn btn-primary" type="submit">Finalise cancellation</button>
+            </form>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>History</h2>
+        <ol class="deal-events">
+          {% for event in events %}
+            <li>
+              <span class="deal-event-date">{{ event.created_at|date:"j M Y H:i" }}</span>
+              <strong>{{ event.get_event_type_display }}</strong>
+              {% if event.summary %}<span class="muted">— {{ event.summary }}</span>{% endif %}
+            </li>
+          {% empty %}
+            <li class="muted">No history yet.</li>
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+
+    <aside class="panel deal-sidebar">
+      <h2>Listing</h2>
+      {% with cover=deal.listing.cover_image %}
+        {% if cover %}
+          <img class="deal-sidebar-image" src="{{ cover.image.url }}" alt="" loading="lazy">
+        {% endif %}
+      {% endwith %}
+      <p class="muted small">{{ deal.listing.category.name }} · {{ deal.listing.get_condition_display }}</p>
+      {% if deal.listing.is_public %}
+        <a class="btn btn-quiet btn-small" href="{{ deal.listing.get_absolute_url }}">View listing</a>
+      {% endif %}
+
+      <h2>People</h2>
+      <dl class="detail-list">
+        <div><dt>Buyer</dt><dd>{{ deal.buyer.display_name|default:"ManzilCart member" }}</dd></div>
+        <div><dt>Seller</dt><dd>{{ deal.seller.display_name|default:"ManzilCart member" }}</dd></div>
+        <div><dt>Marketplace</dt><dd>{{ deal.emirate.name }}</dd></div>
+        <div><dt>Area</dt><dd>{{ deal.listing.service_area.name }}</dd></div>
+      </dl>
+
+      <p class="safety-note">
+        <strong>Stay safe.</strong> View the furniture before paying. ManzilCart does not
+        hold or guarantee the purchase price.
+      </p>
+    </aside>
+  </div>
+</section>
+{% endblock %}

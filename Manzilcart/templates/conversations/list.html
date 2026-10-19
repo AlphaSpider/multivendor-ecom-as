@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Messages — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Your account</p>
+      <h1>Messages</h1>
+      <p class="muted">Conversations with buyers and sellers, newest first.</p>
+    </div>
+  </div>
+
+  {% if conversations %}
+    <ul class="conversation-list">
+      {% for conversation in conversations %}
+        <li class="panel conversation-row">
+          <div class="conversation-thumb">
+            {% with cover=conversation.listing.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy">
+              {% else %}
+                <span class="muted small">No photo</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+
+          <div class="conversation-body">
+            <div class="conversation-head">
+              <a href="{% url 'conversations:detail' pk=conversation.pk %}">
+                {{ conversation.listing.title }}
+              </a>
+              {% if conversation.unread_count %}
+                <span class="badge">{{ conversation.unread_count }} new</span>
+              {% endif %}
+            </div>
+            <p class="muted small">
+              With
+              {% if conversation.buyer_id == user.pk %}
+                {{ conversation.seller.display_name|default:"the seller" }}
+              {% else %}
+                {{ conversation.buyer.display_name|default:"a buyer" }}
+              {% endif %}
+              · {{ conversation.listing.service_area.name }}, {{ conversation.listing.emirate.name }}
+            </p>
+            <p class="muted small">
+              {% if conversation.last_message_at %}
+                Last message {{ conversation.last_message_at|naturaltime }}
+              {% else %}
+                No messages yet
+              {% endif %}
+            </p>
+          </div>
+
+          <div class="conversation-actions">
+            <a class="btn btn-quiet btn-small" href="{% url 'conversations:detail' pk=conversation.pk %}">Open</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty-state">
+      <h3>No conversations yet</h3>
+      <p>When you message a seller — or a buyer messages you — the thread appears here.</p>
+      {% if current_emirate %}
+        <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}">Browse furniture</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

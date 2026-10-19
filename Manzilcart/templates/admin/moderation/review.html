@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='catalog' %}">Catalog</a>
+  &rsaquo; <a href="{% url 'admin:catalog_listing_changelist' %}">Listings</a>
+  &rsaquo; Review
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Review listing: {{ listing.title }}</h1>
+
+<div class="module" style="padding:1rem;margin-bottom:1rem">
+  <p>
+    <strong>Seller:</strong> {{ listing.seller.display_name|default:"(no name)" }}
+    · {{ listing.seller.phone }}
+    {% if listing.seller.email %}({{ listing.seller.email }}){% endif %}
+    <br>
+    <strong>Location:</strong> {{ listing.service_area.name }}, {{ listing.emirate.name }}
+    <br>
+    <strong>Category / condition:</strong> {{ listing.category.name }} · {{ listing.get_condition_display }}
+    <br>
+    <strong>Price:</strong> AED {{ listing.asking_price|floatformat:2|intcomma }}
+    <br>
+    <strong>Current status:</strong> {{ listing.get_status_display }}
+    {% if listing.submitted_at %}· submitted {{ listing.submitted_at|date:"j M Y H:i" }}{% endif %}
+    {% if listing.moderation_note %}<br><strong>Previous note:</strong> {{ listing.moderation_note }}{% endif %}
+  </p>
+  <p><strong>Description</strong></p>
+  <div>{{ listing.description|linebreaks }}</div>
+</div>
+
+{% if listing.images.all %}
+  <div class="module" style="padding:1rem;margin-bottom:1rem">
+    <h2>Photos</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      {% for image in listing.images.all %}
+        <a href="{{ image.image.url }}" target="_blank">
+          <img src="{{ image.image.url }}" alt="" style="height:150px;border-radius:8px">
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+{% else %}
+  <p><strong>This listing has no photos.</strong> Consider rejecting it for that reason.</p>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <div class="module" style="padding:1rem;margin-bottom:1rem">
+    <h2>Decision</h2>
+    {{ form.as_p }}
+  </div>
+  <div class="submit-row">
+    <input type="submit" class="default" value="Save decision">
+    <a href="{% url 'admin:catalog_listing_changelist' %}" class="button cancel-link">Back to the queue</a>
+  </div>
+</form>
+
+{% if reviews %}
+  <div class="module" style="padding:1rem;margin-top:1rem">
+    <h2>Review history</h2>
+    <ul>
+      {% for review in reviews %}
+        <li>
+          {{ review.created_at|date:"j M Y H:i" }} —
+          {{ review.get_decision_display }} by {{ review.reviewer|default:"staff" }}
+          {% if review.reason %}<br><em>{{ review.reason }}</em>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% endblock %}

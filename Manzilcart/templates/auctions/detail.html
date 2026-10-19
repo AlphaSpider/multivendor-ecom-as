@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ auction.reference }} — {{ listing.title }} auction — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'auction_marketplace:list' emirate_slug=emirate.slug %}">Auctions</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ auction.reference }}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction · {{ auction.reference }}</p>
+      <h1>{{ listing.title }}</h1>
+      <p class="muted">
+        {{ listing.category.name }} · {{ listing.service_area.name }}, {{ emirate.name }}
+        {% if is_seller %} · You are the seller{% endif %}
+      </p>
+    </div>
+    <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
+  </div>
+
+  {% if auction.status == "scheduled" %}
+    <div class="form-alert" role="status">
+      <p><strong>Bidding has not opened yet.</strong> It starts on {{ auction.start_at|date:"j M Y, H:i" }} and closes on {{ auction.end_at|date:"j M Y, H:i" }}.</p>
+    </div>
+  {% elif auction.status == "live" %}
+    <div class="form-alert" role="status">
+      <p>
+        <strong>Bidding is open.</strong>
+        {% if now < auction.end_at %}
+          It closes on {{ auction.end_at|date:"j M Y, H:i" }}.
+        {% else %}
+          The scheduled end has passed. The seller did not lock a bid in time, so this auction will close unsold.
+        {% endif %}
+      </p>
+    </div>
+  {% elif auction.status == "locked" %}
+    <div class="form-alert" role="status">
+      <p>
+        <strong>Bidding is frozen.</strong>
+        The seller locked a bid and the selected bidder has until
+        {{ auction.confirmation_deadline|date:"j M Y, H:i" }} to confirm or decline.
+      </p>
+    </div>
+  {% elif auction.status == "awarded" %}
+    <div class="form-alert" role="status">
+      <p>
+        <strong>Auction awarded.</strong>
+        The winning bidder confirmed at AED {{ auction.awarded_deal.agreed_price|floatformat:0|intcomma }}.
+        {% if auction.awarded_deal %}
+          {% if is_seller or is_staff_viewer or auction.awarded_deal.buyer_id == user.pk or auction.awarded_deal.seller_id == user.pk %}
+            <a href="{% url 'deals:detail' pk=auction.awarded_deal.pk %}">Open the accepted deal</a>.
+          {% endif %}
+        {% endif %}
+      </p>
+    </div>
+  {% elif auction.status == "unsold" %}
+    <div class="form-alert" role="status">
+      <p><strong>Auction closed unsold.</strong> {{ auction.outcome_note|default:"No eligible bidder confirmed the auction." }}</p>
+    </div>
+  {% elif auction.status == "cancelled" %}
+    <div class="form-alert" role="status">
+      <p><strong>Auction cancelled.</strong> {{ auction.outcome_note|default:"This auction is no longer running." }}</p>
+    </div>
+  {% endif %}
+
+  <div class="auction-layout">
+    <div class="auction-main">
+      <section class="panel">
+        <h2>Bidding</h2>
+        {% if top_bid %}
+          <p class="auction-price-large">
+            <strong>AED {{ top_bid.amount|floatformat:0|intcomma }}</strong>
+            <span class="muted small">current highest bid</span>
+          </p>
+        {% else %}
+          <p class="auction-price-large"><strong>No bids yet</strong></p>
+        {% endif %}
+
+        {% if auction.reserve_price %}
+          <p class="muted small">
+            {% if is_seller or is_staff_viewer %}
+              Reserve price: AED {{ auction.reserve_price|floatformat:0|intcomma }}.
+            {% else %}
+              A reserve price applies to this auction.
+            {% endif %}
+            {% if top_bid and not reserve_met %}The reserve has not been met yet.{% endif %}
+          </p>
+        {% endif %}
+
+        <p class="muted small">
+          The next valid bid must be at least
+          <strong>AED {{ minimum_bid|floatformat:0|intcomma }}</strong>.
+          Ties are decided in favour of the earliest bid.
+        </p>
+
+        {% if can_bid %}
+          <form class="auction-bid-form" method="post" action="{% url 'auction_marketplace:bid' emirate_slug=emirate.slug pk=auction.pk %}">
+            {% csrf_token %}
+            {{ bid_form.client_bid_id }}
+            <div class="auction-bid-row">
+              <div class="field">
+                <label class="field-label" for="{{ bid_form.amount.id_for_label }}">Your bid (AED)</label>
+                <input class="input" type="number" name="amount" id="{{ bid_form.amount.id_for_label }}" min="{{ minimum_bid }}" step="1" inputmode="decimal" required>
+              </div>
+              <button class="btn btn-primary" type="submit">Place bid</button>
+            </div>
+            <p class="muted small">
+              Your name is not shown to other bidders. A bid is a commitment to buy at
+              that price if the seller locks it and you confirm.
+            </p>
+          </form>
+        {% elif auction.status == "live" %}
+          {% if not user.is_authenticated %}
+            <a class="btn btn-primary" href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Sign in to bid</a>
+            <p class="muted small">Only verified members can bid.</p>
+          {% elif is_seller %}
+            <p class="muted small">You cannot bid on your own auction. Lock the highest eligible bid below when you are ready.</p>
+          {% elif not user.is_mobile_verified %}
+            <a class="btn btn-quiet" href="{% url 'accounts:profile' %}">Verify your mobile number to bid</a>
+          {% elif viewer_bid_count >= bid_limit %}
+            <p class="muted small">You have reached the bid limit for this auction.</p>
+          {% else %}
+            <p class="muted small">Bidding is not available for your account right now.</p>
+          {% endif %}
+        {% else %}
+          <p class="muted small">Bidding is closed for this auction.</p>
+        {% endif %}
+
+        {% if can_lock %}
+          <div class="auction-lock-panel">
+            <h3>Lock the highest eligible bid</h3>
+            <p class="muted small">
+              Locking freezes bidding immediately. The bidder is asked to confirm within
+              the confirmation window. If they decline or do not respond, the auction is
+              offered to the next highest eligible bidder. Bidding is never reopened.
+            </p>
+            <p>
+              Highest eligible bid:
+              <strong>AED {{ highest_eligible.amount|floatformat:0|intcomma }}</strong>
+              from {{ highest_eligible.bidder.display_name|default:"a bidder" }}.
+            </p>
+            <form method="post" action="{% url 'auction_marketplace:lock' emirate_slug=emirate.slug pk=auction.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="bid_id" value="{{ highest_eligible.pk }}">
+              <button class="btn btn-primary" type="submit">Lock this bid</button>
+            </form>
+          </div>
+        {% elif is_seller and auction.status == "live" %}
+          <p class="muted small">There is no eligible bid to lock yet. Bids below the reserve price cannot be selected.</p>
+        {% endif %}
+
+        {% if can_cancel %}
+          <form class="auction-cancel-form" method="post" action="{% url 'auction_marketplace:cancel' emirate_slug=emirate.slug pk=auction.pk %}">
+            {% csrf_token %}
+            <label class="field-label" for="cancel-reason">Cancel this auction (optional reason)</label>
+            <div class="auction-bid-row">
+              <input class="input" id="cancel-reason" type="text" name="reason" maxlength="255">
+              <button class="btn btn-quiet" type="submit">Cancel auction</button>
+            </div>
+          </form>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Bid history</h2>
+        {% if bids %}
+          <div class="auction-table-wrap">
+            <table class="auction-bid-table">
+              <thead>
+                <tr>
+                  <th scope="col">Bid</th>
+                  <th scope="col">Bidder</th>
+                  <th scope="col">Placed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for bid in bids %}
+                  <tr>
+                    <td>
+                      AED {{ bid.amount|floatformat:0|intcomma }}
+                      {% if forloop.first %}<span class="badge">Highest</span>{% endif %}
+                    </td>
+                    <td>{{ bid.viewer_name }}</td>
+                    <td class="muted small">{{ bid.created_at|date:"j M Y, H:i" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="muted small">
+            Bid amounts are public. Bidder identities are hidden from other bidders.
+            The seller sees who bid.
+          </p>
+        {% else %}
+          <p class="muted">No bids have been placed.</p>
+        {% endif %}
+      </section>
+
+      {% if selections %}
+        <section class="panel">
+          <h2>Confirmation rounds</h2>
+          <ol class="auction-rounds">
+            {% for selection in selections %}
+              <li>
+                <span class="auction-round-number">#{{ selection.sequence }}</span>
+                <span>
+                  <strong>
+                    {% if is_seller or is_staff_viewer %}
+                      {{ selection.bidder.display_name|default:"Member" }}
+                    {% else %}
+                      You
+                    {% endif %}
+                  </strong>
+                  at AED {{ selection.bid.amount|floatformat:0|intcomma }}
+                  <span class="status-pill status-selection-{{ selection.status }}">{{ selection.get_status_display }}</span>
+                </span>
+                <span class="muted small">
+                  Deadline {{ selection.confirmation_deadline|date:"j M Y, H:i" }}
+                  {% if selection.responded_at %} · answered {{ selection.responded_at|date:"j M Y, H:i" }}{% endif %}
+                </span>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+      {% endif %}
+
+      {% if is_seller or is_staff_viewer %}
+        <section class="panel">
+          <h2>Auction history</h2>
+          <ol class="auction-events">
+            {% for event in events %}
+              <li>
+                <span class="auction-event-date">{{ event.created_at|date:"j M Y, H:i" }}</span>
+                <strong>{{ event.get_event_type_display }}</strong>
+                {% if event.summary %}<span class="muted">— {{ event.summary }}</span>{% endif %}
+              </li>
+            {% empty %}
+              <li class="muted">No history yet.</li>
+            {% endfor %}
+          </ol>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="panel auction-sidebar">
+      {% with cover=listing.cover_image %}
+        {% if cover %}
+          <img class="auction-sidebar-image" src="{{ cover.image.url }}" alt="" loading="lazy">
+        {% endif %}
+      {% endwith %}
+      <h2>{{ listing.title }}</h2>
+      <p class="muted small">{{ listing.get_condition_display }}</p>
+      {% if listing.is_public %}
+        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View the listing</a>
+      {% endif %}
+
+      <h2>Auction</h2>
+      <dl class="detail-list">
+        <div><dt>Status</dt><dd>{{ auction.get_status_display }}</dd></div>
+        <div><dt>Starts</dt><dd>{{ auction.start_at|date:"j M Y, H:i" }}</dd></div>
+        <div><dt>Ends</dt><dd>{{ auction.end_at|date:"j M Y, H:i" }}</dd></div>
+        {% if auction.reserve_price and is_seller or auction.reserve_price and is_staff_viewer %}
+          <div><dt>Reserve</dt><dd>AED {{ auction.reserve_price|floatformat:0|intcomma }}</dd></div>
+        {% endif %}
+        <div><dt>Seller</dt><dd>{{ auction.seller.display_name|default:"ManzilCart member" }}</dd></div>
+        <div><dt>Area</dt><dd>{{ listing.service_area.name }}</dd></div>
+      </dl>
+
+      {% if viewer_selection and selection_url %}
+        <div class="auction-selection-callout">
+          <h2>Your confirmation</h2>
+          <p>{{ viewer_selection.get_status_display }}.</p>
+          <a class="btn btn-primary btn-small" href="{{ selection_url }}">
+            {% if viewer_selection.status == "pending" %}Confirm or decline{% else %}View your response{% endif %}
+          </a>
+        </div>
+      {% endif %}
+
+      {% if pending_selection and is_seller or pending_selection and is_staff_viewer %}
+        <div class="auction-selection-callout">
+          <h2>Waiting for confirmation</h2>
+          <p class="muted small">
+            {{ pending_selection.bidder.display_name|default:"The selected bidder" }}
+            has until {{ pending_selection.confirmation_deadline|date:"j M Y, H:i" }}.
+          </p>
+        </div>
+      {% endif %}
+
+      <p class="safety-note">
+        <strong>Stay safe.</strong> View the furniture before paying. ManzilCart does not
+        process or hold the purchase price — payment is agreed directly with the seller.
+      </p>
+    </aside>
+  </div>
+</section>
+{% endblock %}

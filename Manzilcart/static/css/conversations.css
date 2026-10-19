@@ -1,0 +1,244 @@
+
+/* ==========================================================================
+   My listings and conversations
+   ========================================================================== */
+
+.my-listings,
+.conversation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.my-listing {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  align-items: flex-start;
+}
+
+.my-listing-thumb,
+.conversation-thumb {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--sand);
+  display: grid;
+  place-items: center;
+}
+
+.my-listing-thumb img,
+.conversation-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-listing-body,
+.conversation-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.my-listing-head,
+.conversation-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.my-listing-head h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.15rem;
+}
+
+.my-listing-price {
+  font-weight: 700;
+  margin: 0.35rem 0;
+}
+
+.my-listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.my-listing-actions form {
+  margin: 0;
+}
+
+.conversation-row {
+  display: flex;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  align-items: center;
+}
+
+.conversation-head a {
+  font-weight: 700;
+}
+
+.conversation-actions {
+  flex: 0 0 auto;
+}
+
+/* -- chat ---------------------------------------------------------------- */
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.chat-context {
+  padding: 1rem;
+}
+
+.chat-listing {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.chat-listing img {
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.chat-listing h1 {
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.chat-panel {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 560px;
+  height: min(75vh, 720px);
+  overflow: hidden;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-header h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.chat-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.chat-status[data-state="open"] { color: var(--brand); }
+.chat-status[data-state="reconnecting"],
+.chat-status[data-state="connecting"] { color: #8a6a1f; }
+
+.chat-history-link {
+  padding: 0.6rem 1rem 0;
+  text-align: center;
+}
+
+.chat-log {
+  list-style: none;
+  margin: 0;
+  padding: 1rem;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.chat-log:focus { outline: none; }
+
+.chat-bubble {
+  max-width: min(78%, 560px);
+  padding: 0.55rem 0.75rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-bubble.is-mine {
+  align-self: flex-end;
+  background: var(--brand-soft);
+  border-color: #cfe1d5;
+}
+
+.chat-bubble.is-theirs {
+  align-self: flex-start;
+}
+
+.chat-author {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.chat-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-time {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  text-align: right;
+}
+
+.chat-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.chat-form .input {
+  flex: 1 1 auto;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 160px;
+}
+
+.chat-hint {
+  padding: 0 1rem 0.75rem;
+  margin: 0;
+  background: var(--surface);
+}
+
+@media (max-width: 760px) {
+  .chat-layout { grid-template-columns: 1fr; }
+  .chat-panel { height: 70vh; min-height: 460px; }
+  .my-listing, .conversation-row { flex-wrap: wrap; }
+  .my-listing-thumb, .conversation-thumb { width: 72px; height: 72px; flex-basis: 72px; }
+}

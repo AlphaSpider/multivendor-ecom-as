@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in or join — ManzilCart{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<section class="container auth-layout">
+  <div class="auth-card">
+    <p class="eyebrow">{% if emirate %}{{ emirate.name }} marketplace{% else %}ManzilCart{% endif %}</p>
+    <h1>Enter with your mobile number</h1>
+    <p class="muted">
+      We send a one-time code on WhatsApp. New here? Verifying your number creates your
+      account — there is no password to remember.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.phone %}
+
+      <button class="btn btn-primary btn-block" type="submit">Send my code</button>
+    </form>
+
+    <p class="auth-footnote">
+      By continuing you agree to use ManzilCart respectfully. Payments are arranged
+      directly between buyer and seller.
+    </p>
+  </div>
+
+  <aside class="auth-aside" aria-label="How it works">
+    <h2>How ManzilCart works</h2>
+    <ol class="step-list">
+      <li><strong>Verify your mobile.</strong> A one-time code on WhatsApp keeps the marketplace human.</li>
+      <li><strong>Choose your area.</strong> Your marketplace is your own emirate.</li>
+      <li><strong>Buy or sell.</strong> Message, negotiate and agree a deal directly.</li>
+    </ol>
+  </aside>
+</section>
+{% endblock %}

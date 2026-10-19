@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ selected_category.name|default:"Furniture" }} in {{ emirate.name }} — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <span>{% if selected_category %}{{ selected_category.name }}{% else %}All furniture{% endif %}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">{{ emirate.name }} marketplace</p>
+      <h1>{% if selected_category %}{{ selected_category.name }}{% else %}All furniture{% endif %}</h1>
+      <p class="muted">
+        {{ total_results }} item{{ total_results|pluralize }} available
+        {% if query %}for “{{ query }}”{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="browse-layout">
+    <aside class="filter-panel" aria-label="Filters">
+      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">
+        <div class="field">
+          <label class="field-label" for="filter-q">Search</label>
+          <input class="input" id="filter-q" type="search" name="q" value="{{ request.GET.q }}" placeholder="Sofas, desks, beds…">
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="filter-category">Category</label>
+          <select class="input" id="filter-category" name="category">
+            <option value="">All categories</option>
+            {% for category in categories %}
+              <option value="{{ category.slug }}"{% if selected_category and selected_category.id == category.id %} selected{% endif %}>{{ category.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="filter-condition">Condition</label>
+          <select class="input" id="filter-condition" name="condition">
+            <option value="">Any condition</option>
+            {% for value, label in conditions %}
+              <option value="{{ value }}"{% if request.GET.condition == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field field-split">
+          <div>
+            <label class="field-label" for="filter-min">Min AED</label>
+            <input class="input" id="filter-min" type="number" min="0" step="1" name="min_price" value="{{ request.GET.min_price }}">
+          </div>
+          <div>
+            <label class="field-label" for="filter-max">Max AED</label>
+            <input class="input" id="filter-max" type="number" min="0" step="1" name="max_price" value="{{ request.GET.max_price }}">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="filter-sort">Sort</label>
+          <select class="input" id="filter-sort" name="sort">
+            {% for value, label in sort_choices %}
+              <option value="{{ value }}"{% if request.GET.sort == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary btn-small" type="submit">Apply filters</button>
+          <a class="btn btn-quiet btn-small" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Reset</a>
+        </div>
+      </form>
+    </aside>
+
+    <div class="browse-results">
+      {% if listings %}
+        <div class="listing-grid">
+          {% for listing in listings %}
+            {% include "partials/listing_card.html" with listing=listing %}
+          {% endfor %}
+        </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+          <nav class="pagination" aria-label="Pagination">
+            {% if page_obj.has_previous %}
+              <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}">Previous</a>
+            {% endif %}
+            <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+              <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}">Next</a>
+            {% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <h3>Nothing matches those filters</h3>
+          <p>Try widening your price range or choosing another category.</p>
+          <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Clear filters</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

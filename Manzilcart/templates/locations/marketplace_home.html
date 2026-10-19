@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ emirate.name }} furniture marketplace — ManzilCart{% endblock %}
+{% block meta_description %}Browse new and refurbished furniture for sale in {{ emirate.name }}.{% endblock %}
+
+{% block content %}
+<section class="hero hero-market">
+  <div class="container hero-inner">
+    <p class="eyebrow">Marketplace · {{ emirate.name }}</p>
+    <h1>Furniture looking for<br>its next home.</h1>
+    <p class="hero-lede">
+      New and refurbished pieces from sellers across {{ emirate.name }}.
+      Every listing is reviewed before it goes live.
+    </p>
+
+    <form class="search-bar" method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" role="search">
+      <label class="sr-only" for="market-search">Search furniture</label>
+      <input id="market-search" type="search" name="q" placeholder="Search sofas, desks, beds…" autocomplete="off">
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+  </div>
+</section>
+
+<section class="container section">
+  <div class="section-heading section-heading-row">
+    <div>
+      <h2>Browse by category</h2>
+      <p class="muted">Find the piece that finishes the room.</p>
+    </div>
+    <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">All listings</a>
+  </div>
+
+  {% if categories %}
+    <div class="category-grid">
+      {% for category in categories %}
+        <a class="category-card" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ category.slug }}">
+          <span class="category-name">{{ category.name }}</span>
+          <span class="category-count">{{ category.listing_count|default:0 }} listing{{ category.listing_count|default:0|pluralize }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state compact">
+      <p>Categories are being set up.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section class="container section">
+  <div class="section-heading section-heading-row">
+    <div>
+      <h2>Fresh in {{ emirate.name }}</h2>
+      <p class="muted">The newest approved listings.</p>
+    </div>
+  </div>
+
+  {% if featured_listings %}
+    <div class="listing-grid">
+      {% for listing in featured_listings %}
+        {% include "partials/listing_card.html" with listing=listing %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h3>No listings yet</h3>
+      <p>Be the first to list a piece of furniture in {{ emirate.name }}.</p>
+      {% if user.is_authenticated %}
+        <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}">Sell an item</a>
+      {% else %}
+        <a class="btn btn-primary" href="{% url 'accounts:start' %}">Join to sell</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+
+<section class="container section">
+  <div class="section-heading section-heading-row">
+    <div>
+      <h2>Selling in {{ emirate.name }}</h2>
+      <p class="muted">We operate in {{ service_areas|length }} neighbourhoods here.</p>
+    </div>
+    <a class="btn btn-primary" href="{% if user.is_authenticated %}{% url 'catalog:listing_create' emirate_slug=emirate.slug %}{% else %}{% url 'accounts:start' %}{% endif %}">
+      List an item
+    </a>
+  </div>
+  <ul class="area-list">
+    {% for area in service_areas %}
+      <li>{{ area.name }}</li>
+    {% empty %}
+      <li class="muted">No neighbourhoods are currently active.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

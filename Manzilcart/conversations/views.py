@@ -1,0 +1,132 @@
+"""HTTP views for conversations.
+
+The WebSocket consumer handles live delivery; these views own the page, the message
+history pagination, thread creation, and a no-JavaScript send fallback. Every view is
+login-only and every conversation lookup is participant-scoped.
+"""
+
+from __future__ import annotations
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views import View
+from django.views.generic import TemplateView
+
+from catalog.models import Listing
+from conversations import services
+from conversations.selectors import (
+    conversation_for_participant,
+    conversations_for,
+    messages_for,
+)
+from core.exceptions import DomainError
+
+
+class ConversationListView(LoginRequiredMixin, TemplateView):
+    template_name = "conversations/list.html"
+    login_url = "accounts:login"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["conversations"] = conversations_for(self.request.user)
+        return context
+
+
+class ConversationDetailView(LoginRequiredMixin, TemplateView):
+    template_name = "conversations/detail.html"
+    login_url = "accounts:login"
+
+    def get(self, request, *args, **kwargs):
+        conversation = self.get_conversation()
+        services.mark_conversation_read(conversation, reader=request.user)
+        return super().get(request, *args, **kwargs)
+
+    def get_conversation(self):
+        conversation = conversation_for_participant(
+            self.kwargs["pk"], self.request.user
+        )
+        if conversation is None:
+            raise Http404("Conversation not found.")
+        return conversation
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        conversation = self.get_conversation()
+
+        # Newest first for pagination, then reversed for display. This keeps the
+        # "load older" cursor stable when new messages arrive while reading.
+        queryset = messages_for(conversation).order_by("-created_at", "-id")
+        paginator = Paginator(queryset, settings.MESSAGES_PER_PAGE)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        page_messages = sorted(page_obj.object_list, key=lambda m: (m.created_at, m.pk))
+
+        context.update(
+            {
+                "conversation": conversation,
+                "listing": conversation.listing,
+                "other": conversation.other_participant(self.request.user),
+                "messages": page_messages,
+                "page_obj": page_obj,
+                "is_seller": conversation.seller_id == self.request.user.pk,
+                "max_message_length": settings.CHAT_MESSAGE_MAX_LENGTH,
+            }
+        )
+        return context
+
+
+class StartConversationView(LoginRequiredMixin, View):
+    """Create (or reopen) the buyer's thread for a listing."""
+
+    login_url = "accounts:login"
+
+    def post(self, request, *args, **kwargs):
+        listing = get_object_or_404(
+            Listing.objects.select_related("seller", "emirate"),
+            pk=kwargs["listing_id"],
+        )
+        try:
+            conversation = services.start_conversation(
+                listing, request.user, request=request
+            )
+        except DomainError as exc:
+            messages.error(request, exc.message)
+            return redirect(listing.get_absolute_url())
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect(listing.get_absolute_url())
+
+        return redirect("conversations:detail", pk=conversation.pk)
+
+
+class SendMessageView(LoginRequiredMixin, View):
+    """Progressive-enhancement fallback when JavaScript/WebSocket is unavailable."""
+
+    login_url = "accounts:login"
+
+    def post(self, request, *args, **kwargs):
+        conversation = conversation_for_participant(kwargs["pk"], request.user)
+        if conversation is None:
+            raise Http404("Conversation not found.")
+
+        try:
+            message, _created = services.send_message(
+                conversation,
+                sender=request.user,
+                body=request.POST.get("body", ""),
+                request=request,
+            )
+        except DomainError as exc:
+            messages.error(request, exc.message)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+        else:
+            url = reverse("conversations:detail", kwargs={"pk": conversation.pk})
+            return redirect(f"{url}#message-{message.pk}")
+
+        return redirect("conversations:detail", pk=conversation.pk)

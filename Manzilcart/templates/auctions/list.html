@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Auctions in {{ emirate.name }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <span>Auctions</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">{{ emirate.name }} marketplace</p>
+      <h1>Furniture auctions</h1>
+      <p class="muted">
+        {{ total_active }} auction{{ total_active|pluralize }} open or scheduled.
+        Sellers lock the highest eligible bid; the selected bidder then confirms.
+      </p>
+    </div>
+    {% if current_emirate %}
+      <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}">Browse fixed-price listings</a>
+    {% endif %}
+  </div>
+
+  {% if auctions %}
+    <div class="listing-grid">
+      {% for auction in auctions %}
+        <article class="listing-card auction-card">
+          <a class="listing-card-media" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}" aria-label="{{ auction.listing.title }}">
+            {% with cover=auction.listing.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width }}" height="{{ cover.height }}">
+              {% else %}
+                <span class="auction-no-photo">No photo</span>
+              {% endif %}
+            {% endwith %}
+          </a>
+          <div class="listing-card-body">
+            <div class="listing-card-top">
+              <span class="badge">Auction</span>
+              <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
+            </div>
+            <h2 class="listing-card-title">
+              <a href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}">{{ auction.listing.title }}</a>
+            </h2>
+            <p class="auction-card-price">
+              {% if auction.top_bid %}
+                Highest bid <strong>AED {{ auction.top_bid|floatformat:0|intcomma }}</strong>
+              {% else %}
+                No bids yet
+              {% endif %}
+            </p>
+            <p class="listing-card-meta muted small">
+              {{ auction.listing.service_area.name }}
+              {% if auction.status == "live" %}
+                · Ends {{ auction.end_at|date:"j M, H:i" }}
+              {% elif auction.status == "scheduled" %}
+                · Starts {{ auction.start_at|date:"j M, H:i" }}
+              {% elif auction.status == "locked" %}
+                · Awaiting bidder confirmation
+              {% endif %}
+            </p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <nav class="pagination" aria-label="Pagination">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}">Previous</a>
+        {% endif %}
+        <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="empty-state">
+      <h3>No auctions are running right now</h3>
+      <p>New auctions appear here as soon as sellers schedule them.</p>
+      <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Browse furniture</a>
+    </div>
+  {% endif %}
+
+  {% if ended_auctions %}
+    <section class="auction-ended">
+      <h2>Recently closed</h2>
+      <div class="auction-ended-list">
+        {% for auction in ended_auctions %}
+          <a class="auction-ended-row" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}">
+            <span class="auction-ended-title">{{ auction.listing.title }}</span>
+            <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
+            <span class="muted small">
+              {% if auction.top_bid %}Top bid AED {{ auction.top_bid|floatformat:0|intcomma }}{% else %}No bids{% endif %}
+              · {{ auction.end_at|date:"j M Y" }}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+</section>
+{% endblock %}

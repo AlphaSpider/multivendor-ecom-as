@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Create an auction — {{ listing.title }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <span aria-hidden="true">/</span>
+    <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+    <span aria-hidden="true">/</span>
+    <span>New auction</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction</p>
+      <h1>Auction “{{ listing.title }}”</h1>
+      <p class="muted">
+        Asking price AED {{ listing.asking_price|floatformat:0|intcomma }} ·
+        {{ listing.service_area.name }}, {{ emirate.name }}
+      </p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="field-row">
+        {% include "partials/field.html" with field=form.start_at %}
+        {% include "partials/field.html" with field=form.end_at %}
+      </div>
+
+      {% include "partials/field.html" with field=form.reserve_price %}
+
+      <div class="field{% if form.agree_fallback.errors %} field-invalid{% endif %}">
+        <label class="auction-checkbox" for="{{ form.agree_fallback.id_for_label }}">
+          {{ form.agree_fallback }}
+          <span>{{ form.agree_fallback.label }}</span>
+        </label>
+        {% for error in form.agree_fallback.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Start auction</button>
+        <a class="btn btn-quiet" href="{{ listing.get_absolute_url }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel panel-muted">
+    <h2>How auctions work</h2>
+    <ul class="auction-rules">
+      <li>Bidders can place bids while the auction is live. Amounts are public; bidder identities are not shown to other bidders.</li>
+      <li>The seller must explicitly lock the current highest eligible bid before the scheduled end. There is no automatic winner at the end.</li>
+      <li>If you never lock a bid, the auction closes unsold.</li>
+      <li>After you lock a bid, bidding stops. That bidder has {{ confirmation_hours }} hour{{ confirmation_hours|pluralize }} to confirm or decline.</li>
+      <li>If they decline or time out, the next highest eligible bidder is offered the auction with a fresh deadline. Each bidder is offered the auction at most once.</li>
+      <li>The final deal is always at the winning bidder's own bid price. Payment and handover are arranged directly between you and the buyer.</li>
+      <li>Bids below the optional reserve price can still be placed, but cannot be locked as the winner.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

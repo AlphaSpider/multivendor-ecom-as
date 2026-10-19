@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Chat about {{ conversation.listing.title }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'conversations:list' %}">Messages</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ conversation.listing.title }}</span>
+  </nav>
+
+  <div class="chat-layout">
+    <aside class="panel chat-context">
+      <div class="chat-listing">
+        {% with cover=listing.cover_image %}
+          {% if cover %}
+            <img src="{{ cover.image.url }}" alt="" loading="lazy">
+          {% endif %}
+        {% endwith %}
+        <div>
+          <h1>{{ listing.title }}</h1>
+          <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+          <p class="muted small">{{ listing.service_area.name }}, {{ listing.emirate.name }}</p>
+          <p class="muted small">{{ listing.get_status_display }}</p>
+        </div>
+      </div>
+
+      <dl class="detail-list">
+        <div>
+          <dt>{% if is_seller %}Buyer{% else %}Seller{% endif %}</dt>
+          <dd>{{ other.display_name|default:"ManzilCart member" }}</dd>
+        </div>
+      </dl>
+
+      {% if listing.is_public %}
+        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View listing</a>
+      {% endif %}
+
+      <p class="safety-note">
+        <strong>Stay safe.</strong> Never pay a deposit before seeing the furniture.
+        ManzilCart does not hold or process the purchase price.
+      </p>
+    </aside>
+
+    <div class="panel chat-panel">
+      <div class="chat-header">
+        <h2>Conversation</h2>
+        <span class="chat-status" id="chat-status" data-state="connecting">Connecting…</span>
+      </div>
+
+      {% if page_obj.has_next %}
+        <div class="chat-history-link">
+          <a class="btn btn-quiet btn-small" href="?page={{ page_obj.next_page_number }}">Load older messages</a>
+        </div>
+      {% endif %}
+
+      <ol
+        class="chat-log"
+        id="chat-log"
+        aria-live="polite"
+        aria-label="Messages"
+        data-conversation-id="{{ conversation.pk }}"
+        data-user-id="{{ user.pk }}"
+        data-message-length="{{ max_message_length }}"
+      >
+        {% for message in messages %}
+          <li
+            class="chat-bubble{% if message.sender_id == user.pk %} is-mine{% else %} is-theirs{% endif %}"
+            id="message-{{ message.pk }}"
+            data-message-id="{{ message.pk }}"
+            data-sender-id="{{ message.sender_id }}"
+          >
+            <span class="chat-author">{{ message.sender.display_name|default:"ManzilCart member" }}</span>
+            <div class="chat-body">{{ message.body|linebreaksbr }}</div>
+            <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
+          </li>
+        {% empty %}
+          <li class="chat-empty muted">No messages yet. Say hello and ask about the furniture.</li>
+        {% endfor %}
+      </ol>
+
+      <form
+        class="chat-form"
+        id="chat-form"
+        method="post"
+        action="{% url 'conversations:send' pk=conversation.pk %}"
+      >
+        {% csrf_token %}
+        <label class="sr-only" for="chat-input">Message</label>
+        <textarea
+          class="input"
+          id="chat-input"
+          name="body"
+          rows="2"
+          maxlength="{{ max_message_length }}"
+          placeholder="Write a message…"
+          required
+        ></textarea>
+        <button class="btn btn-primary" type="submit" id="chat-submit">Send</button>
+      </form>
+      <p class="chat-hint muted small" id="chat-hint">
+        Messages are saved. If the connection drops, your unsent message is retried automatically.
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/chat.js' %}" defer></script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% comment %}A listing card used by grids across the marketplace.{% endcomment %}
+{% load humanize %}
+<article class="listing-card">
+  <a class="listing-card-media" href="{{ listing.get_absolute_url }}" tabindex="-1" aria-hidden="true">
+    {% with cover=listing.cover_image %}
+      {% if cover %}
+        <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width|default:640 }}" height="{{ cover.height|default:480 }}">
+      {% else %}
+        <span class="listing-placeholder" aria-hidden="true">{{ listing.category.name|slice:":1" }}</span>
+      {% endif %}
+    {% endwith %}
+  </a>
+  <div class="listing-card-body">
+    <div class="listing-card-top">
+      <span class="badge">{{ listing.get_condition_display }}</span>
+      {% if show_status %}
+        <span class="status-pill status-{{ listing.status }}">{{ listing.get_status_display }}</span>
+      {% endif %}
+    </div>
+    <h3 class="listing-card-title">
+      <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+    </h3>
+    <p class="listing-card-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+    <p class="listing-card-meta">
+      <span>{{ listing.service_area.name }}</span>
+      <span aria-hidden="true">·</span>
+      <span>{{ listing.category.name }}</span>
+    </p>
+  </div>
+</article>

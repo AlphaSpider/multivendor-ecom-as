@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Verify your number — ManzilCart{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<section class="container auth-layout">
+  <div class="auth-card">
+    <p class="eyebrow">Step 2 of 3</p>
+    <h1>Check your WhatsApp</h1>
+    <p class="muted">
+      We sent a {{ form.fields.code.max_length }}-digit code to
+      <strong>{{ masked_phone }}</strong>. It expires shortly.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+      {% if resend_error %}
+        <div class="form-alert" role="alert"><p>{{ resend_error }}</p></div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.code %}
+
+      <button class="btn btn-primary btn-block" type="submit">Verify and continue</button>
+    </form>
+
+    <div class="auth-actions">
+      <form method="post" action="{% url 'accounts:resend' %}">
+        {% csrf_token %}
+        <button type="submit" class="link-button">Send a new code</button>
+      </form>
+      <a href="{% url 'accounts:start' %}">Use a different number</a>
+    </div>
+
+    <p class="field-help" data-code-expiry data-seconds="{{ expires_seconds }}">
+      The code expires in about <span data-expiry-label>{{ expires_seconds }}</span> seconds.
+    </p>
+  </div>
+
+  <aside class="auth-aside">
+    <h2>Didn’t get it?</h2>
+    <p>
+      Check that WhatsApp can receive messages on this number and that you have a
+      connection. You can request a new code after the cooldown.
+    </p>
+    <p class="muted small">
+      For your security, never share the code with anyone — including someone who says
+      they are from ManzilCart.
+    </p>
+  </aside>
+</section>
+{% endblock %}
