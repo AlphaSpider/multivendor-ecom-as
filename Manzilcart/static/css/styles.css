@@ -191,29 +191,45 @@ a:hover { color: var(--brand-strong); }
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
   text-decoration: none;
-  color: var(--ink);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-size: 1.15rem;
   margin-inline-end: auto;
+  line-height: 1;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 800;
-  box-shadow: 0 2px 8px var(--brand-glow);
+.brand-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  transition: transform 0.15s ease;
 }
 
-.brand-text span { color: var(--brand); }
+.brand:hover .brand-logo {
+  transform: scale(1.03);
+}
+
+:root:not([data-theme="dark"]) .brand-logo-dark { display: none; }
+:root:not([data-theme="dark"]) .brand-logo-light { display: block; }
+[data-theme="dark"] .brand-logo-light { display: none; }
+[data-theme="dark"] .brand-logo-dark { display: block; }
+
+.footer-brand-link {
+  display: inline-block;
+  text-decoration: none;
+  margin-bottom: 0.6rem;
+}
+
+.footer-logo {
+  height: 38px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  transition: opacity 0.15s ease;
+}
+
+.footer-brand-link:hover .footer-logo {
+  opacity: 0.88;
+}
 
 .marketplace-chip {
   display: inline-flex;

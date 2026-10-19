@@ -26,6 +26,7 @@
       } catch (e) {}
     })();
   </script>
+  <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
@@ -35,8 +36,8 @@
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="{% url 'locations:landing' %}" aria-label="ManzilCart home">
-        <span class="brand-mark" aria-hidden="true">M</span>
-        <span class="brand-text">Manzil<span>Cart</span></span>
+        <img src="{% static 'images/logo.png' %}" alt="ManzilCart" class="brand-logo brand-logo-light" width="138" height="49">
+        <img src="{% static 'images/logo-dark.png' %}" alt="ManzilCart" class="brand-logo brand-logo-dark" width="138" height="49">
       </a>
 
       {% if current_emirate %}
@@ -132,7 +133,9 @@
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="footer-brand">
-        <strong>ManzilCart</strong>
+        <a href="{% url 'locations:landing' %}" class="footer-brand-link" aria-label="ManzilCart home">
+          <img src="{% static 'images/logo-dark.png' %}" alt="ManzilCart" class="footer-logo" width="148" height="52">
+        </a>
         <p data-i18n="footer_brand_desc">New and refurbished furniture, from homes in the UAE to homes in the UAE.</p>
       </div>
       <div class="footer-links">
