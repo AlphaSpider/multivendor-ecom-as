@@ -101,7 +101,30 @@
       footer_profile: "Profile",
       footer_create_account: "Create an account",
       footer_legal_p1: "Payments for furniture are arranged directly between buyer and seller. ManzilCart does not process or hold the purchase price.",
-      uae_country: "United Arab Emirates."
+      uae_country: "United Arab Emirates.",
+      detail_category: "Category",
+      detail_area: "Area",
+      detail_emirate: "Emirate",
+      detail_listed: "Listed",
+      member_since: "Member since",
+      edit_listing: "Edit listing",
+      view_auction: "View auction",
+      create_auction: "Create auction",
+      all_my_listings: "All my listings",
+      msg_seller: "Message the seller",
+      chat_instructions: "Ask questions, then agree a price in chat.",
+      make_offer: "Or make an offer (AED)",
+      btn_make_offer: "Make offer",
+      handover_note: "There is no online payment. You agree handover and payment directly.",
+      sign_in_to_message: "Sign in to message the seller",
+      chat_verified_only: "Chat is available to verified members.",
+      stay_safe: "Stay safe.",
+      safety_text: "View the furniture before paying. ManzilCart does not process, hold or guarantee the purchase price — payment is agreed directly between buyer and seller.",
+      about_piece: "About this piece",
+      hover_to_zoom: "Hover to zoom",
+      no_photos_yet: "No photos yet",
+      status_reserved: "Reserved",
+      status_sold: "Sold"
     },
     ar: {
       skip_to_content: "الانتقال إلى المحتوى",
@@ -164,7 +187,30 @@
       footer_profile: "الملف الشخصي",
       footer_create_account: "إنشاء حساب",
       footer_legal_p1: "يتم ترتيب الدفع للأثاث مباشرة بين المشتري والبائع. لا تقوم منزل كارت بمعالجة أو احتجاز سعر الشراء.",
-      uae_country: "الإمارات العربية المتحدة."
+      uae_country: "الإمارات العربية المتحدة.",
+      detail_category: "الفئة",
+      detail_area: "المنطقة",
+      detail_emirate: "الإمارة",
+      detail_listed: "تاريخ العرض",
+      member_since: "عضو منذ",
+      edit_listing: "تعديل الإعلان",
+      view_auction: "عرض المزاد",
+      create_auction: "إنشاء مزاد",
+      all_my_listings: "جميع إعلاناتي",
+      msg_seller: "راسل البائع",
+      chat_instructions: "اسأل واستفسر، ثم اتفق على السعر في المحادثة.",
+      make_offer: "أو قدم عرضاً (بالدرهم)",
+      btn_make_offer: "تقديم العرض",
+      handover_note: "لا يوجد دفع إلكتروني. يتم الاتفاق على التسليم والدفع مباشرة.",
+      sign_in_to_message: "سجل الدخول لمراسلة البائع",
+      chat_verified_only: "المحادثة متاحة للأعضاء الموثقين فقط.",
+      stay_safe: "ابقَ آمناً.",
+      safety_text: "عاين الأثاث قبل الدفع. لا تعالج منزل كارت سعر الشراء أو تحتجزه أو تضمنه — يتم الاتفاق على الدفع مباشرة بين المشتري والبائع.",
+      about_piece: "حول هذه القطعة",
+      hover_to_zoom: "مرر للتكبير",
+      no_photos_yet: "لا توجد صور بعد",
+      status_reserved: "محجوز",
+      status_sold: "تم البيع"
     }
   };
 
@@ -334,4 +380,104 @@
       reader.readAsDataURL(input.files[0]);
     });
   });
+
+  // --- Product Detail Interactive Gallery (Zoom on Hover & Thumbnails) ----
+  var gallery = document.querySelector("[data-product-gallery]");
+  if (gallery) {
+    var viewport = gallery.querySelector("[data-zoom-viewport]");
+    var mainImg = gallery.querySelector("[data-main-image]");
+    var thumbs = Array.from(gallery.querySelectorAll("[data-thumb-btn]"));
+    var prevBtn = gallery.querySelector("[data-gallery-prev]");
+    var nextBtn = gallery.querySelector("[data-gallery-next]");
+    var currentIndex = 0;
+
+    function selectImage(index) {
+      if (!thumbs.length || index < 0 || index >= thumbs.length) return;
+      currentIndex = index;
+
+      thumbs.forEach(function (thumb, idx) {
+        var isActive = idx === currentIndex;
+        thumb.classList.toggle("is-active", isActive);
+        thumb.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+
+      var selectedThumb = thumbs[currentIndex];
+      var fullSrc = selectedThumb.getAttribute("data-full-src");
+      var caption = selectedThumb.getAttribute("data-caption");
+
+      if (mainImg) {
+        mainImg.style.opacity = "0.7";
+        setTimeout(function () {
+          mainImg.src = fullSrc;
+          if (caption) {
+            mainImg.alt = caption;
+          }
+          mainImg.style.opacity = "1";
+          mainImg.style.transform = "scale(1)";
+          mainImg.style.transformOrigin = "center center";
+        }, 80);
+      }
+
+      try {
+        selectedThumb.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      } catch (err) {}
+    }
+
+    thumbs.forEach(function (thumb, idx) {
+      thumb.addEventListener("click", function () {
+        selectImage(idx);
+      });
+    });
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var prevIdx = (currentIndex - 1 + thumbs.length) % thumbs.length;
+        selectImage(prevIdx);
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var nextIdx = (currentIndex + 1) % thumbs.length;
+        selectImage(nextIdx);
+      });
+    }
+
+    if (viewport) {
+      viewport.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft") {
+          var isRtl = document.documentElement.getAttribute("dir") === "rtl";
+          var targetIdx = isRtl ? (currentIndex + 1) % thumbs.length : (currentIndex - 1 + thumbs.length) % thumbs.length;
+          selectImage(targetIdx);
+        } else if (e.key === "ArrowRight") {
+          var isRtl = document.documentElement.getAttribute("dir") === "rtl";
+          var targetIdx = isRtl ? (currentIndex - 1 + thumbs.length) % thumbs.length : (currentIndex + 1) % thumbs.length;
+          selectImage(targetIdx);
+        }
+      });
+
+      // Cursor Zoom in on Hover
+      viewport.addEventListener("mousemove", function (e) {
+        if (!mainImg) return;
+        var rect = viewport.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+
+        var xPercent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        var yPercent = Math.max(0, Math.min(100, (y / rect.height) * 100));
+
+        mainImg.style.transformOrigin = xPercent + "% " + yPercent + "%";
+        mainImg.style.transform = "scale(2.2)";
+      });
+
+      viewport.addEventListener("mouseleave", function () {
+        if (!mainImg) return;
+        mainImg.style.transform = "scale(1)";
+        mainImg.style.transformOrigin = "center center";
+      });
+    }
+  }
 })();
+

@@ -11,7 +11,7 @@
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</a>
     <span aria-hidden="true">/</span>
     <a href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}">{{ listing.category.name }}</a>
     <span aria-hidden="true">/</span>
@@ -40,25 +40,62 @@
   {% endif %}
 
   <div class="detail-layout">
-    <div class="detail-gallery">
+    <div class="detail-gallery" data-product-gallery>
       {% if listing.images.all %}
-        <div class="gallery-main">
-          {% with cover=listing.cover_image %}
-            <img src="{{ cover.image.url }}" alt="{{ cover.caption|default:listing.title }}" width="{{ cover.width }}" height="{{ cover.height }}">
-          {% endwith %}
+        {% with cover=listing.cover_image|default:listing.images.first %}
+        <div class="gallery-main-container">
+          <div class="gallery-zoom-viewport" data-zoom-viewport tabindex="0" role="region" aria-label="Product image viewer with zoom">
+            <img id="gallery-main-img"
+                 class="gallery-main-img"
+                 src="{{ cover.image.url }}"
+                 alt="{{ cover.caption|default:listing.title }}"
+                 data-main-image>
+            <div class="gallery-zoom-hint" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="11" y1="8" x2="11" y2="14"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+              </svg>
+              <span data-i18n="hover_to_zoom">Hover to zoom</span>
+            </div>
+            {% if listing.images.count > 1 %}
+              <button type="button" class="gallery-arrow gallery-prev" data-gallery-prev aria-label="Previous photo">‹</button>
+              <button type="button" class="gallery-arrow gallery-next" data-gallery-next aria-label="Next photo">›</button>
+            {% endif %}
+          </div>
         </div>
+
         {% if listing.images.count > 1 %}
-          <div class="gallery-thumbs">
+          <div class="gallery-thumbs-row" role="tablist" aria-label="Product photos">
             {% for image in listing.images.all %}
-              <a href="{{ image.image.url }}" target="_blank" rel="noopener" aria-label="Open photo {{ forloop.counter }}">
-                <img src="{{ image.image.url }}" alt="" loading="lazy">
-              </a>
+              <button type="button"
+                      class="gallery-thumb-btn{% if forloop.first or image.pk == cover.pk %} is-active{% endif %}"
+                      data-thumb-btn
+                      data-full-src="{{ image.image.url }}"
+                      data-caption="{{ image.caption|default:listing.title }}"
+                      data-index="{{ forloop.counter0 }}"
+                      role="tab"
+                      aria-selected="{% if forloop.first or image.pk == cover.pk %}true{% else %}false{% endif %}"
+                      aria-label="View photo {{ forloop.counter }} of {{ listing.images.count }}">
+                <img src="{{ image.image.url }}" alt="{{ image.caption|default:listing.title }}" loading="lazy">
+              </button>
             {% endfor %}
           </div>
         {% endif %}
+        {% endwith %}
       {% else %}
-        <div class="gallery-main gallery-empty">
-          <span>No photos yet</span>
+        <div class="gallery-main-container">
+          <div class="gallery-zoom-viewport gallery-empty">
+            <div class="gallery-empty-inner">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="muted">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span data-i18n="no_photos_yet">No photos yet</span>
+            </div>
+          </div>
         </div>
       {% endif %}
     </div>
@@ -66,77 +103,75 @@
     <aside class="detail-panel">
       <div class="detail-badges">
         <span class="badge">{{ listing.get_condition_display }}</span>
-        {% if listing.status == "reserved" %}<span class="status-pill status-reserved">Reserved</span>{% endif %}
-        {% if listing.status == "sold" %}<span class="status-pill status-sold">Sold</span>{% endif %}
+        {% if listing.status == "reserved" %}<span class="status-pill status-reserved" data-i18n="status_reserved">Reserved</span>{% endif %}
+        {% if listing.status == "sold" %}<span class="status-pill status-sold" data-i18n="status_sold">Sold</span>{% endif %}
       </div>
 
       <h1>{{ listing.title }}</h1>
       <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
 
       <dl class="detail-list">
-        <div><dt>Category</dt><dd>{{ listing.category.name }}</dd></div>
-        <div><dt>Area</dt><dd>{{ listing.service_area.name }}</dd></div>
-        <div><dt>Emirate</dt><dd>{{ listing.emirate.name }}</dd></div>
-        <div><dt>Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
+        <div><dt data-i18n="detail_category">Category</dt><dd>{{ listing.category.name }}</dd></div>
+        <div><dt data-i18n="detail_area">Area</dt><dd>{{ listing.service_area.name }}</dd></div>
+        <div><dt data-i18n="detail_emirate">Emirate</dt><dd data-emirate-name="{{ listing.emirate.name }}">{{ listing.emirate.name }}</dd></div>
+        <div><dt data-i18n="detail_listed">Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
       </dl>
 
       <div class="seller-card">
         <span class="seller-avatar" aria-hidden="true">{{ listing.seller.short_name|slice:":1"|upper }}</span>
         <div>
           <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong>
-          <span class="muted small">Member since {{ listing.seller.date_joined|date:"M Y" }}</span>
+          <span class="muted small"><span data-i18n="member_since">Member since</span> {{ listing.seller.date_joined|date:"M Y" }}</span>
         </div>
       </div>
 
       {% if is_owner %}
         <div class="form-actions">
           {% if can_edit %}
-            <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}">Edit listing</a>
+            <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}" data-i18n="edit_listing">Edit listing</a>
           {% endif %}
           {% if listing.is_public %}
             {% if active_auction %}
-              <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}">View auction</a>
+              <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}" data-i18n="view_auction">View auction</a>
             {% else %}
-              <a class="btn btn-quiet" href="{% url 'auction_marketplace:create' emirate_slug=emirate.slug listing_slug=listing.slug %}">Create auction</a>
+              <a class="btn btn-quiet" href="{% url 'auction_marketplace:create' emirate_slug=emirate.slug listing_slug=listing.slug %}" data-i18n="create_auction">Create auction</a>
             {% endif %}
           {% endif %}
-          <a class="btn btn-quiet" href="{% url 'accounts:listings' %}">All my listings</a>
+          <a class="btn btn-quiet" href="{% url 'accounts:listings' %}" data-i18n="all_my_listings">All my listings</a>
         </div>
       {% else %}
         <div class="contact-panel">
           {% if user.is_authenticated %}
             <form method="post" action="{% url 'conversations:start' listing_id=listing.pk %}">
               {% csrf_token %}
-              <button class="btn btn-primary" type="submit">Message the seller</button>
+              <button class="btn btn-primary" type="submit" data-i18n="msg_seller">Message the seller</button>
             </form>
-            <p class="muted small">Ask questions, then agree a price in chat.</p>
+            <p class="muted small" data-i18n="chat_instructions">Ask questions, then agree a price in chat.</p>
 
             <form class="offer-form" method="post" action="{% url 'deals:start' listing_id=listing.pk %}">
               {% csrf_token %}
-              <label class="field-label" for="offer-amount">Or make an offer (AED)</label>
+              <label class="field-label" for="offer-amount" data-i18n="make_offer">Or make an offer (AED)</label>
               <div class="offer-form-row">
                 <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" placeholder="{{ listing.asking_price|floatformat:0 }}" required>
-                <button class="btn btn-primary" type="submit">Make offer</button>
+                <button class="btn btn-primary" type="submit" data-i18n="btn_make_offer">Make offer</button>
               </div>
             </form>
-            <p class="muted small">There is no online payment. You agree handover and payment directly.</p>
+            <p class="muted small" data-i18n="handover_note">There is no online payment. You agree handover and payment directly.</p>
           {% else %}
-            <a class="btn btn-primary" href="{% url 'accounts:start' %}">Sign in to message the seller</a>
-            <p class="muted small">Chat is available to verified members.</p>
+            <a class="btn btn-primary" href="{% url 'accounts:start' %}" data-i18n="sign_in_to_message">Sign in to message the seller</a>
+            <p class="muted small" data-i18n="chat_verified_only">Chat is available to verified members.</p>
           {% endif %}
         </div>
       {% endif %}
 
       <p class="safety-note">
-        <strong>Stay safe.</strong> View the furniture before paying. ManzilCart does not
-        process, hold or guarantee the purchase price — payment is agreed directly
-        between buyer and seller.
+        <strong data-i18n="stay_safe">Stay safe.</strong> <span data-i18n="safety_text">View the furniture before paying. ManzilCart does not process, hold or guarantee the purchase price — payment is agreed directly between buyer and seller.</span>
       </p>
     </aside>
   </div>
 
   <div class="panel detail-description">
-    <h2>About this piece</h2>
+    <h2 data-i18n="about_piece">About this piece</h2>
     {{ listing.description|linebreaks }}
   </div>
 </section>
