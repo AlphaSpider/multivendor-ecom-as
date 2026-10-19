@@ -90,12 +90,21 @@ class ListingListView(EmirateRequiredMixin, TemplateView):
 
         categories = _attach_category_counts(list(active_categories()), self.emirate)
 
+        modal_filter_count = (
+            (1 if category else 0)
+            + (1 if data.get("condition") else 0)
+            + (1 if data.get("min_price") is not None or data.get("max_price") is not None else 0)
+        )
+        active_filter_count = modal_filter_count + (1 if data.get("q") else 0)
+
         context.update(
             {
                 "emirate": self.emirate,
                 "page_obj": page,
                 "listings": page.object_list,
                 "total_results": paginator.count,
+                "active_filter_count": active_filter_count,
+                "modal_filter_count": modal_filter_count,
                 "search_form": ListingSearchForm(
                     initial={
                         "q": data.get("q", ""),

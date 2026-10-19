@@ -46,6 +46,7 @@
       btn_switch: "Switch",
       nav_browse: "Browse",
       nav_sell: "Sell",
+      nav_sell_plus: "Sell+",
       nav_auctions: "Auctions",
       nav_messages: "Messages",
       nav_deals: "Deals",
@@ -124,7 +125,31 @@
       hover_to_zoom: "Hover to zoom",
       no_photos_yet: "No photos yet",
       status_reserved: "Reserved",
-      status_sold: "Sold"
+      status_sold: "Sold",
+      filters_button: "Filters",
+      filter_modal_title: "Filters",
+      filter_search_label: "Search",
+      filter_category_label: "Category",
+      filter_all_categories: "All categories",
+      filter_condition_label: "Condition",
+      filter_any_condition: "Any condition",
+      filter_price_label: "Price range",
+      filter_min_label: "Minimum",
+      filter_max_label: "Maximum",
+      filter_sort_label: "Sort",
+      filter_apply_btn: "Apply filters",
+      filter_reset_btn: "Reset filters",
+      filter_clear_all: "Reset all",
+      filter_active_filters: "Active filters:",
+      all_furniture: "All furniture",
+      items_available: "items available",
+      no_matching_filters: "Nothing matches those filters",
+      empty_filters_help: "Try widening your price range or choosing another category.",
+      price_under_500: "Under AED 500",
+      price_500_1500: "AED 500 – 1.5k",
+      price_1500_4000: "AED 1.5k – 4k",
+      price_4000_plus: "AED 4,000+",
+      price_any: "Any price"
     },
     ar: {
       skip_to_content: "الانتقال إلى المحتوى",
@@ -132,6 +157,7 @@
       btn_switch: "تبديل",
       nav_browse: "تصفح",
       nav_sell: "بيع",
+      nav_sell_plus: "بيع+",
       nav_auctions: "المزادات",
       nav_messages: "الرسائل",
       nav_deals: "الصفقات",
@@ -210,7 +236,31 @@
       hover_to_zoom: "مرر للتكبير",
       no_photos_yet: "لا توجد صور بعد",
       status_reserved: "محجوز",
-      status_sold: "تم البيع"
+      status_sold: "تم البيع",
+      filters_button: "عوامل التصفية",
+      filter_modal_title: "تصفية الإعلانات",
+      filter_search_label: "البحث",
+      filter_category_label: "الفئة",
+      filter_all_categories: "جميع الفئات",
+      filter_condition_label: "الحالة",
+      filter_any_condition: "أي حالة",
+      filter_price_label: "نطاق السعر",
+      filter_min_label: "الحد الأدنى",
+      filter_max_label: "الحد الأقصى",
+      filter_sort_label: "الترتيب",
+      filter_apply_btn: "تطبيق التصفية",
+      filter_reset_btn: "إعادة ضبط",
+      filter_clear_all: "مسح الكل",
+      filter_active_filters: "عوامل التصفية النشطة:",
+      all_furniture: "جميع الأثاث",
+      items_available: "قطعة متوفرة",
+      no_matching_filters: "لا توجد نتائج تطابق عوامل التصفية",
+      empty_filters_help: "جرّب توسيع نطاق السعر أو اختيار فئة أخرى.",
+      price_under_500: "أقل من 500 درهم",
+      price_500_1500: "500 – 1,500 درهم",
+      price_1500_4000: "1,500 – 4,000 درهم",
+      price_4000_plus: "+4,000 درهم",
+      price_any: "أي سعر"
     }
   };
 
@@ -285,6 +335,10 @@
         input.placeholder = input._origPlaceholder;
       }
     });
+
+    if (window._syncPriceSlider) {
+      window._syncPriceSlider();
+    }
   }
 
   // Initialize language from storage
@@ -478,6 +532,245 @@
         mainImg.style.transformOrigin = "center center";
       });
     }
+  }
+
+  // --- Filter Modal (Popup) ------------------------------------------------
+  var filterModal = document.getElementById("filter-modal");
+  var openFilterBtns = document.querySelectorAll("[data-filter-open]");
+  var closeFilterBtns = document.querySelectorAll("[data-filter-close]");
+
+  function openFilterModal() {
+    if (!filterModal) return;
+    filterModal.style.display = "flex";
+    filterModal.offsetHeight; // force reflow
+    filterModal.classList.add("is-open");
+    filterModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    openFilterBtns.forEach(function (btn) {
+      btn.setAttribute("aria-expanded", "true");
+    });
+    // Re-sync slider track fill in case modal was hidden when initialized
+    if (window._syncPriceSlider) {
+      window._syncPriceSlider();
+    }
+    // Focus first interactive control in modal (category select or close button)
+    var catInput = filterModal.querySelector("#filter-category") || filterModal.querySelector(".filter-modal-close");
+    if (catInput) {
+      setTimeout(function () {
+        catInput.focus();
+      }, 100);
+    }
+  }
+
+  function closeFilterModal() {
+    if (!filterModal) return;
+    filterModal.classList.remove("is-open");
+    filterModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    openFilterBtns.forEach(function (btn) {
+      btn.setAttribute("aria-expanded", "false");
+    });
+    setTimeout(function () {
+      if (!filterModal.classList.contains("is-open")) {
+        filterModal.style.display = "none";
+      }
+    }, 200);
+  }
+
+  openFilterBtns.forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      openFilterModal();
+    });
+  });
+
+  closeFilterBtns.forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      closeFilterModal();
+    });
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && filterModal && filterModal.classList.contains("is-open")) {
+      closeFilterModal();
+    }
+  });
+
+  // --- Dual-Handle Price Range Slider -------------------------------------
+  var sliderWidget = document.querySelector("[data-price-slider-widget]");
+  if (sliderWidget) {
+    var rangeMin = sliderWidget.querySelector("[data-slider-min]");
+    var rangeMax = sliderWidget.querySelector("[data-slider-max]");
+    var inputMin = sliderWidget.querySelector("[data-input-min]");
+    var inputMax = sliderWidget.querySelector("[data-input-max]");
+    var displayMin = sliderWidget.querySelector("[data-slider-min-val]");
+    var displayMax = sliderWidget.querySelector("[data-slider-max-val]");
+    var highlight = sliderWidget.querySelector("[data-slider-highlight]");
+    var presetChips = sliderWidget.querySelectorAll("[data-preset-min]");
+
+    var SLIDER_MIN = 0;
+    var SLIDER_MAX = 10000;
+    var MIN_GAP = 50;
+
+    function formatNumber(num) {
+      return Number(num).toLocaleString("en-US");
+    }
+
+    function updateHighlightAndReadout() {
+      var minVal = parseFloat(rangeMin.value) || 0;
+      var maxVal = parseFloat(rangeMax.value) || SLIDER_MAX;
+
+      if (displayMin) {
+        displayMin.textContent = formatNumber(minVal);
+      }
+      if (displayMax) {
+        var isMaxCapped = maxVal >= SLIDER_MAX && (!inputMax || !inputMax.value || parseFloat(inputMax.value) >= SLIDER_MAX);
+        displayMax.textContent = formatNumber(maxVal) + (isMaxCapped ? "+" : "");
+      }
+
+      var percentMin = Math.max(0, Math.min(100, ((minVal - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100));
+      var percentMax = Math.max(0, Math.min(100, ((maxVal - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100));
+      var isRtl = document.documentElement.getAttribute("dir") === "rtl";
+
+      if (highlight) {
+        var width = Math.max(0, percentMax - percentMin);
+        highlight.style.width = width + "%";
+        if (isRtl) {
+          highlight.style.left = "auto";
+          highlight.style.right = percentMin + "%";
+        } else {
+          highlight.style.right = "auto";
+          highlight.style.left = percentMin + "%";
+        }
+      }
+
+      // Check active preset
+      presetChips.forEach(function (chip) {
+        var pMin = chip.getAttribute("data-preset-min");
+        var pMax = chip.getAttribute("data-preset-max");
+        var isActive = false;
+        var curMinEmpty = !inputMin || !inputMin.value || inputMin.value === "0";
+        var curMaxEmpty = !inputMax || !inputMax.value;
+
+        if (pMin === "" && pMax === "") {
+          isActive = curMinEmpty && curMaxEmpty;
+        } else if (pMin === "4000" && pMax === "10000") {
+          isActive = minVal >= 4000 && curMaxEmpty;
+        } else if (pMin !== "" && pMax !== "") {
+          isActive = (minVal === parseFloat(pMin) && maxVal === parseFloat(pMax) && !curMaxEmpty);
+        }
+        chip.classList.toggle("is-active", isActive);
+      });
+    }
+
+    window._syncPriceSlider = updateHighlightAndReadout;
+
+    // Range input min drag
+    if (rangeMin) {
+      rangeMin.addEventListener("input", function () {
+        var minVal = parseFloat(rangeMin.value);
+        var maxVal = parseFloat(rangeMax.value);
+        if (minVal > maxVal - MIN_GAP) {
+          rangeMin.value = maxVal - MIN_GAP;
+          minVal = parseFloat(rangeMin.value);
+        }
+        if (inputMin) {
+          inputMin.value = minVal === 0 ? "" : minVal;
+        }
+        updateHighlightAndReadout();
+      });
+    }
+
+    // Range input max drag
+    if (rangeMax) {
+      rangeMax.addEventListener("input", function () {
+        var minVal = parseFloat(rangeMin.value);
+        var maxVal = parseFloat(rangeMax.value);
+        if (maxVal < minVal + MIN_GAP) {
+          rangeMax.value = minVal + MIN_GAP;
+          maxVal = parseFloat(rangeMax.value);
+        }
+        if (inputMax) {
+          inputMax.value = maxVal >= SLIDER_MAX ? "" : maxVal;
+        }
+        updateHighlightAndReadout();
+      });
+    }
+
+    // Manual number input min
+    if (inputMin) {
+      inputMin.addEventListener("input", function () {
+        var val = parseFloat(inputMin.value);
+        if (isNaN(val) || val < SLIDER_MIN) val = SLIDER_MIN;
+        if (val > SLIDER_MAX) val = SLIDER_MAX;
+        rangeMin.value = val;
+        var maxVal = parseFloat(rangeMax.value);
+        if (val > maxVal) {
+          rangeMax.value = Math.min(SLIDER_MAX, val + MIN_GAP);
+          if (inputMax && inputMax.value && parseFloat(inputMax.value) < val) {
+            inputMax.value = rangeMax.value;
+          }
+        }
+        updateHighlightAndReadout();
+      });
+    }
+
+    // Manual number input max
+    if (inputMax) {
+      inputMax.addEventListener("input", function () {
+        var val = parseFloat(inputMax.value);
+        if (isNaN(val)) val = SLIDER_MAX;
+        if (val < SLIDER_MIN) val = SLIDER_MIN;
+        if (val > SLIDER_MAX) val = SLIDER_MAX;
+        rangeMax.value = val;
+        var minVal = parseFloat(rangeMin.value);
+        if (val < minVal) {
+          rangeMin.value = Math.max(SLIDER_MIN, val - MIN_GAP);
+          if (inputMin && inputMin.value && parseFloat(inputMin.value) > val) {
+            inputMin.value = rangeMin.value;
+          }
+        }
+        updateHighlightAndReadout();
+      });
+    }
+
+    // Preset chips
+    presetChips.forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var pMin = chip.getAttribute("data-preset-min");
+        var pMax = chip.getAttribute("data-preset-max");
+
+        if (pMin === "" && pMax === "") {
+          rangeMin.value = 0;
+          rangeMax.value = SLIDER_MAX;
+          if (inputMin) inputMin.value = "";
+          if (inputMax) inputMax.value = "";
+        } else if (pMin === "4000" && pMax === "10000") {
+          rangeMin.value = 4000;
+          rangeMax.value = SLIDER_MAX;
+          if (inputMin) inputMin.value = "4000";
+          if (inputMax) inputMax.value = "";
+        } else {
+          var minVal = parseFloat(pMin) || 0;
+          var maxVal = parseFloat(pMax) || SLIDER_MAX;
+          rangeMin.value = minVal;
+          rangeMax.value = maxVal;
+          if (inputMin) inputMin.value = minVal === 0 ? "" : minVal;
+          if (inputMax) inputMax.value = maxVal;
+        }
+        updateHighlightAndReadout();
+      });
+    });
+
+    // Initialize from existing input values if any
+    if (inputMin && inputMin.value) {
+      rangeMin.value = Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, parseFloat(inputMin.value) || 0));
+    }
+    if (inputMax && inputMax.value) {
+      rangeMax.value = Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, parseFloat(inputMax.value) || SLIDER_MAX));
+    }
+    updateHighlightAndReadout();
   }
 })();
 

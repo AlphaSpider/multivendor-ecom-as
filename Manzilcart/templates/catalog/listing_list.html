@@ -3,107 +3,916 @@
 
 {% block title %}{{ selected_category.name|default:"Furniture" }} in {{ emirate.name }} — ManzilCart{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Critical Modal & Dual Slider Styles (Guaranteed immediate rendering) */
+  .filter-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+  }
+
+  .filter-modal.is-open {
+    display: flex !important;
+  }
+
+  .filter-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 100000 !important;
+    cursor: pointer;
+  }
+
+  .filter-modal-dialog {
+    position: relative !important;
+    z-index: 100001 !important;
+    width: 100% !important;
+    max-width: 530px !important;
+    max-height: 90vh !important;
+    background: var(--surface, #ffffff) !important;
+    border: 1px solid var(--line, #e4e4e7) !important;
+    border-radius: var(--radius-lg, 16px) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    animation: filterModalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  @keyframes filterModalPop {
+    from {
+      opacity: 0;
+      transform: scale(0.93) translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .filter-modal-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 1.15rem 1.4rem !important;
+    border-bottom: 1px solid var(--line, #e4e4e7) !important;
+    background: var(--surface, #ffffff) !important;
+  }
+
+  .filter-modal-title {
+    margin: 0 !important;
+    font-size: 1.25rem !important;
+    font-weight: 750 !important;
+    color: var(--ink, #18181b) !important;
+  }
+
+  .filter-modal-subtitle {
+    margin: 0.15rem 0 0 !important;
+    font-size: 0.82rem !important;
+    color: var(--muted, #71717a) !important;
+  }
+
+  .filter-modal-close {
+    background: transparent !important;
+    border: none !important;
+    color: var(--muted, #71717a) !important;
+    padding: 0.4rem !important;
+    border-radius: var(--radius-sm, 6px) !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .filter-modal-close:hover {
+    color: var(--ink, #18181b) !important;
+    background: var(--sand, #f4f4f5) !important;
+  }
+
+  .filter-modal-body {
+    padding: 1.35rem 1.4rem !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex: 1 !important;
+  }
+
+  .filter-modal-footer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    padding: 1.1rem 1.4rem !important;
+    border-top: 1px solid var(--line, #e4e4e7) !important;
+    background: var(--surface, #ffffff) !important;
+  }
+
+  /* One Slider Track with 2 Ends (Draggable Thumbs) */
+  .dual-slider-wrap {
+    margin: 0.85rem 0 0.5rem;
+  }
+
+  .slider-readout-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--brand-soft, rgba(220, 38, 38, 0.12));
+    color: var(--brand, #dc2626);
+    font-weight: 750;
+    font-size: 0.88rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+  }
+
+  .dual-track-box {
+    position: relative;
+    width: 100%;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dual-track-rail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--sand-deep, #e4e4e7);
+    pointer-events: none;
+  }
+
+  [data-theme="dark"] .dual-track-rail {
+    background: #27272a;
+  }
+
+  .dual-track-progress {
+    position: absolute;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--brand, #dc2626);
+    pointer-events: none;
+    z-index: 1;
+    transition: left 0.04s ease, width 0.04s ease, right 0.04s ease;
+  }
+
+  .dual-range-input {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 44px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background: transparent !important;
+    pointer-events: none !important;
+    z-index: 3;
+  }
+
+  .dual-range-input:focus {
+    outline: none !important;
+  }
+
+  /* WebKit Slider Thumbs */
+  .dual-range-input::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: var(--brand, #dc2626) !important;
+    border: 3px solid #ffffff !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+    cursor: grab !important;
+    pointer-events: auto !important;
+    transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+  }
+
+  .dual-range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.18) !important;
+    box-shadow: 0 0 0 7px var(--brand-soft, rgba(220, 38, 38, 0.2)) !important;
+  }
+
+  .dual-range-input::-webkit-slider-thumb:active {
+    cursor: grabbing !important;
+    transform: scale(1.25) !important;
+    box-shadow: 0 0 0 9px var(--brand-soft, rgba(220, 38, 38, 0.3)) !important;
+  }
+
+  /* Firefox Slider Thumbs */
+  .dual-range-input::-moz-range-thumb {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: var(--brand, #dc2626) !important;
+    border: 3px solid #ffffff !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+    cursor: grab !important;
+    pointer-events: auto !important;
+    transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+  }
+
+  .dual-range-input::-moz-range-thumb:hover {
+    transform: scale(1.18) !important;
+    box-shadow: 0 0 0 7px var(--brand-soft, rgba(220, 38, 38, 0.2)) !important;
+  }
+
+  .dual-range-input::-moz-range-thumb:active {
+    cursor: grabbing !important;
+    transform: scale(1.25) !important;
+    box-shadow: 0 0 0 9px var(--brand-soft, rgba(220, 38, 38, 0.3)) !important;
+  }
+
+  [data-theme="dark"] .dual-range-input::-webkit-slider-thumb {
+    border-color: #18181b !important;
+  }
+
+  [data-theme="dark"] .dual-range-input::-moz-range-thumb {
+    border-color: #18181b !important;
+  }
+
+  /* Synchronized Price Text Boxes */
+  .price-inputs-grid {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .price-input-card {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+  }
+
+  .price-input-title {
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: var(--muted, #71717a) !important;
+  }
+
+  .price-input-field-wrap {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .currency-affix {
+    position: absolute !important;
+    left: 0.8rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    color: var(--muted, #71717a) !important;
+    pointer-events: none !important;
+  }
+
+  [dir="rtl"] .currency-affix {
+    left: auto !important;
+    right: 0.8rem !important;
+  }
+
+  .price-live-box {
+    width: 100% !important;
+    padding-left: 2.6rem !important;
+    font-size: 0.95rem !important;
+    font-weight: 650 !important;
+    height: 40px !important;
+  }
+
+  [dir="rtl"] .price-live-box {
+    padding-left: 0.8rem !important;
+    padding-right: 2.6rem !important;
+  }
+
+  .price-inputs-hyphen {
+    font-size: 1.2rem !important;
+    font-weight: 700 !important;
+    color: var(--muted, #71717a) !important;
+    padding-top: 1.2rem !important;
+  }
+
+  /* Presets */
+  .price-quick-presets {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.45rem !important;
+    margin-top: 0.75rem !important;
+  }
+
+  .quick-preset-btn {
+    background: var(--sand, #f4f4f5) !important;
+    border: 1px solid var(--line, #e4e4e7) !important;
+    border-radius: 999px !important;
+    padding: 0.32rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    color: var(--ink, #18181b) !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .quick-preset-btn:hover {
+    border-color: var(--brand, #dc2626) !important;
+    color: var(--brand, #dc2626) !important;
+    background: var(--brand-soft, rgba(220, 38, 38, 0.12)) !important;
+  }
+
+  .quick-preset-btn.is-active {
+    background: var(--brand, #dc2626) !important;
+    color: #ffffff !important;
+    border-color: var(--brand, #dc2626) !important;
+  }
+
+  /* Outside Search Bar Styles */
+  .browse-search-bar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.45rem !important;
+    flex: 1 1 280px !important;
+    max-width: 440px !important;
+  }
+
+  .browse-search-input-wrap {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    flex: 1 !important;
+    width: 100% !important;
+  }
+
+  .browse-search-input-wrap .search-input-icon {
+    position: absolute !important;
+    left: 0.85rem !important;
+    color: var(--muted, #71717a) !important;
+    pointer-events: none !important;
+  }
+
+  [dir="rtl"] .browse-search-input-wrap .search-input-icon {
+    left: auto !important;
+    right: 0.85rem !important;
+  }
+
+  .browse-search-input {
+    width: 100% !important;
+    height: 38px !important;
+    padding-left: 2.35rem !important;
+    padding-right: 2rem !important;
+    font-size: 0.88rem !important;
+    border-radius: var(--radius-sm, 8px) !important;
+  }
+
+  [dir="rtl"] .browse-search-input {
+    padding-left: 2rem !important;
+    padding-right: 2.35rem !important;
+  }
+
+  .browse-search-clear {
+    position: absolute !important;
+    right: 0.7rem !important;
+    color: var(--muted, #71717a) !important;
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+  }
+
+  [dir="rtl"] .browse-search-clear {
+    right: auto !important;
+    left: 0.7rem !important;
+  }
+
+  .browse-search-btn {
+    height: 38px !important;
+    padding: 0 0.95rem !important;
+    font-weight: 650 !important;
+    white-space: nowrap !important;
+    border-radius: var(--radius-sm, 8px) !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
     <span aria-hidden="true">/</span>
-    <span>{% if selected_category %}{{ selected_category.name }}{% else %}All furniture{% endif %}</span>
+    <span>{% if selected_category %}{{ selected_category.name }}{% else %}<span data-i18n="all_furniture">All furniture</span>{% endif %}</span>
   </nav>
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">{{ emirate.name }} marketplace</p>
-      <h1>{% if selected_category %}{{ selected_category.name }}{% else %}All furniture{% endif %}</h1>
+      <p class="eyebrow">{{ emirate.name }} <span data-i18n="marketplace_label">marketplace</span></p>
+      <h1>{% if selected_category %}{{ selected_category.name }}{% else %}<span data-i18n="all_furniture">All furniture</span>{% endif %}</h1>
       <p class="muted">
-        {{ total_results }} item{{ total_results|pluralize }} available
+        {{ total_results }} <span data-i18n="items_available">item{{ total_results|pluralize }} available</span>
         {% if query %}for “{{ query }}”{% endif %}
       </p>
     </div>
   </div>
 
-  <div class="browse-layout">
-    <aside class="filter-panel" aria-label="Filters">
-      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">
-        <div class="field">
-          <label class="field-label" for="filter-q">Search</label>
-          <input class="input" id="filter-q" type="search" name="q" value="{{ request.GET.q }}" placeholder="Sofas, desks, beds…">
-        </div>
+  <!-- Browse Toolbar: Outside Search, Popup Trigger, Active Status, Quick Sort -->
+  <div class="browse-toolbar">
+    <div class="browse-toolbar-start">
+      <!-- Search option OUTSIDE the filter popup -->
+      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" class="browse-search-bar" role="search" aria-label="Search furniture">
+        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category.slug }}">{% endif %}
+        {% if request.GET.condition %}<input type="hidden" name="condition" value="{{ request.GET.condition }}">{% endif %}
+        {% if request.GET.min_price %}<input type="hidden" name="min_price" value="{{ request.GET.min_price }}">{% endif %}
+        {% if request.GET.max_price %}<input type="hidden" name="max_price" value="{{ request.GET.max_price }}">{% endif %}
+        {% if request.GET.sort %}<input type="hidden" name="sort" value="{{ request.GET.sort }}">{% endif %}
 
-        <div class="field">
-          <label class="field-label" for="filter-category">Category</label>
+        <div class="browse-search-input-wrap">
+          <svg class="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input class="input browse-search-input" id="outside-search-q" type="search" name="q" value="{{ request.GET.q }}" placeholder="Search sofas, desks, beds…" data-placeholder-i18n="search_placeholder" aria-label="Search furniture">
+          {% if request.GET.q %}
+            <a href="{% querystring q=None page=None %}" class="browse-search-clear" title="Clear search" aria-label="Clear search">&times;</a>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn-secondary browse-search-btn" data-i18n="btn_search">Search</button>
+      </form>
+
+      <!-- Filter button trigger (Opens Popup Modal) -->
+      <button type="button" class="btn btn-secondary filter-open-btn" data-filter-open aria-haspopup="dialog" aria-expanded="false" aria-controls="filter-modal">
+        <svg class="icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+          <line x1="20" y1="21" x2="20" y2="16"></line>
+          <line x1="20" y1="12" x2="20" y2="3"></line>
+          <line x1="1" y1="14" x2="7" y2="14"></line>
+          <line x1="9" y1="8" x2="15" y2="8"></line>
+          <line x1="17" y1="16" x2="23" y2="16"></line>
+        </svg>
+        <span data-i18n="filters_button">Filters</span>
+        {% if modal_filter_count %}
+          <span class="filter-count-badge" aria-label="{{ modal_filter_count }} filters applied">{{ modal_filter_count }}</span>
+        {% endif %}
+      </button>
+
+      {% if active_filter_count %}
+        <a class="filter-clear-link" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="filter_clear_all">Reset all</a>
+      {% endif %}
+    </div>
+
+    <div class="browse-toolbar-end">
+      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" class="quick-sort-form">
+        <!-- Preserve other active GET params during quick sort change -->
+        {% if request.GET.q %}<input type="hidden" name="q" value="{{ request.GET.q }}">{% endif %}
+        {% if request.GET.category %}<input type="hidden" name="category" value="{{ request.GET.category }}">{% endif %}
+        {% if request.GET.condition %}<input type="hidden" name="condition" value="{{ request.GET.condition }}">{% endif %}
+        {% if request.GET.min_price %}<input type="hidden" name="min_price" value="{{ request.GET.min_price }}">{% endif %}
+        {% if request.GET.max_price %}<input type="hidden" name="max_price" value="{{ request.GET.max_price }}">{% endif %}
+
+        <label class="toolbar-sort-label" for="quick-sort-select" data-i18n="filter_sort_label">Sort</label>
+        <select class="input input-sm toolbar-sort-select" id="quick-sort-select" name="sort" data-autosubmit>
+          {% for value, label in sort_choices %}
+            <option value="{{ value }}"{% if request.GET.sort == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- Active Filter Dismissal Chips -->
+  {% if active_filter_count %}
+    <div class="active-filters-bar" aria-label="Active filters">
+      <span class="active-filters-label" data-i18n="filter_active_filters">Active filters:</span>
+
+      {% if request.GET.q %}
+        <a class="filter-chip" href="{% querystring q=None page=None %}" title="Remove search filter">
+          <span>“{{ request.GET.q }}”</span>
+          <span class="filter-chip-remove" aria-hidden="true">&times;</span>
+        </a>
+      {% endif %}
+
+      {% if selected_category %}
+        <a class="filter-chip" href="{% querystring category=None page=None %}" title="Remove category filter">
+          <span>{{ selected_category.name }}</span>
+          <span class="filter-chip-remove" aria-hidden="true">&times;</span>
+        </a>
+      {% endif %}
+
+      {% if request.GET.condition %}
+        <a class="filter-chip" href="{% querystring condition=None page=None %}" title="Remove condition filter">
+          {% for value, label in conditions %}
+            {% if request.GET.condition == value %}<span>{{ label }}</span>{% endif %}
+          {% endfor %}
+          <span class="filter-chip-remove" aria-hidden="true">&times;</span>
+        </a>
+      {% endif %}
+
+      {% if request.GET.min_price or request.GET.max_price %}
+        <a class="filter-chip" href="{% querystring min_price=None max_price=None page=None %}" title="Remove price filter">
+          <span>
+            {% if request.GET.min_price and request.GET.max_price %}
+              AED {{ request.GET.min_price }} – {{ request.GET.max_price }}
+            {% elif request.GET.min_price %}
+              From AED {{ request.GET.min_price }}
+            {% else %}
+              Up to AED {{ request.GET.max_price }}
+            {% endif %}
+          </span>
+          <span class="filter-chip-remove" aria-hidden="true">&times;</span>
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Listings Result Grid (Full Width) -->
+  <div class="browse-results full-width">
+    {% if listings %}
+      <div class="listing-grid">
+        {% for listing in listings %}
+          {% include "partials/listing_card.html" with listing=listing %}
+        {% endfor %}
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="pagination" aria-label="Pagination">
+          {% if page_obj.has_previous %}
+            <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}">Previous</a>
+          {% endif %}
+          <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}">Next</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="empty-state">
+        <h3 data-i18n="no_matching_filters">Nothing matches those filters</h3>
+        <p data-i18n="empty_filters_help">Try widening your price range or choosing another category.</p>
+        <div class="empty-state-actions">
+          <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="filter_clear_all">Clear all filters</a>
+          <button type="button" class="btn btn-secondary" data-filter-open data-i18n="filters_button">Open filters</button>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Filter Popup Dialog / Modal (100% hidden by default via style="display: none;", opens ONLY on click) -->
+<div id="filter-modal" class="filter-modal" style="display: none;" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="filter-modal-title">
+  <div class="filter-modal-backdrop" data-filter-close tabindex="-1"></div>
+  <div class="filter-modal-dialog">
+    <div class="filter-modal-header">
+      <div class="filter-modal-header-text">
+        <h2 id="filter-modal-title" class="filter-modal-title" data-i18n="filter_modal_title">Filters</h2>
+        <p class="filter-modal-subtitle">{{ total_results }} <span data-i18n="items_available">items available</span></p>
+      </div>
+      <button type="button" class="filter-modal-close" data-filter-close aria-label="Close filters">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="filter-modal-body">
+      <form id="filter-form" method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">
+        <!-- Preserve search keyword from outside -->
+        {% if request.GET.q %}<input type="hidden" name="q" value="{{ request.GET.q }}">{% endif %}
+
+        <!-- 1. Category -->
+        <div class="filter-section">
+          <label class="field-label" for="filter-category" data-i18n="filter_category_label">Category</label>
           <select class="input" id="filter-category" name="category">
-            <option value="">All categories</option>
+            <option value="" data-i18n="filter_all_categories">All categories</option>
             {% for category in categories %}
-              <option value="{{ category.slug }}"{% if selected_category and selected_category.id == category.id %} selected{% endif %}>{{ category.name }}</option>
+              <option value="{{ category.slug }}"{% if selected_category and selected_category.id == category.id %} selected{% endif %}>
+                {{ category.name }}{% if category.listing_count %} ({{ category.listing_count }}){% endif %}
+              </option>
             {% endfor %}
           </select>
         </div>
 
-        <div class="field">
-          <label class="field-label" for="filter-condition">Condition</label>
+        <!-- 3. Condition -->
+        <div class="filter-section">
+          <label class="field-label" for="filter-condition" data-i18n="filter_condition_label">Condition</label>
           <select class="input" id="filter-condition" name="condition">
-            <option value="">Any condition</option>
+            <option value="" data-i18n="filter_any_condition">Any condition</option>
             {% for value, label in conditions %}
               <option value="{{ value }}"{% if request.GET.condition == value %} selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
 
-        <div class="field field-split">
-          <div>
-            <label class="field-label" for="filter-min">Min AED</label>
-            <input class="input" id="filter-min" type="number" min="0" step="1" name="min_price" value="{{ request.GET.min_price }}">
+        <!-- 4. Price Filter: One Slider with 2 Ends (Handles) + Simultaneously Synchronized Text Boxes -->
+        <div class="filter-section" id="priceSliderBox">
+          <div class="filter-section-head">
+            <label class="field-label" data-i18n="filter_price_label">Price range</label>
+            <div class="slider-readout-pill">
+              AED <span id="readoutMinVal">{{ request.GET.min_price|default:"0" }}</span>
+              <span>—</span>
+              AED <span id="readoutMaxVal">{{ request.GET.max_price|default:"10000" }}</span>
+            </div>
           </div>
-          <div>
-            <label class="field-label" for="filter-max">Max AED</label>
-            <input class="input" id="filter-max" type="number" min="0" step="1" name="max_price" value="{{ request.GET.max_price }}">
+
+          <!-- The single slider track with 2 adjustable ends -->
+          <div class="dual-track-box" id="dualTrackContainer">
+            <div class="dual-track-rail"></div>
+            <div class="dual-track-progress" id="dualTrackFill"></div>
+            <input type="range" class="dual-range-input" id="sliderThumbMin" min="0" max="10000" step="25" value="{{ request.GET.min_price|default:'0' }}" aria-label="Minimum price">
+            <input type="range" class="dual-range-input" id="sliderThumbMax" min="0" max="10000" step="25" value="{{ request.GET.max_price|default:'10000' }}" aria-label="Maximum price">
+          </div>
+
+          <!-- Simultaneously Synchronized Price Text Boxes -->
+          <div class="price-inputs-grid">
+            <div class="price-input-card">
+              <span class="price-input-title" data-i18n="filter_min_label">Min AED</span>
+              <div class="price-input-field-wrap">
+                <span class="currency-affix">AED</span>
+                <input class="input input-sm price-live-box" id="filter-min" type="number" min="0" max="100000" step="1" name="min_price" value="{{ request.GET.min_price|default:'0' }}">
+              </div>
+            </div>
+            <span class="price-inputs-hyphen">—</span>
+            <div class="price-input-card">
+              <span class="price-input-title" data-i18n="filter_max_label">Max AED</span>
+              <div class="price-input-field-wrap">
+                <span class="currency-affix">AED</span>
+                <input class="input input-sm price-live-box" id="filter-max" type="number" min="0" max="100000" step="1" name="max_price" value="{{ request.GET.max_price|default:'10000' }}">
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="price-quick-presets">
+            <button type="button" class="quick-preset-btn" data-preset-min="0" data-preset-max="500" data-i18n="price_under_500">Under AED 500</button>
+            <button type="button" class="quick-preset-btn" data-preset-min="500" data-preset-max="1500" data-i18n="price_500_1500">AED 500 – 1.5k</button>
+            <button type="button" class="quick-preset-btn" data-preset-min="1500" data-preset-max="4000" data-i18n="price_1500_4000">AED 1.5k – 4k</button>
+            <button type="button" class="quick-preset-btn" data-preset-min="4000" data-preset-max="10000" data-i18n="price_4000_plus">AED 4,000+</button>
+            <button type="button" class="quick-preset-btn" data-preset-min="0" data-preset-max="10000" data-i18n="price_any">Any price</button>
           </div>
         </div>
 
-        <div class="field">
-          <label class="field-label" for="filter-sort">Sort</label>
+        <!-- 5. Sort order inside popup -->
+        <div class="filter-section">
+          <label class="field-label" for="filter-sort" data-i18n="filter_sort_label">Sort order</label>
           <select class="input" id="filter-sort" name="sort">
             {% for value, label in sort_choices %}
               <option value="{{ value }}"{% if request.GET.sort == value %} selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
-
-        <div class="form-actions">
-          <button class="btn btn-primary btn-small" type="submit">Apply filters</button>
-          <a class="btn btn-quiet btn-small" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Reset</a>
-        </div>
       </form>
-    </aside>
+    </div>
 
-    <div class="browse-results">
-      {% if listings %}
-        <div class="listing-grid">
-          {% for listing in listings %}
-            {% include "partials/listing_card.html" with listing=listing %}
-          {% endfor %}
-        </div>
-
-        {% if page_obj.paginator.num_pages > 1 %}
-          <nav class="pagination" aria-label="Pagination">
-            {% if page_obj.has_previous %}
-              <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}">Previous</a>
-            {% endif %}
-            <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
-              <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}">Next</a>
-            {% endif %}
-          </nav>
-        {% endif %}
-      {% else %}
-        <div class="empty-state">
-          <h3>Nothing matches those filters</h3>
-          <p>Try widening your price range or choosing another category.</p>
-          <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Clear filters</a>
-        </div>
-      {% endif %}
+    <div class="filter-modal-footer">
+      <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="filter_reset_btn">Reset filters</a>
+      <button class="btn btn-primary" type="submit" form="filter-form" data-i18n="filter_apply_btn">Apply filters</button>
     </div>
   </div>
-</section>
+</div>
+
+<script>
+  // Self-contained, robust Modal Popup & Dual Slider controller
+  (function () {
+    var modal = document.getElementById("filter-modal");
+    var openBtns = document.querySelectorAll("[data-filter-open]");
+    var closeBtns = document.querySelectorAll("[data-filter-close]");
+
+    function openModal() {
+      if (!modal) return;
+      modal.style.display = "flex";
+      // Force repaint before adding transition class
+      modal.offsetHeight;
+      modal.classList.add("is-open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      openBtns.forEach(function (b) { b.setAttribute("aria-expanded", "true"); });
+      updateSlider();
+      var firstInput = document.getElementById("filter-category");
+      if (firstInput) {
+        setTimeout(function () { firstInput.focus(); }, 120);
+      }
+    }
+
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.remove("is-open");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      openBtns.forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+      setTimeout(function () {
+        if (!modal.classList.contains("is-open")) {
+          modal.style.display = "none";
+        }
+      }, 200);
+    }
+
+    openBtns.forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        openModal();
+      });
+    });
+
+    closeBtns.forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        closeModal();
+      });
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modal && modal.classList.contains("is-open")) {
+        closeModal();
+      }
+    });
+
+    // --- Dual Slider & Price Text Box Synchronization ---
+    var sliderMin = document.getElementById("sliderThumbMin");
+    var sliderMax = document.getElementById("sliderThumbMax");
+    var boxMin = document.getElementById("filter-min");
+    var boxMax = document.getElementById("filter-max");
+    var readoutMin = document.getElementById("readoutMinVal");
+    var readoutMax = document.getElementById("readoutMaxVal");
+    var trackFill = document.getElementById("dualTrackFill");
+    var trackContainer = document.getElementById("dualTrackContainer");
+    var presetBtns = document.querySelectorAll(".quick-preset-btn");
+
+    var TOTAL_MAX = 10000;
+
+    function formatNum(n) {
+      return Number(n).toLocaleString("en-US");
+    }
+
+    function updateSlider() {
+      if (!sliderMin || !sliderMax) return;
+      var minVal = parseInt(sliderMin.value, 10) || 0;
+      var maxVal = parseInt(sliderMax.value, 10) || TOTAL_MAX;
+
+      var pctMin = Math.max(0, Math.min(100, (minVal / TOTAL_MAX) * 100));
+      var pctMax = Math.max(0, Math.min(100, (maxVal / TOTAL_MAX) * 100));
+      var isRtl = document.documentElement.getAttribute("dir") === "rtl";
+
+      if (trackFill) {
+        var w = Math.max(0, pctMax - pctMin);
+        trackFill.style.width = w + "%";
+        if (isRtl) {
+          trackFill.style.left = "auto";
+          trackFill.style.right = pctMin + "%";
+        } else {
+          trackFill.style.right = "auto";
+          trackFill.style.left = pctMin + "%";
+        }
+      }
+
+      if (readoutMin) readoutMin.textContent = formatNum(minVal);
+      if (readoutMax) readoutMax.textContent = formatNum(maxVal) + (maxVal >= TOTAL_MAX ? "+" : "");
+
+      // Active preset highlight
+      presetBtns.forEach(function (btn) {
+        var pMin = parseInt(btn.getAttribute("data-preset-min"), 10);
+        var pMax = parseInt(btn.getAttribute("data-preset-max"), 10);
+        var isActive = (minVal === pMin && maxVal === pMax);
+        btn.classList.toggle("is-active", isActive);
+      });
+    }
+
+    // Dynamic z-index so clicking near a thumb raises it
+    if (trackContainer) {
+      trackContainer.addEventListener("pointerdown", function (e) {
+        var rect = trackContainer.getBoundingClientRect();
+        var clickX = e.clientX - rect.left;
+        var ratio = Math.max(0, Math.min(1, clickX / rect.width));
+        if (document.documentElement.getAttribute("dir") === "rtl") {
+          ratio = 1 - ratio;
+        }
+        var clickVal = ratio * TOTAL_MAX;
+        var distMin = Math.abs(clickVal - parseInt(sliderMin.value, 10));
+        var distMax = Math.abs(clickVal - parseInt(sliderMax.value, 10));
+
+        if (distMin < distMax) {
+          sliderMin.style.zIndex = "10";
+          sliderMax.style.zIndex = "9";
+        } else {
+          sliderMax.style.zIndex = "10";
+          sliderMin.style.zIndex = "9";
+        }
+      });
+    }
+
+    // 1. When MIN slider thumb is dragged -> SIMULTANEOUSLY change price text box
+    if (sliderMin) {
+      sliderMin.addEventListener("input", function () {
+        var minVal = parseInt(sliderMin.value, 10);
+        var maxVal = parseInt(sliderMax.value, 10);
+        if (minVal > maxVal) {
+          sliderMin.value = maxVal;
+          minVal = maxVal;
+        }
+        if (boxMin) {
+          boxMin.value = minVal;
+        }
+        updateSlider();
+      });
+    }
+
+    // 2. When MAX slider thumb is dragged -> SIMULTANEOUSLY change price text box
+    if (sliderMax) {
+      sliderMax.addEventListener("input", function () {
+        var minVal = parseInt(sliderMin.value, 10);
+        var maxVal = parseInt(sliderMax.value, 10);
+        if (maxVal < minVal) {
+          sliderMax.value = minVal;
+          maxVal = minVal;
+        }
+        if (boxMax) {
+          boxMax.value = maxVal;
+        }
+        updateSlider();
+      });
+    }
+
+    // 3. When MIN price text box is typed -> SIMULTANEOUSLY move slider thumb
+    if (boxMin) {
+      boxMin.addEventListener("input", function () {
+        var val = parseInt(boxMin.value, 10);
+        if (isNaN(val)) val = 0;
+        if (val < 0) val = 0;
+        if (val > TOTAL_MAX) val = TOTAL_MAX;
+        sliderMin.value = val;
+        var maxVal = parseInt(sliderMax.value, 10);
+        if (val > maxVal) {
+          sliderMax.value = val;
+          if (boxMax) boxMax.value = val;
+        }
+        updateSlider();
+      });
+    }
+
+    // 4. When MAX price text box is typed -> SIMULTANEOUSLY move slider thumb
+    if (boxMax) {
+      boxMax.addEventListener("input", function () {
+        var val = parseInt(boxMax.value, 10);
+        if (isNaN(val)) val = TOTAL_MAX;
+        if (val < 0) val = 0;
+        if (val > TOTAL_MAX) val = TOTAL_MAX;
+        sliderMax.value = val;
+        var minVal = parseInt(sliderMin.value, 10);
+        if (val < minVal) {
+          sliderMin.value = val;
+          if (boxMin) boxMin.value = val;
+        }
+        updateSlider();
+      });
+    }
+
+    // 5. Preset buttons
+    presetBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var pMin = parseInt(btn.getAttribute("data-preset-min"), 10) || 0;
+        var pMax = parseInt(btn.getAttribute("data-preset-max"), 10) || TOTAL_MAX;
+
+        sliderMin.value = pMin;
+        sliderMax.value = pMax;
+        if (boxMin) boxMin.value = pMin;
+        if (boxMax) boxMax.value = pMax;
+
+        updateSlider();
+      });
+    });
+
+    // Form submit optimization: if min is 0 and untouched, or max is 10000 and untouched, omit or keep clean
+    var form = document.getElementById("filter-form");
+    if (form) {
+      form.addEventListener("submit", function () {
+        if (boxMin && boxMin.value === "0" && (!sliderMin || sliderMin.value === "0")) {
+          // If 0, can submit 0 or empty (Django accepts both)
+        }
+      });
+    }
+
+    // Initialize initial values
+    if (boxMin && boxMin.value) {
+      sliderMin.value = boxMin.value;
+    }
+    if (boxMax && boxMax.value) {
+      sliderMax.value = boxMax.value;
+    }
+    updateSlider();
+
+    window._syncPriceSlider = updateSlider;
+  })();
+</script>
 {% endblock %}

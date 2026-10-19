@@ -356,6 +356,32 @@ a:hover { color: var(--brand-strong); }
 .main-nav a:hover,
 .link-button:hover { color: var(--brand); text-decoration: underline; }
 
+.main-nav a.nav-sell-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand, #dc2626) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--brand, #dc2626) !important;
+  font-weight: 750;
+  font-size: 0.88rem;
+  padding: 0.45rem 1.05rem;
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
+  text-decoration: none !important;
+  transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+  line-height: 1.2;
+}
+
+.main-nav a.nav-sell-btn:hover {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.45);
+  text-decoration: none !important;
+}
+
 .inline-form { display: inline; }
 
 .nav-toggle {
@@ -801,6 +827,594 @@ a:hover { color: var(--brand-strong); }
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Browse Toolbar, Filter Popup Modal & Dual Price Slider
+   -------------------------------------------------------------------------- */
+
+.browse-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.browse-toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
+.browse-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 280px;
+  max-width: 440px;
+}
+
+.browse-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+}
+
+.browse-search-input-wrap .search-input-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+[dir="rtl"] .browse-search-input-wrap .search-input-icon {
+  left: auto;
+  right: 0.85rem;
+}
+
+.browse-search-input {
+  width: 100%;
+  height: 38px;
+  padding-left: 2.35rem !important;
+  padding-right: 2rem !important;
+  font-size: 0.88rem;
+  border-radius: var(--radius-sm);
+}
+
+[dir="rtl"] .browse-search-input {
+  padding-left: 2rem !important;
+  padding-right: 2.35rem !important;
+}
+
+.browse-search-clear {
+  position: absolute;
+  right: 0.7rem;
+  color: var(--muted);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1;
+  cursor: pointer;
+}
+
+[dir="rtl"] .browse-search-clear {
+  right: auto;
+  left: 0.7rem;
+}
+
+.browse-search-btn {
+  height: 38px;
+  padding: 0 0.95rem;
+  font-weight: 650;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+
+.browse-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.filter-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-open-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.filter-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.filter-clear-link {
+  font-size: 0.86rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.filter-clear-link:hover {
+  color: var(--brand);
+}
+
+.quick-sort-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar-sort-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.toolbar-sort-select {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.88rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Active Filters Bar */
+.active-filters-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.35rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.active-filters-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--sand);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 550;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.filter-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--brand);
+  line-height: 1;
+}
+
+.browse-results.full-width {
+  width: 100%;
+}
+
+.empty-state-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* Filter Popup Modal */
+.filter-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.filter-modal.is-open {
+  display: flex !important;
+}
+
+.filter-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.filter-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95) translateY(8px);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.filter-modal.is-open .filter-modal-dialog {
+  transform: scale(1) translateY(0);
+}
+
+.filter-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.15rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.filter-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 750;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.filter-modal-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.filter-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.filter-modal-close:hover {
+  color: var(--ink);
+  background: var(--sand);
+}
+
+.filter-modal-body {
+  padding: 1.35rem 1.4rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+
+.filter-section {
+  margin-bottom: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0.2rem;
+}
+
+.filter-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.filter-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+[dir="rtl"] .search-input-icon {
+  left: auto;
+  right: 0.85rem;
+}
+
+.filter-search-input {
+  padding-left: 2.35rem;
+}
+
+[dir="rtl"] .filter-search-input {
+  padding-left: 0.85rem;
+  padding-right: 2.35rem;
+}
+
+/* Price Slider Component */
+.slider-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  letter-spacing: -0.01em;
+}
+
+.readout-sep {
+  opacity: 0.6;
+}
+
+.dual-slider-container {
+  position: relative;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  margin: 0.85rem 0 0.5rem;
+}
+
+.dual-slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sand-deep);
+}
+
+.dual-slider-highlight {
+  position: absolute;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  transition: left 0.05s ease, width 0.05s ease, right 0.05s ease;
+}
+
+.dual-range-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 38px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+  z-index: 2;
+}
+
+.dual-range-input:focus {
+  outline: none;
+}
+
+/* Slider Thumbs */
+.dual-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dual-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px var(--brand-soft);
+}
+
+.dual-range-input::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.22);
+  box-shadow: 0 0 0 8px var(--brand-soft);
+}
+
+.dual-range-input::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dual-range-input::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px var(--brand-soft);
+}
+
+.dual-range-input::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.22);
+  box-shadow: 0 0 0 8px var(--brand-soft);
+}
+
+/* Synchronized Number Inputs */
+.slider-inputs-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.slider-input-cell {
+  flex: 1;
+}
+
+.input-caption {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.input-prefix-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+[dir="rtl"] .input-prefix {
+  left: auto;
+  right: 0.75rem;
+}
+
+.slider-num-input {
+  padding-left: 2.3rem !important;
+}
+
+[dir="rtl"] .slider-num-input {
+  padding-left: 0.75rem !important;
+  padding-right: 2.3rem !important;
+}
+
+.slider-inputs-divider {
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Preset Price Buttons */
+.price-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.preset-chip {
+  background: var(--sand);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.32rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-chip:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.preset-chip.is-active {
+  background: var(--brand);
+  color: #ffffff;
+  border-color: var(--brand);
+}
+
+.filter-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* Dark mode refinements */
+[data-theme="dark"] .dual-range-input::-webkit-slider-thumb {
+  border-color: #111111;
+}
+
+[data-theme="dark"] .dual-range-input::-moz-range-thumb {
+  border-color: #111111;
+}
+
+[data-theme="dark"] .filter-modal-backdrop {
+  background: rgba(0, 0, 0, 0.75);
 }
 
 /* --------------------------------------------------------------------------

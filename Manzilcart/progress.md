@@ -7,8 +7,8 @@
 **Project:** ManzilCart — C2C marketplace for new and refurbished furniture, UAE
 **Django project:** `Manzilcart` (settings package: `Manzilcart/`)
 **Django app:** originally `mainapp`, renamed to `core` (agreed with the owner)
-**Python venv:** `D:\Programming\My Project\ManzilAs\venv`
-**Last updated:** 2026-10-19
+**Python venv:** `d:\Django_projects\multivendor-ecom-as\Manzilcart\venv`
+**Last updated:** 2026-10-19 23:55
 
 ---
 
@@ -279,6 +279,62 @@ real cron deployment is documented in `docs/deployment.md`.
 - Executed a local PostgreSQL **restore drill**: `pg_dump -Fc` → restore into a scratch
   database → matching `django_migrations` (32) and service-area (32) counts → drop.
 - Added the production flags and messaging placeholders to `.env.example`.
+
+### 2026-10-19 (Evening Session: 17:30 – 23:55) — Frontend Theme, Bilingual RTL, Interactive Gallery, Filter Modal, & Navigation Refinements ✅
+
+1. **Landing Page Template Inheritance & Alerts Fix (17:45)**:
+   - Fixed `templates/locations/landing.html` block structure by ensuring all page content inherits properly within `{% block content %}` and error alerts display when an inactive or invalid marketplace is encountered.
+
+2. **Red / White / Black Theme, Dark Mode & Arabic Bilingual RTL Switcher (18:30)**:
+   - **Theme**: Updated entire site color scheme to Red (`--brand: #dc2626`), clean whites/neutrals (`#ffffff`, `#f4f4f5`), and dark/black surfaces (`--ink: #111111`, `#09090b`).
+   - **Dark Mode**: Added theme toggle (`[data-theme-toggle]`) in header with sun/moon SVG icons. Persists preference in `localStorage.getItem("theme")`.
+   - **Bilingual (English / Arabic RTL)**:
+     - Added language switcher (`[data-lang-toggle]`) in header with `localStorage` persistence.
+     - Automatically sets `html[dir="rtl"]` and `html[lang="ar"]` when Arabic is selected.
+     - Created comprehensive client-side translation dictionaries in `static/js/app.js` (`i18n.en` and `i18n.ar`) covering navigation, hero sections, value cards, listing details, emirate names, form placeholders (`[data-placeholder-i18n]`), and filter modal labels.
+     - Added mirrored RTL styling in `static/css/styles.css` for inputs, icons, carousels, and layout grids.
+
+3. **Logo Integration (19:15)**:
+   - Replaced old logo with new branded assets in `static/images/`:
+     - `logo.png`: Full logo for light backgrounds.
+     - `logo-dark.png`: Full logo for dark theme.
+     - `logo-mark.png`: Compact emblem/favicon.
+   - Updated `templates/base.html` header and footer with CSS auto-switching between light and dark modes.
+
+4. **Product Detail Interactive Zoom Gallery (19:50)**:
+   - `templates/catalog/listing_detail.html`:
+     - Transformed vertical image dump into a single featured hero image container (`[data-zoom-viewport]`) with interactive cursor hover-zoom (`transform: scale(2.2)` tracking pointer position).
+     - Added horizontal thumbnail row below main photo with active highlight borders, click-to-view, left/right keyboard navigation, and smooth auto-scrolling into view.
+
+5. **Listing Page Popup Filter Modal & Dual Price Range Slider (21:35)**:
+   - `templates/catalog/listing_list.html`, `static/css/styles.css`, `static/js/app.js`:
+     - **Popup Modal**: Filters are completely hidden by default (`style="display: none;"`) so they never render in page flow below listings.
+     - **Trigger**: Added a browse toolbar containing a "Filters" button (`[data-filter-open]`) with active filter count badge.
+     - Opens an accessible modal overlay (`#filter-modal`) with dark blurred backdrop, ESC key listener, and click-outside dismissal.
+     - **Price Dual-Slider**: Implemented a single horizontal track with two draggable red handles (`min_price` and `max_price`), solid red fill between handles, and smart pointer collision detection.
+     - **Simultaneous Real-Time Price Text Box Sync**: Dragging either slider handle updates the Min/Max price text boxes in real-time at 60fps; typing into the text boxes moves the slider handles in lockstep.
+     - Added quick preset price chips ("Under AED 500", "AED 500 – 1.5k", "AED 1.5k – 4k", "AED 4,000+", "Any price").
+     - Added active filter chips with `×` remove links using Django's `{% querystring %}` tag.
+     - Bumped static cache-busting query strings (`?v=1.4`) in `templates/base.html` and placed critical modal styles in `{% block extra_head %}` to guarantee immediate rendering without browser caching issues.
+
+6. **Outside Search Bar Separation (22:05)**:
+   - Kept the search keyword input (`q`) outside the filter popup modal by placing a dedicated search bar (`.browse-search-bar`) directly in the browse toolbar on the page.
+   - Removed search input from inside the modal while preserving active query parameters as hidden fields.
+   - Split filter count into `modal_filter_count` (category, condition, price) for the "Filters" button badge and `active_filter_count` for active dismissal chips (`catalog/views.py`).
+
+7. **Header Navigation Refinement — "Sell+" Button (21:45)**:
+   - `templates/base.html`:
+     - Removed the "Join ManzilCart" button.
+     - Moved "Sell" from inside the nav links to the far top-right as a prominent red button labeled `"Sell+"` (`.nav-sell-btn`).
+     - Added bilingual translations (`Sell+` in EN, `بيع+` in AR).
+
+
+### Test Status (Verified 2026-10-19 23:55)
+- All 194 automated tests pass with zero failures:
+  ```powershell
+  ..\venv\Scripts\python.exe manage.py test
+  # Ran 194 tests in 22.9s ... OK
+  ```
 
 ---
 

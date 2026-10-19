@@ -27,7 +27,7 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
-  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.4">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -91,7 +91,6 @@
       <nav class="main-nav" id="primary-nav" aria-label="Primary">
         {% if current_emirate %}
           <a href="{% url 'marketplace:home' emirate_slug=current_emirate.slug %}" data-i18n="nav_browse">Browse</a>
-          <a href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell">Sell</a>
           <a href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}" data-i18n="nav_auctions">Auctions</a>
         {% endif %}
 
@@ -105,9 +104,12 @@
           </form>
         {% else %}
           <a href="{% url 'accounts:login' %}" data-i18n="nav_sign_in">Sign in</a>
-          {% if current_emirate %}
-            <a class="btn btn-small btn-primary" href="{% url 'accounts:start' %}" data-i18n="nav_join">Join ManzilCart</a>
-          {% endif %}
+        {% endif %}
+
+        {% if current_emirate %}
+          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell_plus">Sell+</a>
+        {% else %}
+          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'locations:landing' %}" data-i18n="nav_sell_plus">Sell+</a>
         {% endif %}
       </nav>
     </div>
@@ -169,7 +171,7 @@
     </div>
   </footer>
 
-  <script src="{% static 'js/app.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}?v=1.4" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

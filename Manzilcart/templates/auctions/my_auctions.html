@@ -83,10 +83,13 @@
   {% else %}
     <div class="empty-state">
       <h3>No auctions yet</h3>
-      <p>Bid on an auction from the marketplace, or start one from one of your listings.</p>
-      {% if current_emirate %}
-        <a class="btn btn-primary" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
-      {% endif %}
+      <p>Auctions are created from your approved furniture listings. Go to your listings to start an auction, or browse active auctions.</p>
+      <div class="form-actions" style="justify-content: center; margin-top: 1rem;">
+        <a class="btn btn-primary" href="{% url 'accounts:listings' %}">Go to My listings</a>
+        {% if current_emirate %}
+          <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
+        {% endif %}
+      </div>
     </div>
   {% endif %}
 </section>
