@@ -62,7 +62,9 @@ class Command(BaseCommand):
     def _open_scheduled(self, now, limit: int) -> int:
         ids = list(
             Auction.objects.filter(
-                status=Auction.Status.SCHEDULED, start_at__lte=now
+                status=Auction.Status.SCHEDULED,
+                moderation_status=Auction.ModerationStatus.APPROVED,
+                start_at__lte=now,
             )
             .order_by("start_at", "id")
             .values_list("pk", flat=True)[:limit]
@@ -81,7 +83,9 @@ class Command(BaseCommand):
     def _close_expired(self, now, limit: int) -> int:
         ids = list(
             Auction.objects.filter(
-                status=Auction.Status.LIVE, end_at__lte=now
+                status=Auction.Status.LIVE,
+                moderation_status=Auction.ModerationStatus.APPROVED,
+                end_at__lte=now,
             )
             .order_by("end_at", "id")
             .values_list("pk", flat=True)[:limit]

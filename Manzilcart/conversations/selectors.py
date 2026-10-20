@@ -11,8 +11,15 @@ def conversations_for(user):
     """Every thread the user participates in, newest activity first."""
     return (
         Conversation.objects.filter(Q(buyer=user) | Q(seller=user))
-        .select_related("listing", "listing__emirate", "buyer", "seller")
-        .prefetch_related("listing__images")
+        .select_related(
+            "listing",
+            "listing__emirate",
+            "auction",
+            "auction__emirate",
+            "buyer",
+            "seller",
+        )
+        .prefetch_related("listing__images", "auction__images")
         .annotate(
             unread_count=Count(
                 "messages",
@@ -43,6 +50,11 @@ def conversation_for_participant(pk: int, user) -> Conversation | None:
             "listing__emirate",
             "listing__service_area",
             "listing__seller",
+            "auction",
+            "auction__category",
+            "auction__emirate",
+            "auction__service_area",
+            "auction__seller",
             "buyer",
             "seller",
             "emirate",

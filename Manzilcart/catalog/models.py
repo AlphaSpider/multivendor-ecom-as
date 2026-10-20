@@ -104,7 +104,6 @@ class ListingQuerySet(models.QuerySet):
 
 class Listing(TimeStampedModel):
     class Condition(models.TextChoices):
-        NEW = "new", "New"
         LIKE_NEW = "like_new", "Like new"
         GOOD = "good", "Good"
         FAIR = "fair", "Fair"

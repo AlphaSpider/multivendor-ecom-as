@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from django.db.models import Max, Q
+from django.db.models import Max, Prefetch, Q
 
-from auctions.models import Auction, AuctionSelection
+from auctions.models import Auction, AuctionImage, AuctionSelection
 
 ACTIVE_STATUSES = (
     Auction.Status.SCHEDULED,
@@ -16,63 +16,60 @@ ENDED_STATUSES = (
     Auction.Status.UNSOLD,
     Auction.Status.CANCELLED,
 )
+APPROVED = Auction.ModerationStatus.APPROVED
 
 
 def _auction_queryset():
     return (
         Auction.objects.select_related(
-            "listing",
-            "listing__category",
-            "listing__service_area",
-            "listing__emirate",
-            "listing__seller",
-            "seller",
+            "category",
+            "service_area",
             "emirate",
+            "seller",
             "selected_bid",
             "selected_bidder",
             "awarded_deal",
         )
-        .prefetch_related("listing__images")
+        .prefetch_related(
+            Prefetch("images", queryset=AuctionImage.objects.order_by("display_order", "id"))
+        )
         .annotate(top_bid=Max("bids__amount"))
     )
 
 
 def active_auctions_for_emirate(emirate):
-    """Auctions a visitor can still watch or bid on, soonest deadline first."""
+    """Approved auctions a visitor can watch or bid on, soonest deadline first."""
     return (
         _auction_queryset()
         .filter(
             emirate=emirate,
             status__in=ACTIVE_STATUSES,
-            listing__published_at__isnull=False,
+            moderation_status=APPROVED,
         )
         .order_by("end_at", "id")
     )
 
 
 def ended_auctions_for_emirate(emirate):
-    """Recently finished auctions, newest outcome first."""
+    """Recently finished approved auctions, newest outcome first."""
     return (
         _auction_queryset()
         .filter(
             emirate=emirate,
             status__in=ENDED_STATUSES,
-            listing__published_at__isnull=False,
+            moderation_status=APPROVED,
         )
         .order_by("-end_at", "-id")
     )
 
 
 def auction_for_emirate(pk: int, emirate) -> Auction | None:
-    return (
-        _auction_queryset()
-        .filter(pk=pk, emirate=emirate)
-        .first()
-    )
+    """Fetch an auction in its marketplace; visibility is enforced by the view."""
+    return _auction_queryset().filter(pk=pk, emirate=emirate).first()
 
 
 def auctions_for_user(user):
-    """Auctions the member is selling in, bidding on or has been offered."""
+    """Every auction the member sells, bids on, or has been offered."""
     return (
         _auction_queryset()
         .filter(
@@ -83,14 +80,6 @@ def auctions_for_user(user):
         )
         .distinct()
         .order_by("-created_at", "-id")
-    )
-
-
-def active_auction_for_listing(listing) -> Auction | None:
-    return (
-        Auction.objects.filter(listing=listing, status__in=ACTIVE_STATUSES)
-        .order_by("-created_at", "-id")
-        .first()
     )
 
 

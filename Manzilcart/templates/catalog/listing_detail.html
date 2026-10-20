@@ -29,16 +29,6 @@
     </div>
   {% endif %}
 
-  {% if active_auction %}
-    <div class="form-alert" role="status">
-      <p>
-        <strong>This item is in an auction.</strong>
-        Bidding is open in the marketplace.
-        <a href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}">View the auction and current bids</a>.
-      </p>
-    </div>
-  {% endif %}
-
   <div class="detail-layout">
     <div class="detail-gallery" data-product-gallery>
       {% if listing.images.all %}
@@ -129,13 +119,6 @@
         <div class="form-actions">
           {% if can_edit %}
             <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}" data-i18n="edit_listing">Edit listing</a>
-          {% endif %}
-          {% if listing.is_public %}
-            {% if active_auction %}
-              <a class="btn btn-quiet" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=active_auction.pk %}" data-i18n="view_auction">View auction</a>
-            {% else %}
-              <a class="btn btn-quiet" href="{% url 'auction_marketplace:create' emirate_slug=emirate.slug listing_slug=listing.slug %}" data-i18n="create_auction">Create auction</a>
-            {% endif %}
           {% endif %}
           <a class="btn btn-quiet" href="{% url 'accounts:listings' %}" data-i18n="all_my_listings">All my listings</a>
         </div>

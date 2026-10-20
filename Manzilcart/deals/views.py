@@ -110,7 +110,7 @@ class DealDetailView(LoginRequiredMixin, TemplateView):
                 in {deal.Status.ACCEPTED, deal.Status.CANCELLATION_REQUESTED},
                 "offer_form": OfferForm(),
                 "cancellation_form": CancellationRequestForm(),
-                "available_services": available_service_options(deal.listing.service_area),
+                "available_services": available_service_options(deal.service_area),
                 "selected_service_ids": selected_ids,
             }
         )
@@ -208,7 +208,7 @@ class DealActionView(LoginRequiredMixin, View):
 
     def action_accept(self, request, deal):
         services.accept_offer(deal, actor=request.user, request=request)
-        return "Deal accepted. The listing is now reserved."
+        return "Deal accepted. The item is now reserved."
 
     def action_reject(self, request, deal):
         services.reject_offer(
@@ -249,7 +249,7 @@ class DealActionView(LoginRequiredMixin, View):
             request=request,
         )
         return (
-            "Cancellation accepted. The deal is cancelled and the listing reopened."
+            "Cancellation accepted. The deal is cancelled and the item reopened."
             if accept
             else "Cancellation request rejected."
         )
@@ -271,7 +271,7 @@ class DealActionView(LoginRequiredMixin, View):
             note=request.POST.get("note", ""),
             request=request,
         )
-        return "Deal cancelled by operations; the listing was reopened where possible."
+        return "Deal cancelled by operations; the item was reopened where possible."
 
     # -- helpers -----------------------------------------------------------
     @staticmethod

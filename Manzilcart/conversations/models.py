@@ -24,12 +24,22 @@ from core.models import TimeStampedModel
 
 
 class Conversation(TimeStampedModel):
-    """A buyer's thread about one listing."""
+    """A buyer's thread about one listing or one standalone auction."""
 
     listing = models.ForeignKey(
         "catalog.Listing",
+        null=True,
+        blank=True,
         on_delete=models.PROTECT,
         related_name="conversations",
+    )
+    auction = models.ForeignKey(
+        "auctions.Auction",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="conversations",
+        help_text="Set for a thread about a standalone auction.",
     )
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -57,7 +67,20 @@ class Conversation(TimeStampedModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["listing", "buyer"],
+                condition=Q(listing__isnull=False),
                 name="conversation_unique_listing_buyer",
+            ),
+            models.UniqueConstraint(
+                fields=["auction", "buyer"],
+                condition=Q(auction__isnull=False),
+                name="conversation_unique_auction_buyer",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (Q(listing__isnull=False) & Q(auction__isnull=True))
+                    | (Q(listing__isnull=True) & Q(auction__isnull=False))
+                ),
+                name="conversation_exactly_one_source",
             ),
             models.CheckConstraint(
                 condition=~Q(buyer=F("seller")),
@@ -71,7 +94,36 @@ class Conversation(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.buyer} / {self.seller} about {self.listing}"
+        return f"{self.buyer} / {self.seller} about {self.item_title}"
+
+    # -- item facade --------------------------------------------------------
+    @property
+    def item_title(self) -> str:
+        if self.listing_id:
+            return self.listing.title
+        return self.auction.title if self.auction_id else "Item"
+
+    @property
+    def service_area(self):
+        if self.listing_id:
+            return self.listing.service_area
+        return self.auction.service_area if self.auction_id else None
+
+    @property
+    def cover_image(self):
+        if self.listing_id:
+            return self.listing.cover_image
+        return self.auction.cover_image if self.auction_id else None
+
+    @property
+    def item_url(self) -> str:
+        if self.listing_id:
+            return self.listing.get_absolute_url()
+        return self.auction.get_absolute_url() if self.auction_id else ""
+
+    @property
+    def item_kind(self) -> str:
+        return "auction" if self.auction_id else "listing"
 
     # -- authorisation ------------------------------------------------------
     def is_participant(self, user) -> bool:

@@ -14,6 +14,11 @@ urlpatterns = [
         name="start",
     ),
     path(
+        "my/conversations/start/auction/<int:auction_id>/",
+        views.StartAuctionConversationView.as_view(),
+        name="start_auction",
+    ),
+    path(
         "my/conversations/<int:pk>/",
         views.ConversationDetailView.as_view(),
         name="detail",

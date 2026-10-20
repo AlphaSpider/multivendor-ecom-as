@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Seller account needed — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Seller area</p>
+      <h1>You cannot create an item yet</h1>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:1.5rem">
+    <p>{{ message }}</p>
+    <p class="muted">
+      Once your mobile number is verified you can create both fixed-price listings and
+      auctions from your dashboard.
+    </p>
+    <div class="form-actions">
+      <a class="btn btn-primary" href="{% url 'accounts:dashboard' %}">Go to my account</a>
+      <a class="btn btn-quiet" href="{% url 'accounts:profile' %}">Check my profile</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

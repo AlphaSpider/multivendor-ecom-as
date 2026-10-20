@@ -19,6 +19,7 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from catalog.models import Listing
+from auctions.models import Auction
 from conversations import services
 from conversations.selectors import (
     conversation_for_participant,
@@ -69,6 +70,7 @@ class ConversationDetailView(LoginRequiredMixin, TemplateView):
         context.update(
             {
                 "conversation": conversation,
+                "item": conversation,
                 "listing": conversation.listing,
                 "other": conversation.other_participant(self.request.user),
                 "messages": page_messages,
@@ -100,6 +102,31 @@ class StartConversationView(LoginRequiredMixin, View):
         except ValidationError as exc:
             messages.error(request, " ".join(exc.messages))
             return redirect(listing.get_absolute_url())
+
+        return redirect("conversations:detail", pk=conversation.pk)
+
+
+class StartAuctionConversationView(LoginRequiredMixin, View):
+    """Create (or reopen) the buyer's thread for a standalone auction."""
+
+    login_url = "accounts:login"
+
+    def post(self, request, *args, **kwargs):
+        auction = get_object_or_404(
+            Auction.objects.select_related("seller", "emirate"),
+            pk=kwargs["auction_id"],
+            moderation_status=Auction.ModerationStatus.APPROVED,
+        )
+        try:
+            conversation = services.start_conversation(
+                auction=auction, buyer=request.user, request=request
+            )
+        except DomainError as exc:
+            messages.error(request, exc.message)
+            return redirect(auction.get_absolute_url())
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect(auction.get_absolute_url())
 
         return redirect("conversations:detail", pk=conversation.pk)
 

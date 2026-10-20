@@ -30,7 +30,7 @@ class MessageInline(admin.TabularInline):
 class ConversationAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "listing",
+        "item_display",
         "buyer",
         "seller",
         "emirate",
@@ -40,15 +40,17 @@ class ConversationAdmin(admin.ModelAdmin):
     list_filter = ("emirate", "created_at")
     search_fields = (
         "listing__title",
+        "auction__title",
         "buyer__phone",
         "buyer__display_name",
         "seller__phone",
         "seller__display_name",
     )
-    list_select_related = ("listing", "buyer", "seller", "emirate")
+    list_select_related = ("listing", "auction", "buyer", "seller", "emirate")
     date_hierarchy = "created_at"
     readonly_fields = (
         "listing",
+        "auction",
         "buyer",
         "seller",
         "emirate",
@@ -57,6 +59,10 @@ class ConversationAdmin(admin.ModelAdmin):
         "updated_at",
     )
     inlines = (MessageInline,)
+
+    @admin.display(description="Item")
+    def item_display(self, obj):
+        return obj.item_title
 
     def has_add_permission(self, request):
         return False
@@ -75,6 +81,7 @@ class MessageAdmin(admin.ModelAdmin):
         "sender__phone",
         "sender__display_name",
         "conversation__listing__title",
+        "conversation__auction__title",
     )
     list_select_related = ("conversation", "sender")
     date_hierarchy = "created_at"

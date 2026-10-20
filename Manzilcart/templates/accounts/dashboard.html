@@ -30,6 +30,14 @@
       <span class="muted" data-i18n="my_listings_desc">Drafts, reviews and items you have sold.</span>
     </a>
 
+    {% if auction_create_url %}
+      <a class="dashboard-tile" href="{{ auction_create_url }}">
+        <span class="tile-eyebrow" data-i18n="nav_auctions">Auctions</span>
+        <strong>Create auction</strong>
+        <span class="muted">List a standalone item with photos, a schedule and an optional reserve.</span>
+      </a>
+    {% endif %}
+
     <a class="dashboard-tile" href="{% url 'conversations:list' %}">
       <span class="tile-eyebrow" data-i18n="nav_messages">Messages</span>
       <strong data-i18n="conversations_title">Conversations</strong>

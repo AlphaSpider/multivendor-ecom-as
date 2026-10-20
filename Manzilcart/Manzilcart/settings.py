@@ -1,5 +1,5 @@
 """
-Django settings for ManzilCart - a C2C marketplace for new and refurbished furniture
+Django settings for ManzilCart - a C2C marketplace for pre-owned and refurbished furniture
 in the United Arab Emirates (launching in Abu Dhabi and Ras Al Khaimah).
 
 Design notes

@@ -71,6 +71,9 @@ class AuditEvent(models.Model):
         DEAL_COMPLETED = "deal.completed", "Deal completed"
         # Auctions
         AUCTION_CREATED = "auction.created", "Auction created"
+        AUCTION_SUBMITTED = "auction.submitted", "Auction submitted for review"
+        AUCTION_APPROVED = "auction.approved", "Auction approved"
+        AUCTION_REJECTED = "auction.rejected", "Auction rejected"
         AUCTION_BID_LOCKED = "auction.bid_locked", "Bid locked by seller"
         AUCTION_AWARDED = "auction.awarded", "Auction awarded"
         AUCTION_UNSOLD = "auction.unsold", "Auction closed unsold"

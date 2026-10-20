@@ -4,11 +4,11 @@
 > decisions behind it, and exactly what is left. Update it at the end of every working
 > session (or after each completed task) with the date and what changed.
 
-**Project:** ManzilCart — C2C marketplace for new and refurbished furniture, UAE
+**Project:** ManzilCart — C2C marketplace for pre-owned furniture, UAE
 **Django project:** `Manzilcart` (settings package: `Manzilcart/`)
 **Django app:** originally `mainapp`, renamed to `core` (agreed with the owner)
 **Python venv:** `d:\Django_projects\multivendor-ecom-as\Manzilcart\venv`
-**Last updated:** 2026-10-20 12:10
+**Last updated:** 2026-10-20 21:40
 
 ---
 
@@ -410,6 +410,99 @@ real cron deployment is documented in `docs/deployment.md`.
   ..\venv\Scripts\python.exe manage.py test
   # Ran 196 tests in 19.8s ... OK
   ```
+
+---
+
+### 2026-10-20 (Afternoon Session: 19:00 - 20:45) - Step 2: Standalone Auctions & Decoupled Deals ✅
+
+**Decision:** `catalog.Listing` is fixed-price only. An auction is now a standalone
+marketplace item with its own content, photos, location, schedule and moderation. It
+never creates, inherits from, or references a listing at runtime.
+
+**Auction model and lifecycle**
+- `Auction` gained `title`, `description`, `category`, `condition`, `service_area`,
+  `moderation_status` (`draft` / `pending` / `approved` / `rejected`), moderation
+  timestamps/reviewer, `moderation_note`, an optional `legacy_listing_id` rollback
+  breadcrumb, and `AuctionImage` with a one-cover-per-auction partial unique index.
+- Approval is a separate axis from lifecycle `status`. New auctions are `SCHEDULED`;
+  only an approved auction can be public, opened by the worker, bid on, locked or
+  awarded. Draft/pending/rejected items are hidden from the board and return 404 to
+  visitors; their owner and staff can still inspect them.
+- New auctions support “Submit for review” (default) and “Save draft”. Draft/rejected
+  auctions are freely editable. Approved auctions are editable only before the first
+  bid; editing sends them back to `pending` and resets lifecycle to `scheduled`. Once
+  bidding starts, content and photos are frozen.
+- Seller notifications and audit events added for submit/approve/reject; append-only
+  `moderation.AuctionReview` rows are written by `approve_auction()` /
+  `reject_auction()` so every caller gets the same history.
+- Rejection reasons are shown to the seller in My auctions, where they can edit and
+  resubmit.
+
+**Auctions UI and access**
+- New route `/<emirate_slug>/auctions/new/`; one form covers item details, photos,
+  schedule, optional reserve and fallback agreement. The edit route reuses it.
+- Navbar “Auctions” opens a paginated board of approved live/scheduled auctions
+  (soonest deadline first) then recently closed outcomes, with a prominent
+  “Create Auction” action.
+- Logged-out visitors are sent to login with a `next` back to the create page.
+  Ineligible sellers see the same shared `accounts/seller_not_eligible.html` message
+  as listing creation, never a 404.
+- “Create auction” entry points added to the member dashboard and My auctions.
+- Auction board cards now reuse the fixed-price `listing-card` layout (cover image,
+  condition badge, title, price, area/category), with an added close/open time line.
+- Auction detail photos now use the same interactive gallery as fixed-price listings:
+  main viewport with hover zoom, previous/next arrows, thumbnail strip, active thumb,
+  and the shared no-photos state (`partials/auction_card.html`, `data-product-gallery`).
+- Auction detail now places the Bidding/place-bid panel immediately after the gallery,
+  with “About this item” below it in the actual DOM order (so mobile, tablet and
+  desktop all agree); bid history and auction history follow, then the sidebar.
+- Mobile header now places the burger menu at the inline-start (left in LTR, right in
+  RTL), before the logo. Static asset versions were bumped to avoid stale CSS caches.
+- Marketplace condition choices are pre-owned only: `New` was removed from both
+  listing and auction choices. Migrations remap any existing `new` rows to `like_new`
+  (catalog `0005`, auctions `0004`). Marketing copy now says “pre-owned” instead of
+  “new and refurbished”.
+- Removed all catalog auction links/injection: listing feeds, category pages, search,
+  counts and APIs contain listings only.
+
+**Deals and conversations decoupled**
+- `Deal.listing` is nullable and `Deal.auction` was added with an XOR check
+  (`deal_exactly_one_source`), one-active-deal-per-listing and
+  one-active-deal-per-auction partial uniques, plus an auction/status index.
+- `create_awarded_deal(listing=None, auction=None, ...)` now awards either source.
+  New auction awards create `Deal(auction=auction, listing=None)` as `ACCEPTED`;
+  legacy listing-linked auction deals are left untouched. `Deal` exposes
+  `item_title`, `item_reference`, `item_kind`, `item_url`, `cover_image` etc.
+- Deal pages, selectors, notifications and cancellation flows work without a listing.
+- `Conversation.listing` is nullable and `Conversation.auction` was added with an XOR
+  check and one-thread-per-buyer/per-item partial uniques. New route
+  `my/conversations/start/auction/<id>/` only accepts approved auctions. Templates use
+  item facade properties.
+
+**Migrations and rollout**
+- `auctions.0002_standalone_auction_content`: adds the new fields/images, copies
+  listing title/description/category/condition/area/seller and images, marks auctions
+  whose listing was published as `APPROVED`, then enforces non-null content fields and
+  drops listing-scoped uniqueness.
+- `auctions.0003_drop_auction_listing`: archives linked `approved` listings that have
+  no deal, leaves listings with any deal untouched, then drops `Auction.listing`.
+  Reverse re-adds the column and restores `legacy_listing_id` (new standalone auctions
+  have no legacy listing, so rollback after creating them needs an operator decision).
+- `deals.0002_auction_deals`, `conversations.0002_auction_conversations`,
+  `moderation.0002_auctionreview`, `core.0002_audit_auction_moderation` add the
+  corresponding schema and choices. Existing deals are never altered.
+- Added read-only dry run:
+  `..\venv\Scripts\python.exe manage.py audit_auction_decoupling [--json]`.
+  It introspects the live schema, so it works before and after the migrations, and
+  reports listings that will be archived vs. protected by an existing deal.
+
+**Verification**
+- `manage.py check`: clean.
+- `manage.py check --deploy` in `DJANGO_ENV=production` with a production-like
+  configuration: no errors (only expected warnings for Redis/provider mode/DEBUG in
+  this local environment).
+- `manage.py test`: **199 tests, OK** (auctions 36, deals 32, conversations including
+  auction threads, plus the existing suites).
 
 ---
 

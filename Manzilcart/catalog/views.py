@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
 
+from accounts.eligibility import SellerEligibleMixin
 from catalog import services
 from catalog.forms import ListingForm, ListingSearchForm
 from catalog.models import Listing
@@ -146,18 +147,13 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
                 # Same response as a missing listing: do not disclose drafts.
                 raise Http404("Listing not found.")
 
-        # Owners get an auction entry point; everyone sees an active auction banner.
-        from auctions.selectors import active_auction_for_listing
-
-        active_auction = active_auction_for_listing(listing)
-
+        # Owners get edit controls; auctions are standalone items and never appear here.
         return render(
             request,
             self.template_name,
             {
                 "emirate": self.emirate,
                 "listing": listing,
-                "active_auction": active_auction,
                 "is_owner": request.user.is_authenticated
                 and request.user.pk == listing.seller_id,
                 "can_edit": request.user.is_authenticated
@@ -167,7 +163,7 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
         )
 
 
-class ListingCreateView(LoginRequiredMixin, EmirateRequiredMixin, View):
+class ListingCreateView(LoginRequiredMixin, SellerEligibleMixin, EmirateRequiredMixin, View):
     """Create a listing in the marketplace the member is browsing."""
 
     template_name = "catalog/listing_form.html"

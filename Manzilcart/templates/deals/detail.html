@@ -18,9 +18,9 @@
   <div class="page-heading">
     <div>
       <p class="eyebrow" data-status>{{ deal.get_status_display }}</p>
-      <h1>{{ deal.listing.title }}</h1>
+      <h1>{{ deal.item_title }}</h1>
       <p class="muted">
-        {{ deal.reference }} · <span data-area-name>{{ deal.listing.service_area.name }}</span>, <span data-emirate-name>{{ deal.emirate.name }}</span>
+        {{ deal.reference }} · <span data-area-name>{{ deal.service_area.name }}</span>, <span data-emirate-name>{{ deal.emirate.name }}</span>
         · {% if is_buyer %}<span data-i18n="deals_you_are_buyer">You are the buyer</span>{% else %}<span data-i18n="deals_you_are_seller">You are the seller</span>{% endif %}
       </p>
     </div>
@@ -40,8 +40,10 @@
         <p class="deal-agreed-price">
           {% if deal.agreed_price %}
             Agreed at <strong>AED {{ deal.agreed_price|floatformat:0|intcomma }}</strong>
-          {% else %}
+          {% elif deal.listing_id %}
             Asking price <strong>AED {{ deal.listing.asking_price|floatformat:0|intcomma }}</strong>
+          {% else %}
+            Winning bid <strong>AED {{ deal.agreed_price|floatformat:0|intcomma }}</strong>
           {% endif %}
         </p>
         <p class="muted small">
@@ -268,15 +270,15 @@
     </div>
 
     <aside class="panel deal-sidebar">
-      <h2>Listing</h2>
-      {% with cover=deal.listing.cover_image %}
+      <h2>{{ deal.item_kind|capfirst }}</h2>
+      {% with cover=deal.cover_image %}
         {% if cover %}
           <img class="deal-sidebar-image" src="{{ cover.image.url }}" alt="" loading="lazy">
         {% endif %}
       {% endwith %}
-      <p class="muted small">{{ deal.listing.category.name }} · {{ deal.listing.get_condition_display }}</p>
-      {% if deal.listing.is_public %}
-        <a class="btn btn-quiet btn-small" href="{{ deal.listing.get_absolute_url }}">View listing</a>
+      <p class="muted small">{{ deal.item_category.name }} · {{ deal.condition_display }}</p>
+      {% if deal.item_url %}
+        <a class="btn btn-quiet btn-small" href="{{ deal.item_url }}">View {{ deal.item_kind }}</a>
       {% endif %}
 
       <h2>People</h2>
@@ -284,7 +286,7 @@
         <div><dt>Buyer</dt><dd>{{ deal.buyer.display_name|default:"ManzilCart member" }}</dd></div>
         <div><dt>Seller</dt><dd>{{ deal.seller.display_name|default:"ManzilCart member" }}</dd></div>
         <div><dt>Marketplace</dt><dd>{{ deal.emirate.name }}</dd></div>
-        <div><dt>Area</dt><dd>{{ deal.listing.service_area.name }}</dd></div>
+        <div><dt>Area</dt><dd>{{ deal.service_area.name }}</dd></div>
       </dl>
 
       <p class="safety-note">

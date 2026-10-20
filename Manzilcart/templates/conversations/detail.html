@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
-{% block title %}Chat about {{ conversation.listing.title }} — ManzilCart{% endblock %}
+{% block title %}Chat about {{ conversation.item_title }} — ManzilCart{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/conversations.css' %}">
@@ -12,22 +12,34 @@
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
     <span aria-hidden="true">/</span>
-    <span>{{ conversation.listing.title }}</span>
+    <span>{{ conversation.item_title }}</span>
   </nav>
 
   <div class="chat-layout">
     <aside class="panel chat-context">
       <div class="chat-listing">
-        {% with cover=listing.cover_image %}
+        {% with cover=conversation.cover_image %}
           {% if cover %}
             <img src="{{ cover.image.url }}" alt="" loading="lazy">
           {% endif %}
         {% endwith %}
         <div>
-          <h1>{{ listing.title }}</h1>
-          <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
-          <p class="muted small"><span data-area-name>{{ listing.service_area.name }}</span>, <span data-emirate-name>{{ listing.emirate.name }}</span></p>
-          <p class="muted small" data-status>{{ listing.get_status_display }}</p>
+          <h1>{{ conversation.item_title }}</h1>
+          <p class="detail-price">
+            {% if conversation.listing_id %}
+              AED {{ conversation.listing.asking_price|floatformat:0|intcomma }}
+            {% else %}
+              Auction item
+            {% endif %}
+          </p>
+          <p class="muted small"><span data-area-name>{{ conversation.service_area.name }}</span>, <span data-emirate-name>{{ conversation.emirate.name }}</span></p>
+          <p class="muted small" data-status>
+            {% if conversation.listing_id %}
+              {{ conversation.listing.get_status_display }}
+            {% else %}
+              {{ conversation.auction.get_status_display }}
+            {% endif %}
+          </p>
         </div>
       </div>
 
@@ -38,8 +50,8 @@
         </div>
       </dl>
 
-      {% if listing.is_public %}
-        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}" data-i18n="deals_view_listing">View listing</a>
+      {% if conversation.item_url %}
+        <a class="btn btn-quiet btn-small" href="{{ conversation.item_url }}">View {{ conversation.item_kind }}</a>
       {% endif %}
 
       <p class="safety-note">

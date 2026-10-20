@@ -1,9 +1,9 @@
 """
-Auction service layer: creation, bidding, seller lock, confirmation and fallback.
+Auction service layer: moderation, creation, bidding, seller lock and fallback.
 
 All deadline processing is idempotent and row-locked, so two workers (or a worker and
-the bidder's browser) cannot award an auction twice. The auction row is locked first,
-then the listing row inside ``deals.services.create_awarded_deal``.
+the bidder's browser) cannot award an auction twice. The auction row is locked first.
+An auction award creates a deal linked to the auction (never to a catalog listing).
 """
 
 from __future__ import annotations
@@ -12,21 +12,25 @@ import logging
 import uuid
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.conf import settings
-from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.core.files.base import ContentFile
+from django.core import signing
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
-from auctions.models import Auction, AuctionEvent, AuctionSelection, Bid
-from catalog.models import Listing
-from catalog.services import ensure_owner
+from auctions.models import Auction, AuctionEvent, AuctionImage, AuctionSelection, Bid
+from catalog.models import Category
 from core.audit import record_audit
 from core.exceptions import PermissionDeniedError, StateTransitionError
+from core.images import sanitise_image, validate_image_upload
 from core.models import AuditEvent
 from deals.services import create_awarded_deal
+from locations.validation import validate_emirate_service_area
 from notifications.models import Notification
 from notifications.services import queue_notification
 
@@ -37,6 +41,10 @@ ACTIVE_STATUSES = (
     Auction.Status.SCHEDULED,
     Auction.Status.LIVE,
     Auction.Status.LOCKED,
+)
+EDITABLE_MODERATION_STATUSES = (
+    Auction.ModerationStatus.DRAFT,
+    Auction.ModerationStatus.REJECTED,
 )
 
 
@@ -88,6 +96,62 @@ def _notify_user(*, user, kind, subject, body, auction, key):
         logger.exception("Could not queue %s for auction %s", kind, auction.pk)
 
 
+def _ensure_owner(auction: Auction, actor) -> None:
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        raise PermissionDeniedError("Please sign in to manage this auction.")
+    if auction.seller_id != actor.pk:
+        raise PermissionDeniedError("You cannot change this auction.")
+
+
+def _validate_schedule(start_at, end_at, *, now=None) -> tuple:
+    """Validate and normalise an auction schedule. Shared by create and edit."""
+    now = now or timezone.now()
+    if start_at is None or end_at is None:
+        raise ValidationError({"end_at": "Choose a start and end time."})
+    if end_at <= start_at:
+        raise ValidationError({"end_at": "The end time must be after the start time."})
+    if end_at <= now:
+        raise ValidationError({"end_at": "The auction must end in the future."})
+    if start_at < now - timedelta(minutes=1):
+        start_at = now
+    duration = end_at - start_at
+    if duration < timedelta(hours=settings.AUCTION_MIN_DURATION_HOURS):
+        raise ValidationError(
+            {
+                "end_at": (
+                    "Auctions must run for at least "
+                    f"{settings.AUCTION_MIN_DURATION_HOURS} hour(s)."
+                )
+            }
+        )
+    if duration > timedelta(days=settings.AUCTION_MAX_DURATION_DAYS):
+        raise ValidationError(
+            {
+                "end_at": (
+                    "Auctions can run for at most "
+                    f"{settings.AUCTION_MAX_DURATION_DAYS} days."
+                )
+            }
+        )
+    return start_at, end_at
+
+
+def _validate_content(*, title, description, category, condition) -> None:
+    if not (title or "").strip():
+        raise ValidationError({"title": "Give the item a title."})
+    if len((description or "").strip()) < 20:
+        raise ValidationError(
+            {"description": "Please write at least 20 characters about the item."}
+        )
+    if category is None or not category.is_active:
+        raise ValidationError({"category": "Please choose an available category."})
+    if category.parent_id is None and category.children.filter(is_active=True).exists():
+        raise ValidationError({"category": "Please choose a more specific category."})
+    valid_conditions = {choice[0] for choice in Auction.Condition.choices}
+    if condition not in valid_conditions:
+        raise ValidationError({"condition": "Choose a valid condition."})
+
+
 def eligible_bids(auction: Auction) -> list[Bid]:
     """
     One row per bidder: their highest bid, earliest first on a tie.
@@ -128,7 +192,7 @@ def selection_from_token(token: str) -> AuctionSelection | None:
         return None
     return (
         AuctionSelection.objects.select_related(
-            "auction", "auction__listing", "auction__emirate", "bidder", "bid"
+            "auction", "auction__emirate", "bidder", "bid"
         )
         .filter(pk=selection_id)
         .first()
@@ -150,7 +214,7 @@ def _send_selection_invite(selection: AuctionSelection) -> None:
         else Notification.Kind.AUCTION_SELECTION
     )
     body = (
-        f"You have been selected for {auction.reference} — {auction.listing.title} "
+        f"You have been selected for {auction.reference} — {auction.title} "
         f"at AED {selection.bid.amount}. Confirm or decline within {minutes} minute(s): "
         f"{_selection_link(selection)}\n"
         "If you do not respond by the deadline, the auction is offered to the next "
@@ -168,67 +232,64 @@ def _send_selection_invite(selection: AuctionSelection) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Creation
+# Creation and seller edits
 # ---------------------------------------------------------------------------
 
 
 @transaction.atomic
 def create_auction(
     *,
-    listing: Listing,
     seller,
+    emirate,
+    title: str,
+    description: str,
+    category: Category,
+    condition: str,
+    service_area,
     start_at,
     end_at,
     reserve_price=None,
     agree_fallback: bool = False,
+    submit_for_review: bool = True,
     request=None,
 ) -> Auction:
-    ensure_owner(listing, seller)
-
-    locked_listing = (
-        Listing.objects.select_for_update()
-        .select_related("seller", "emirate", "service_area")
-        .get(pk=listing.pk)
-    )
-    if not locked_listing.is_public:
-        raise StateTransitionError("Only an approved, published listing can be auctioned.")
-    if Auction.objects.filter(listing=locked_listing, status__in=ACTIVE_STATUSES).exists():
-        raise StateTransitionError("This listing already has an active auction.")
+    """Create a standalone auction item. No catalog listing is created."""
     if not agree_fallback:
         raise ValidationError(
             {"agree_fallback": "You must accept the fallback rules before starting."}
         )
-
-    now = timezone.now()
-    if start_at is None or end_at is None:
-        raise ValidationError({"end_at": "Choose a start and end time."})
-    if end_at <= start_at:
-        raise ValidationError({"end_at": "The end time must be after the start time."})
-    if end_at <= now:
-        raise ValidationError({"end_at": "The auction must end in the future."})
-    if start_at < now - timedelta(minutes=1):
-        start_at = now
-    duration = end_at - start_at
-    if duration < timedelta(hours=settings.AUCTION_MIN_DURATION_HOURS):
-        raise ValidationError(
-            {"end_at": f"Auctions must run for at least {settings.AUCTION_MIN_DURATION_HOURS} hour(s)."}
-        )
-    if duration > timedelta(days=settings.AUCTION_MAX_DURATION_DAYS):
-        raise ValidationError(
-            {"end_at": f"Auctions can run for at most {settings.AUCTION_MAX_DURATION_DAYS} days."}
-        )
+    emirate, service_area = validate_emirate_service_area(emirate, service_area)
+    _validate_content(
+        title=title, description=description, category=category, condition=condition
+    )
+    start_at, end_at = _validate_schedule(start_at, end_at)
     reserve = _money(reserve_price) if reserve_price not in (None, "") else None
 
-    auction = Auction.objects.create(
-        listing=locked_listing,
+    now = timezone.now()
+    auction = Auction(
         seller=seller,
-        emirate=locked_listing.emirate,
+        title=title.strip(),
+        description=description.strip(),
+        category=category,
+        condition=condition,
+        emirate=emirate,
+        service_area=service_area,
         start_at=start_at,
         end_at=end_at,
         reserve_price=reserve,
-        status=Auction.Status.LIVE if start_at <= now else Auction.Status.SCHEDULED,
+        # Approval is required before the worker may open this auction.
+        status=Auction.Status.SCHEDULED,
+        moderation_status=(
+            Auction.ModerationStatus.PENDING
+            if submit_for_review
+            else Auction.ModerationStatus.DRAFT
+        ),
+        submitted_at=now if submit_for_review else None,
         seller_agreed_fallback=True,
     )
+    auction.full_clean(exclude=["approved_by"])
+    auction.save()
+
     _record_event(
         auction,
         AuctionEvent.Type.CREATED,
@@ -240,20 +301,338 @@ def create_auction(
             "reserve_price": str(reserve) if reserve else None,
         },
     )
+    if submit_for_review:
+        _record_event(
+            auction,
+            AuctionEvent.Type.SUBMITTED,
+            actor=seller,
+            summary="Submitted for moderation",
+        )
     record_audit(
-        action=AuditEvent.Action.AUCTION_CREATED,
+        action=(
+            AuditEvent.Action.AUCTION_SUBMITTED
+            if submit_for_review
+            else AuditEvent.Action.ADMIN_ACTION
+        ),
         actor=seller,
         entity=auction,
         emirate=auction.emirate,
-        summary=f"Auction {auction.reference} created for {locked_listing.title}",
+        summary=(
+            f"Auction {auction.reference} submitted for review"
+            if submit_for_review
+            else f"Auction {auction.reference} saved as draft"
+        ),
         request=request,
     )
     return auction
 
 
 @transaction.atomic
+def update_auction(
+    auction: Auction,
+    *,
+    actor,
+    title: str,
+    description: str,
+    category: Category,
+    condition: str,
+    service_area,
+    start_at,
+    end_at,
+    reserve_price=None,
+    agree_fallback: bool = False,
+    submit_for_review: bool = True,
+    request=None,
+) -> Auction:
+    """
+    Edit an auction.
+
+    Drafts and rejected auctions can be edited freely. An approved auction may only be
+    edited before its first bid; doing so puts it back into moderation. Once bidding has
+    started, content is frozen.
+    """
+    _ensure_owner(auction, actor)
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    if not locked.is_editable_by_owner:
+        raise StateTransitionError(
+            "This auction can no longer be edited. Bidding has already started."
+        )
+    if not agree_fallback:
+        raise ValidationError(
+            {"agree_fallback": "You must accept the fallback rules before saving."}
+        )
+
+    emirate, service_area = validate_emirate_service_area(locked.emirate, service_area)
+    _validate_content(
+        title=title, description=description, category=category, condition=condition
+    )
+    start_at, end_at = _validate_schedule(start_at, end_at)
+    reserve = _money(reserve_price) if reserve_price not in (None, "") else None
+
+    locked.title = title.strip()
+    locked.description = description.strip()
+    locked.category = category
+    locked.condition = condition
+    locked.service_area = service_area
+    locked.start_at = start_at
+    locked.end_at = end_at
+    locked.reserve_price = reserve
+    locked.seller_agreed_fallback = True
+
+    was_approved = locked.moderation_status == Auction.ModerationStatus.APPROVED
+    if was_approved or submit_for_review:
+        locked.moderation_status = Auction.ModerationStatus.PENDING
+        locked.submitted_at = timezone.now()
+        locked.moderation_note = ""
+        # Content is no longer public until a moderator approves it again.
+        locked.status = Auction.Status.SCHEDULED
+    elif locked.moderation_status == Auction.ModerationStatus.DRAFT:
+        locked.status = Auction.Status.SCHEDULED
+
+    locked.full_clean(exclude=["approved_by"])
+    locked.save()
+
+    if locked.moderation_status == Auction.ModerationStatus.PENDING:
+        _record_event(
+            locked,
+            AuctionEvent.Type.SUBMITTED,
+            actor=actor,
+            summary="Edited and resubmitted for moderation",
+        )
+        record_audit(
+            action=AuditEvent.Action.AUCTION_SUBMITTED,
+            actor=actor,
+            entity=locked,
+            emirate=emirate,
+            summary=f"Auction {locked.reference} edited and resubmitted",
+            request=request,
+        )
+    else:
+        record_audit(
+            action=AuditEvent.Action.ADMIN_ACTION,
+            actor=actor,
+            entity=locked,
+            emirate=emirate,
+            summary=f"Auction {locked.reference} saved as draft",
+            request=request,
+        )
+    return locked
+
+
+@transaction.atomic
+def submit_auction(auction: Auction, *, actor, request=None) -> Auction:
+    _ensure_owner(auction, actor)
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    if locked.moderation_status not in EDITABLE_MODERATION_STATUSES:
+        raise StateTransitionError("This auction is not waiting for a resubmission.")
+    locked.moderation_status = Auction.ModerationStatus.PENDING
+    locked.moderation_note = ""
+    locked.submitted_at = timezone.now()
+    locked.save(
+        update_fields=["moderation_status", "moderation_note", "submitted_at", "updated_at"]
+    )
+    _record_event(
+        locked,
+        AuctionEvent.Type.SUBMITTED,
+        actor=actor,
+        summary="Submitted for moderation",
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_SUBMITTED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} submitted for review",
+        request=request,
+    )
+    return locked
+
+
+# ---------------------------------------------------------------------------
+# Moderation
+# ---------------------------------------------------------------------------
+
+
+@transaction.atomic
+def approve_auction(auction: Auction, *, reviewer, request=None) -> Auction:
+    """Approve a pending auction. Lifecycle status is deliberately unchanged."""
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    if locked.moderation_status != Auction.ModerationStatus.PENDING:
+        raise StateTransitionError("Only a pending auction can be approved.")
+    previous = locked.moderation_status
+    now = timezone.now()
+    locked.moderation_status = Auction.ModerationStatus.APPROVED
+    locked.moderation_note = ""
+    locked.approved_at = now
+    locked.approved_by = reviewer
+    locked.save(
+        update_fields=[
+            "moderation_status",
+            "moderation_note",
+            "approved_at",
+            "approved_by",
+            "updated_at",
+        ]
+    )
+    _record_event(
+        locked,
+        AuctionEvent.Type.APPROVED,
+        actor=reviewer,
+        summary="Auction approved",
+    )
+    from moderation.models import AuctionReview
+
+    AuctionReview.objects.create(
+        auction=locked,
+        reviewer=reviewer,
+        decision=AuctionReview.Decision.APPROVE,
+        previous_status=previous,
+        new_status=Auction.ModerationStatus.APPROVED,
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPROVED,
+        actor=reviewer,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} approved",
+        metadata={"previous_status": previous},
+        request=request,
+    )
+    _notify_user(
+        user=locked.seller,
+        kind=Notification.Kind.AUCTION_OUTCOME,
+        subject=f"Auction approved — {locked.reference}",
+        body=(
+            f"Your auction “{locked.title}” ({locked.reference}) has been approved. "
+            f"It opens on {locked.start_at:%d %b %Y %H:%M} and closes on "
+            f"{locked.end_at:%d %b %Y %H:%M}."
+        ),
+        auction=locked,
+        key=f"auction:{locked.pk}:moderation:approved",
+    )
+    return locked
+
+
+@transaction.atomic
+def reject_auction(auction: Auction, *, reviewer, reason: str, request=None) -> Auction:
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError({"reason": "A rejection reason is required."})
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    if locked.moderation_status != Auction.ModerationStatus.PENDING:
+        raise StateTransitionError("Only a pending auction can be rejected.")
+    previous = locked.moderation_status
+    locked.moderation_status = Auction.ModerationStatus.REJECTED
+    locked.moderation_note = reason
+    locked.save(
+        update_fields=["moderation_status", "moderation_note", "updated_at"]
+    )
+    _record_event(
+        locked,
+        AuctionEvent.Type.REJECTED,
+        actor=reviewer,
+        summary=reason,
+    )
+    from moderation.models import AuctionReview
+
+    AuctionReview.objects.create(
+        auction=locked,
+        reviewer=reviewer,
+        decision=AuctionReview.Decision.REJECT,
+        reason=reason,
+        previous_status=previous,
+        new_status=Auction.ModerationStatus.REJECTED,
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_REJECTED,
+        actor=reviewer,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} rejected",
+        metadata={"reason": reason, "previous_status": previous},
+        request=request,
+    )
+    _notify_user(
+        user=locked.seller,
+        kind=Notification.Kind.AUCTION_OUTCOME,
+        subject=f"Auction needs changes — {locked.reference}",
+        body=(
+            f"Your auction “{locked.title}” ({locked.reference}) was not approved.\n"
+            f"Reason: {reason}\n"
+            "Edit the auction from My auctions and submit it again."
+        ),
+        auction=locked,
+        key=f"auction:{locked.pk}:moderation:rejected",
+    )
+    return locked
+
+
+# ---------------------------------------------------------------------------
+# Images
+# ---------------------------------------------------------------------------
+
+
+@transaction.atomic
+def add_auction_image(auction: Auction, uploaded_file, *, actor, caption: str = "") -> AuctionImage:
+    """Validate, sanitise and store one auction image using ``core.images``."""
+    _ensure_owner(auction, actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.moderation_status == Auction.ModerationStatus.APPROVED and locked.bids.exists():
+        raise StateTransitionError("Photos cannot be changed once bidding has started.")
+
+    existing_count = locked.images.count()
+    if existing_count >= settings.MAX_IMAGES_PER_LISTING:
+        raise ValidationError(
+            f"An auction can have at most {settings.MAX_IMAGES_PER_LISTING} images."
+        )
+
+    validate_image_upload(uploaded_file)
+
+    uploaded_file.seek(0)
+    payload = uploaded_file.read()
+    data, extension = sanitise_image(payload)
+
+    image = AuctionImage(
+        auction=locked,
+        caption=caption[:140],
+        is_cover=(existing_count == 0),
+        display_order=existing_count,
+    )
+    image.image.save(f"{uuid.uuid4().hex}.{extension}", ContentFile(data), save=False)
+
+    with Image.open(BytesIO(data)) as probe:
+        image.width, image.height = probe.size
+    image.byte_size = len(data)
+
+    try:
+        # A savepoint keeps the outer transaction usable if a concurrent upload won
+        # the single-cover constraint first.
+        with transaction.atomic():
+            image.save()
+    except IntegrityError:
+        image.is_cover = False
+        image.save()
+
+    return image
+
+
+# ---------------------------------------------------------------------------
+# Bidding
+# ---------------------------------------------------------------------------
+
+
+def _normalise_client_id(value):
+    if value in (None, ""):
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError({"client_bid_id": "Invalid bid identifier."}) from exc
+
+
+@transaction.atomic
 def cancel_auction(auction: Auction, *, actor, reason="", request=None) -> Auction:
-    locked = Auction.objects.select_for_update().select_related("listing", "emirate").get(pk=auction.pk)
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
     is_seller = actor is not None and actor.pk == locked.seller_id
     is_staff = actor is not None and getattr(actor, "is_staff", False)
     if not (is_seller or is_staff):
@@ -283,20 +662,6 @@ def cancel_auction(auction: Auction, *, actor, reason="", request=None) -> Aucti
     return locked
 
 
-# ---------------------------------------------------------------------------
-# Bidding
-# ---------------------------------------------------------------------------
-
-
-def _normalise_client_id(value):
-    if value in (None, ""):
-        return None
-    try:
-        return uuid.UUID(str(value))
-    except (TypeError, ValueError) as exc:
-        raise ValidationError({"client_bid_id": "Invalid bid identifier."}) from exc
-
-
 @transaction.atomic
 def place_bid(
     auction: Auction,
@@ -314,7 +679,9 @@ def place_bid(
     if not getattr(bidder, "is_mobile_verified", False):
         raise PermissionDeniedError("Verify your mobile number before bidding.")
 
-    lock = Auction.objects.select_for_update().select_related("listing", "emirate").get(pk=auction.pk)
+    lock = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    if not lock.is_public:
+        raise StateTransitionError("This auction is not available.")
     if lock.seller_id == bidder.pk:
         raise PermissionDeniedError("You cannot bid on your own auction.")
 
@@ -331,8 +698,6 @@ def place_bid(
         raise StateTransitionError("Bidding has not started yet.")
     if now >= lock.end_at:
         raise StateTransitionError("This auction has closed.")
-    if not lock.listing.is_public:
-        raise StateTransitionError("The listing is no longer available.")
 
     limit = settings.AUCTION_MAX_BIDS_PER_USER
     if lock.bids.filter(bidder=bidder).count() >= limit:
@@ -366,7 +731,7 @@ def place_bid(
             kind=Notification.Kind.AUCTION_OUTBID,
             subject=f"You have been outbid — {lock.reference}",
             body=(
-                f"A new bid of AED {amount} was placed on {lock.listing.title}. "
+                f"A new bid of AED {amount} was placed on {lock.title}. "
                 f"Place a higher bid before {lock.end_at:%d %b %Y %H:%M}."
             ),
             auction=lock,
@@ -382,12 +747,12 @@ def lock_bid(auction: Auction, *, seller, bid_id: int, request=None) -> AuctionS
 
     Only the current highest eligible bid can be locked, and only before ``end_at``.
     """
-    locked = Auction.objects.select_for_update().select_related("listing", "emirate").get(pk=auction.pk)
-    ensure_owner(locked.listing, seller)
+    locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
+    _ensure_owner(locked, seller)
+    if not locked.is_public:
+        raise StateTransitionError("This auction is not available for bidding.")
     if locked.status != Auction.Status.LIVE:
         raise StateTransitionError("Only a live auction can lock a bid.")
-    if not locked.listing.is_public:
-        raise StateTransitionError("This listing is no longer available for auction.")
     if timezone.now() >= locked.end_at:
         raise StateTransitionError("The auction has ended; bids can no longer be locked.")
 
@@ -405,7 +770,11 @@ def lock_bid(auction: Auction, *, seller, bid_id: int, request=None) -> AuctionS
         auction=locked,
         bidder=highest.bidder,
         bid=highest,
-        sequence=(locked.selections.order_by("-sequence").values_list("sequence", flat=True).first() or 0) + 1,
+        sequence=(
+            locked.selections.order_by("-sequence").values_list("sequence", flat=True).first()
+            or 0
+        )
+        + 1,
         confirmation_deadline=deadline,
     )
     locked.status = Auction.Status.LOCKED
@@ -453,8 +822,6 @@ def _award(
     actor,
     request=None,
 ) -> "Deal":  # noqa: F821 - avoids importing Deal at module import time
-    from deals.models import Deal
-
     # Idempotency: the unique awarded_deal relationship is the final backstop.
     if auction.awarded_deal_id:
         if (
@@ -474,9 +841,11 @@ def _award(
         raise StateTransitionError("This auction is no longer awaiting confirmation.")
     if auction.selected_bid_id != selection.bid_id:
         raise StateTransitionError("This bid is no longer the selected bid.")
+    if not auction.is_public:
+        raise StateTransitionError("This auction is no longer available.")
 
     deal = create_awarded_deal(
-        listing=auction.listing,
+        auction=auction,
         buyer=selection.bidder,
         amount=selection.bid.amount,
         source="auction",
@@ -540,10 +909,10 @@ def confirm_selection(
     with transaction.atomic():
         locked_selection = (
             AuctionSelection.objects.select_for_update()
-            .select_related("auction", "auction__listing", "bid")
+            .select_related("auction", "bid")
             .get(pk=selection.pk)
         )
-        auction = Auction.objects.select_for_update().select_related("listing", "emirate").get(
+        auction = Auction.objects.select_for_update().select_related("emirate").get(
             pk=locked_selection.auction_id
         )
         if actor is None or actor.pk != locked_selection.bidder_id:
@@ -591,7 +960,7 @@ def decline_selection(
         .select_related("auction", "bid")
         .get(pk=selection.pk)
     )
-    auction = Auction.objects.select_for_update().select_related("listing", "emirate").get(
+    auction = Auction.objects.select_for_update().select_related("emirate").get(
         pk=locked_selection.auction_id
     )
     if actor is None or actor.pk != locked_selection.bidder_id:
@@ -660,7 +1029,7 @@ def _offer_next(auction: Auction, *, actor=None) -> AuctionSelection | None:
             subject=f"Auction unsold — {auction.reference}",
             body=(
                 f"{auction.reference} closed without a confirmed bidder. "
-                "You can relist the item or run another auction."
+                "You can create a new auction for the item."
             ),
             auction=auction,
             key=f"auction:{auction.pk}:unsold:seller",
@@ -714,17 +1083,13 @@ def expire_selection(selection_id: int, *, now=None) -> AuctionSelection | None:
     unsold. Safe to call repeatedly from the scheduler.
     """
     now = now or timezone.now()
-    selection = (
-        AuctionSelection.objects.select_for_update()
-        .filter(pk=selection_id)
-        .first()
-    )
+    selection = AuctionSelection.objects.select_for_update().filter(pk=selection_id).first()
     if selection is None or selection.status != AuctionSelection.Status.PENDING:
         return None
     if selection.confirmation_deadline > now:
         return selection
 
-    auction = Auction.objects.select_for_update().select_related("listing", "emirate").get(
+    auction = Auction.objects.select_for_update().select_related("emirate").get(
         pk=selection.auction_id
     )
     if auction.status != Auction.Status.LOCKED:
@@ -752,10 +1117,18 @@ def expire_selection(selection_id: int, *, now=None) -> AuctionSelection | None:
 
 @transaction.atomic
 def open_scheduled_auction(auction_id: int, *, now=None) -> Auction | None:
+    """Open an approved scheduled auction. Unapproved items are never opened."""
     now = now or timezone.now()
-    auction = Auction.objects.select_for_update().select_related("listing", "emirate").filter(
-        pk=auction_id, status=Auction.Status.SCHEDULED
-    ).first()
+    auction = (
+        Auction.objects.select_for_update()
+        .select_related("emirate")
+        .filter(
+            pk=auction_id,
+            status=Auction.Status.SCHEDULED,
+            moderation_status=Auction.ModerationStatus.APPROVED,
+        )
+        .first()
+    )
     if auction is None:
         return None
     if auction.end_at <= now:
@@ -781,9 +1154,16 @@ def close_expired_auction(auction_id: int, *, now=None) -> Auction | None:
     a bid before the end, the auction closes unsold.
     """
     now = now or timezone.now()
-    auction = Auction.objects.select_for_update().select_related("listing", "emirate").filter(
-        pk=auction_id, status=Auction.Status.LIVE
-    ).first()
+    auction = (
+        Auction.objects.select_for_update()
+        .select_related("emirate")
+        .filter(
+            pk=auction_id,
+            status=Auction.Status.LIVE,
+            moderation_status=Auction.ModerationStatus.APPROVED,
+        )
+        .first()
+    )
     if auction is None or auction.end_at > now:
         return auction
 
@@ -807,8 +1187,8 @@ def close_expired_auction(auction_id: int, *, now=None) -> Auction | None:
         kind=Notification.Kind.AUCTION_OUTCOME,
         subject=f"Auction ended unsold — {auction.reference}",
         body=(
-            f"{auction.reference} ended without a locked bid. You can relist the item "
-            "or run another auction."
+            f"{auction.reference} ended without a locked bid. You can create a new "
+            "auction for the item."
         ),
         auction=auction,
         key=f"auction:{auction.pk}:unsold:seller",

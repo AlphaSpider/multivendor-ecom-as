@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}ManzilCart — furniture marketplace{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Buy and sell new and refurbished furniture in Abu Dhabi and Ras Al Khaimah.{% endblock %}">
+  <meta name="description" content="{% block meta_description %}Buy and sell pre-owned furniture in Abu Dhabi and Ras Al Khaimah.{% endblock %}">
   <meta name="theme-color" content="#dc2626">
   <script>
     (function () {
@@ -27,7 +27,7 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
-  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.4">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.5">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -136,7 +136,7 @@
         <a href="{% if current_emirate %}{% url 'marketplace:home' emirate_slug=current_emirate.slug %}{% else %}{% url 'locations:landing' %}{% endif %}" class="footer-brand-link" aria-label="ManzilCart home">
           <img src="{% static 'images/logo-dark.png' %}" alt="ManzilCart" class="footer-logo" width="148" height="52">
         </a>
-        <p data-i18n="footer_brand_desc">New and refurbished furniture, from homes in the UAE to homes in the UAE.</p>
+        <p data-i18n="footer_brand_desc">Pre-owned furniture, from homes in the UAE to homes in the UAE.</p>
       </div>
       <div class="footer-links">
         <span class="footer-heading" data-i18n="footer_marketplaces">Marketplaces</span>
@@ -169,7 +169,7 @@
     </div>
   </footer>
 
-  <script src="{% static 'js/app.js' %}?v=2.5" defer></script>
+  <script src="{% static 'js/app.js' %}?v=2.6" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

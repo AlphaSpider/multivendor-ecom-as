@@ -22,7 +22,7 @@
       {% for conversation in conversations %}
         <li class="panel conversation-row">
           <div class="conversation-thumb">
-            {% with cover=conversation.listing.cover_image %}
+            {% with cover=conversation.cover_image %}
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
@@ -34,7 +34,7 @@
           <div class="conversation-body">
             <div class="conversation-head">
               <a href="{% url 'conversations:detail' pk=conversation.pk %}">
-                {{ conversation.listing.title }}
+                {{ conversation.item_title }}
               </a>
               {% if conversation.unread_count %}
                 <span class="badge">{{ conversation.unread_count }} <span data-i18n="new_badge">new</span></span>
@@ -47,7 +47,7 @@
               {% else %}
                 {{ conversation.buyer.display_name|default:"a buyer" }}
               {% endif %}
-              · <span data-area-name="{{ conversation.listing.service_area.name }}">{{ conversation.listing.service_area.name }}</span>, <span data-emirate-name="{{ conversation.listing.emirate.name }}">{{ conversation.listing.emirate.name }}</span>
+              · <span data-area-name="{{ conversation.service_area.name }}">{{ conversation.service_area.name }}</span>, <span data-emirate-name="{{ conversation.emirate.name }}">{{ conversation.emirate.name }}</span>
             </p>
             <p class="muted small">
               {% if conversation.last_message_at %}

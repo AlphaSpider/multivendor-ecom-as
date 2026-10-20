@@ -4,7 +4,7 @@
 {% block title %}Auctions in {{ emirate.name }} — ManzilCart{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.2">
 {% endblock %}
 
 {% block content %}
@@ -23,89 +23,57 @@
         {{ total_active }} <span data-i18n="auctions_active_suffix">auctions open or scheduled. Sellers lock the highest eligible bid; the selected bidder then confirms.</span>
       </p>
     </div>
-    {% if current_emirate %}
-      <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}" data-i18n="browse_fixed_price">Browse fixed-price listings</a>
-    {% endif %}
+    <div class="page-actions">
+      {% if create_url %}
+        <a class="btn btn-primary btn-lg" href="{{ create_url }}">Create Auction</a>
+      {% elif request.user.is_authenticated %}
+        <a class="btn btn-primary btn-lg" href="{% url 'accounts:dashboard' %}">Create Auction</a>
+      {% else %}
+        <a class="btn btn-primary btn-lg" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Sign in to create an auction</a>
+      {% endif %}
+    </div>
   </div>
 
   {% if auctions %}
     <div class="listing-grid">
       {% for auction in auctions %}
-        <article class="listing-card auction-card">
-          <a class="listing-card-media" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}" aria-label="{{ auction.listing.title }}">
-            {% with cover=auction.listing.cover_image %}
-              {% if cover %}
-                <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width }}" height="{{ cover.height }}">
-              {% else %}
-                <span class="auction-no-photo" data-i18n="no_photo">No photo</span>
-              {% endif %}
-            {% endwith %}
-          </a>
-          <div class="listing-card-body">
-            <div class="listing-card-top">
-              <span class="badge" data-i18n="auction_label">Auction</span>
-              <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
-            </div>
-            <h2 class="listing-card-title">
-              <a href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}">{{ auction.listing.title }}</a>
-            </h2>
-            <p class="auction-card-price">
-              {% if auction.top_bid %}
-                <span data-i18n="highest_bid">Highest bid</span> <strong>AED {{ auction.top_bid|floatformat:0|intcomma }}</strong>
-              {% else %}
-                <span data-i18n="no_bids_yet">No bids yet</span>
-              {% endif %}
-            </p>
-            <p class="listing-card-meta muted small">
-              <span data-area-name="{{ auction.listing.service_area.name }}">{{ auction.listing.service_area.name }}</span>
-              {% if auction.status == "live" %}
-                · Ends {{ auction.end_at|date:"j M, H:i" }}
-              {% elif auction.status == "scheduled" %}
-                · Starts {{ auction.start_at|date:"j M, H:i" }}
-              {% elif auction.status == "locked" %}
-                · Awaiting bidder confirmation
-              {% endif %}
-            </p>
-          </div>
-        </article>
+        {% include "partials/auction_card.html" with auction=auction %}
       {% endfor %}
     </div>
 
-    {% if page_obj.paginator.num_pages > 1 %}
-      <nav class="pagination" aria-label="Pagination">
+    {% if page_obj.has_other_pages %}
+      <nav class="pagination" aria-label="Auction pages">
         {% if page_obj.has_previous %}
-          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}" data-i18n="btn_previous">Previous</a>
+          <a class="btn btn-quiet" href="?page={{ page_obj.previous_page_number }}">Previous</a>
         {% endif %}
-        <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <span class="muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}" data-i18n="btn_next">Next</a>
+          <a class="btn btn-quiet" href="?page={{ page_obj.next_page_number }}">Next</a>
         {% endif %}
       </nav>
     {% endif %}
   {% else %}
-    <div class="empty-state">
-      <h3>No auctions are running right now</h3>
-      <p>New auctions appear here as soon as sellers schedule them.</p>
-      <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}">Browse furniture</a>
+    <div class="panel empty-state">
+      <h2>No live auctions yet</h2>
+      <p class="muted">Be the first to auction a piece in {{ emirate.name }}.</p>
+      {% if create_url %}
+        <a class="btn btn-primary" href="{{ create_url }}">Create Auction</a>
+      {% endif %}
     </div>
   {% endif %}
 
   {% if ended_auctions %}
-    <section class="auction-ended">
-      <h2>Recently closed</h2>
-      <div class="auction-ended-list">
-        {% for auction in ended_auctions %}
-          <a class="auction-ended-row" href="{% url 'auction_marketplace:detail' emirate_slug=emirate.slug pk=auction.pk %}">
-            <span class="auction-ended-title">{{ auction.listing.title }}</span>
-            <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
-            <span class="muted small">
-              {% if auction.top_bid %}Top bid AED {{ auction.top_bid|floatformat:0|intcomma }}{% else %}No bids{% endif %}
-              · {{ auction.end_at|date:"j M Y" }}
-            </span>
-          </a>
-        {% endfor %}
+    <div class="section-heading" style="margin-top:2.5rem">
+      <div>
+        <h2>Recently closed</h2>
+        <p class="muted">Awarded, unsold and cancelled auctions, newest first.</p>
       </div>
-    </section>
+    </div>
+    <div class="listing-grid">
+      {% for auction in ended_auctions %}
+        {% include "partials/auction_card.html" with auction=auction %}
+      {% endfor %}
+    </div>
   {% endif %}
 </section>
 {% endblock %}

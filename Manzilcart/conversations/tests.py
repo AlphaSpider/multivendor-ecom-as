@@ -9,6 +9,7 @@ same authentication path a browser uses.
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from asgiref.sync import async_to_sync
@@ -21,6 +22,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 
 from catalog.models import Category, Listing
+from auctions.models import Auction
 from conversations.consumers import ConversationConsumer
 from conversations.models import Conversation, Message
 from conversations.services import send_message
@@ -406,3 +408,75 @@ class ConversationWebSocketTests(TransactionTestCase):
             if event["type"] == "message.ack":
                 return event
         raise AssertionError("No acknowledgement received")
+
+class AuctionConversationTests(TestCase):
+    """Threads about standalone auctions use the auction foreign key, not a listing."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.emirate = Emirate.objects.get(slug="abu-dhabi")
+        cls.area = ServiceArea.objects.filter(emirate=cls.emirate, is_active=True).first()
+        cls.category = Category.objects.filter(is_active=True).first()
+        cls.seller = make_member(
+            phone="+971501000011", name="Auction seller", emirate=cls.emirate, area=cls.area
+        )
+        cls.buyer = make_member(
+            phone="+971501000012", name="Auction buyer", emirate=cls.emirate, area=cls.area
+        )
+        now = timezone.now()
+        cls.auction = Auction.objects.create(
+            seller=cls.seller,
+            title="Standalone auction sideboard",
+            description="A teak sideboard offered through the auction marketplace.",
+            category=cls.category,
+            condition=Auction.Condition.GOOD,
+            emirate=cls.emirate,
+            service_area=cls.area,
+            start_at=now - timedelta(hours=1),
+            end_at=now + timedelta(hours=2),
+            status=Auction.Status.LIVE,
+            moderation_status=Auction.ModerationStatus.APPROVED,
+            seller_agreed_fallback=True,
+            submitted_at=now,
+            approved_at=now,
+        )
+
+    def test_starting_an_auction_thread_links_the_auction_and_not_a_listing(self):
+        self.client.force_login(self.buyer)
+        response = self.client.post(
+            reverse("conversations:start_auction", args=[self.auction.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        conversation = Conversation.objects.get()
+        self.assertEqual(conversation.auction, self.auction)
+        self.assertIsNone(conversation.listing_id)
+        self.assertEqual(conversation.seller, self.seller)
+        self.assertEqual(conversation.item_title, self.auction.title)
+        self.assertEqual(conversation.item_kind, "auction")
+        self.assertEqual(
+            self.client.get(reverse("conversations:detail", args=[conversation.pk])).status_code,
+            200,
+        )
+
+    def test_repeated_start_reuses_the_same_auction_thread(self):
+        self.client.force_login(self.buyer)
+        self.client.post(reverse("conversations:start_auction", args=[self.auction.pk]))
+        self.client.post(reverse("conversations:start_auction", args=[self.auction.pk]))
+        self.assertEqual(Conversation.objects.count(), 1)
+
+    def test_pending_auction_cannot_start_a_thread(self):
+        self.auction.moderation_status = Auction.ModerationStatus.PENDING
+        self.auction.save(update_fields=["moderation_status", "updated_at"])
+        self.client.force_login(self.buyer)
+        response = self.client.post(
+            reverse("conversations:start_auction", args=[self.auction.pk])
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Conversation.objects.count(), 0)
+
+    def test_auction_thread_appears_in_the_conversation_list(self):
+        self.client.force_login(self.buyer)
+        self.client.post(reverse("conversations:start_auction", args=[self.auction.pk]))
+        response = self.client.get(reverse("conversations:list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.auction.title)

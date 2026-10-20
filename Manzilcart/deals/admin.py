@@ -78,7 +78,7 @@ class DealEventInline(admin.TabularInline):
 class DealAdmin(admin.ModelAdmin):
     list_display = (
         "reference_display",
-        "listing",
+        "item_display",
         "buyer",
         "seller",
         "emirate",
@@ -91,15 +91,17 @@ class DealAdmin(admin.ModelAdmin):
     search_fields = (
         "id",
         "listing__title",
+        "auction__title",
         "buyer__phone",
         "buyer__display_name",
         "seller__phone",
         "seller__display_name",
     )
-    list_select_related = ("listing", "buyer", "seller", "emirate")
+    list_select_related = ("listing", "auction", "buyer", "seller", "emirate")
     date_hierarchy = "created_at"
     readonly_fields = (
         "listing",
+        "auction",
         "buyer",
         "seller",
         "emirate",
@@ -113,7 +115,10 @@ class DealAdmin(admin.ModelAdmin):
         "updated_at",
     )
     fieldsets = (
-        ("Deal", {"fields": ("listing", "buyer", "seller", "emirate", "conversation")}),
+        (
+            "Deal",
+            {"fields": ("listing", "auction", "buyer", "seller", "emirate", "conversation")},
+        ),
         ("Outcome", {
             "fields": (
                 "status",
@@ -136,6 +141,10 @@ class DealAdmin(admin.ModelAdmin):
     @admin.display(description="Reference")
     def reference_display(self, obj):
         return obj.reference
+
+    @admin.display(description="Item")
+    def item_display(self, obj):
+        return obj.item_title
 
     def has_add_permission(self, request):
         return False
@@ -175,7 +184,7 @@ class DealCancellationAdmin(admin.ModelAdmin):
         "responded_at",
     )
     list_filter = ("status", "created_at")
-    search_fields = ("deal__id", "deal__listing__title", "requested_by__phone")
+    search_fields = ("deal__id", "deal__listing__title", "deal__auction__title", "requested_by__phone")
     list_select_related = ("deal", "requested_by", "responded_by")
     readonly_fields = (
         "deal",
@@ -225,7 +234,7 @@ class DealOfferAdmin(admin.ModelAdmin):
 class DealEventAdmin(admin.ModelAdmin):
     list_display = ("id", "deal", "event_type", "actor", "created_at")
     list_filter = ("event_type", "created_at")
-    search_fields = ("deal__id", "deal__listing__title", "summary")
+    search_fields = ("deal__id", "deal__listing__title", "deal__auction__title", "summary")
     list_select_related = ("deal", "actor")
     readonly_fields = ("deal", "actor", "event_type", "summary", "metadata", "created_at")
 

@@ -76,8 +76,6 @@ var categoryNames = {
 };
 
 var conditionNames = {
-  "New": "جديد",
-  "Brand new": "جديد تماماً",
   "Like new": "كالجديد",
   "Good": "جيد",
   "Fair": "مقبول"
@@ -202,7 +200,7 @@ var uiPhrases = {
   "Sell an item": "بيع قطعة",
   "Join to sell": "انضم للبيع",
   "List an item": "أضف قطعة",
-  "New and refurbished furniture, from homes in the UAE to homes in the UAE.": "أثاث جديد ومجدد، من منازل الإمارات إلى منازل الإمارات.",
+  "Pre-owned furniture, from homes in the UAE to homes in the UAE.": "أثاث مستعمل، من منازل الإمارات إلى منازل الإمارات.",
   "Marketplaces": "الأسواق",
   "Account": "الحساب",
   "My auctions": "مزاداتي",
@@ -217,7 +215,7 @@ var uiPhrases = {
   "Toggle dark and light mode": "تبديل الوضع الليلي والنهاري",
   "Furniture looking for its next home.": "أثاث يبحث عن منزله التالي.",
   "Furniture looking for\nits next home.": "أثاث يبحث عن منزله التالي.",
-  "New and refurbished pieces from sellers across the emirate. Every listing is reviewed before it goes live.": "قطع جديدة ومجددة من بائعين في جميع أنحاء الإمارة. يتم فحص كل إعلان قبل نشره.",
+  "Pre-owned pieces from sellers across the emirate. Every listing is reviewed before it goes live.": "قطع مستعملة من بائعين في جميع أنحاء الإمارة. يتم فحص كل إعلان قبل نشره.",
   "Search furniture": "ابحث عن أثاث",
   "Search sofas, desks, beds…": "ابحث عن كنب، مكاتب، أسرة…",
   "Search": "بحث",

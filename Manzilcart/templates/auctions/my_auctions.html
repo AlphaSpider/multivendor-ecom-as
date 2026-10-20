@@ -4,7 +4,7 @@
 {% block title %}My auctions — ManzilCart{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.2">
 {% endblock %}
 
 {% block content %}
@@ -15,9 +15,14 @@
       <h1 data-i18n="my_auctions">My auctions</h1>
       <p class="muted" data-i18n="my_auctions_desc">Auctions you are selling in, bidding on, or have been offered.</p>
     </div>
-    {% if current_emirate %}
-      <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}" data-i18n="browse_auctions">Browse auctions</a>
-    {% endif %}
+    <div class="page-actions">
+      {% if create_url %}
+        <a class="btn btn-primary" href="{{ create_url }}">Create Auction</a>
+      {% endif %}
+      {% if current_emirate %}
+        <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}" data-i18n="browse_auctions">Browse auctions</a>
+      {% endif %}
+    </div>
   </div>
 
   {% if rows %}
@@ -25,7 +30,7 @@
       {% for row in rows %}
         <article class="panel deal-row auction-mine-row">
           <div class="deal-thumb">
-            {% with cover=row.auction.listing.cover_image %}
+            {% with cover=row.auction.cover_image %}
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
@@ -38,17 +43,26 @@
             <div class="deal-row-head">
               <div>
                 <h2>
-                  <a href="{% url 'auction_marketplace:detail' emirate_slug=row.auction.emirate.slug pk=row.auction.pk %}">
-                    {{ row.auction.listing.title }}
-                  </a>
+                  <a href="{{ row.auction.get_absolute_url }}">{{ row.auction.title }}</a>
                 </h2>
                 <p class="muted small">
-                  {{ row.auction.reference }} · <span data-area-name="{{ row.auction.listing.service_area.name }}">{{ row.auction.listing.service_area.name }}</span>, <span data-emirate-name="{{ row.auction.emirate.name }}">{{ row.auction.emirate.name }}</span>
+                  {{ row.auction.reference }} · <span data-area-name="{{ row.auction.service_area.name }}">{{ row.auction.service_area.name }}</span>, <span data-emirate-name="{{ row.auction.emirate.name }}">{{ row.auction.emirate.name }}</span>
                   · {% if row.is_seller %}<span data-i18n="you_are_selling">You are selling</span>{% else %}<span data-i18n="you_are_bidding">You are bidding</span>{% endif %}
                 </p>
               </div>
-              <span class="status-pill status-auction-{{ row.auction.status }}">{{ row.auction.get_status_display }}</span>
+              <div class="auction-status-stack">
+                <span class="status-pill status-{{ row.auction.status }}">{{ row.auction.get_status_display }}</span>
+                {% if row.is_seller %}
+                  <span class="status-pill status-moderation-{{ row.auction.moderation_status }}">{{ row.auction.get_moderation_status_display }}</span>
+                {% endif %}
+              </div>
             </div>
+
+            {% if row.is_seller and row.auction.moderation_status == "rejected" and row.auction.moderation_note %}
+              <div class="form-alert" role="alert">
+                <p><strong>Changes needed:</strong> {{ row.auction.moderation_note }}</p>
+              </div>
+            {% endif %}
 
             <p class="deal-row-price">
               {% if row.auction.top_bid %}
@@ -73,9 +87,13 @@
           <div class="deal-row-actions">
             {% if row.pending_selection and row.selection_url %}
               <a class="btn btn-primary btn-small" href="{{ row.selection_url }}">Confirm bid</a>
-            {% else %}
-              <a class="btn btn-quiet btn-small" href="{% url 'auction_marketplace:detail' emirate_slug=row.auction.emirate.slug pk=row.auction.pk %}">Open</a>
             {% endif %}
+            {% if row.can_edit %}
+              <a class="btn btn-quiet btn-small" href="{% url 'auction_marketplace:edit' emirate_slug=row.auction.emirate.slug pk=row.auction.pk %}">
+                {% if row.auction.moderation_status == "rejected" %}Edit and resubmit{% else %}Edit{% endif %}
+              </a>
+            {% endif %}
+            <a class="btn btn-quiet btn-small" href="{{ row.auction.get_absolute_url }}">Open</a>
           </div>
         </article>
       {% endfor %}
@@ -83,9 +101,11 @@
   {% else %}
     <div class="empty-state">
       <h3>No auctions yet</h3>
-      <p>Auctions are created from your approved furniture listings. Go to your listings to start an auction, or browse active auctions.</p>
+      <p>Create a standalone auction with its own photos, schedule and reserve price — no listing required.</p>
       <div class="form-actions" style="justify-content: center; margin-top: 1rem;">
-        <a class="btn btn-primary" href="{% url 'accounts:listings' %}">Go to My listings</a>
+        {% if create_url %}
+          <a class="btn btn-primary" href="{{ create_url }}">Create Auction</a>
+        {% endif %}
         {% if current_emirate %}
           <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
         {% endif %}

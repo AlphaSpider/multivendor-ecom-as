@@ -4,7 +4,7 @@
 {% block title %}Confirm your winning bid — {{ auction.reference }} — ManzilCart{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/auctions.css' %}">
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.2">
 {% endblock %}
 
 {% block content %}
@@ -18,9 +18,9 @@
   <div class="page-heading">
     <div>
       <p class="eyebrow"><span data-i18n="auction_confirmation_title">Auction confirmation</span> · {{ auction.reference }}</p>
-      <h1>{{ listing.title }}</h1>
+      <h1>{{ auction.title }}</h1>
       <p class="muted">
-        <span data-area-name>{{ listing.service_area.name }}</span>, <span data-emirate-name>{{ auction.emirate.name }}</span> ·
+        <span data-area-name>{{ auction.service_area.name }}</span>, <span data-emirate-name>{{ auction.emirate.name }}</span> ·
         <span data-i18n="auction_your_locked_bid">Your locked bid</span>
         <strong>AED {{ bid.amount|floatformat:0|intcomma }}</strong>
       </p>

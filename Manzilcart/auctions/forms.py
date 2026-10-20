@@ -1,4 +1,4 @@
-"""Forms for creating auctions and placing bids."""
+"""Forms for creating/editing auctions and placing bids."""
 
 from __future__ import annotations
 
@@ -7,12 +7,59 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django import forms
+from django.conf import settings
 from django.utils import timezone
+
+from auctions.models import Auction
+from catalog.forms import MultipleImageField, MultipleImageInput
+from catalog.models import Category
+from locations.selectors import service_areas_for_emirate
 
 
 class AuctionForm(forms.Form):
-    """Seller-facing auction schedule. Business rules live in ``auctions.services``."""
+    """Seller-facing standalone auction item. Business rules live in ``auctions.services``."""
 
+    title = forms.CharField(
+        max_length=140,
+        widget=forms.TextInput(
+            attrs={
+                "class": "input",
+                "placeholder": "e.g. Three-seater linen sofa",
+                "maxlength": 140,
+            }
+        ),
+        label="What are you auctioning?",
+    )
+    description = forms.CharField(
+        max_length=4000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "input",
+                "rows": 6,
+                "maxlength": 4000,
+                "placeholder": (
+                    "Describe the piece: dimensions, age, any marks, and why you are "
+                    "selling. Honest descriptions attract serious bids."
+                ),
+            }
+        ),
+        label="Description",
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.none(),
+        widget=forms.Select(attrs={"class": "input"}),
+        label="Category",
+    )
+    condition = forms.ChoiceField(
+        choices=Auction.Condition.choices,
+        widget=forms.Select(attrs={"class": "input"}),
+        label="Condition",
+    )
+    service_area = forms.ModelChoiceField(
+        queryset=None,
+        widget=forms.Select(attrs={"class": "input"}),
+        label="Area",
+    )
     start_at = forms.DateTimeField(
         label="Bidding starts",
         input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"],
@@ -40,8 +87,8 @@ class AuctionForm(forms.Form):
             attrs={"class": "input", "min": "1", "step": "1", "inputmode": "decimal"}
         ),
         help_text=(
-            "Optional. Bids below this amount still appear but cannot be locked as "
-            "the winner. Leave blank for no reserve."
+            "Optional. Bids below this amount cannot be locked as the winner. "
+            "Leave blank for no reserve."
         ),
     )
     agree_fallback = forms.BooleanField(
@@ -53,21 +100,63 @@ class AuctionForm(forms.Form):
             "required": "You must accept the fallback rules before starting an auction."
         },
     )
+    images = MultipleImageField(
+        required=False,
+        help_text=(
+            f"Up to {settings.MAX_IMAGES_PER_LISTING} photos, "
+            f"{settings.MAX_IMAGE_UPLOAD_SIZE // (1024 * 1024)} MB each. "
+            "JPEG, PNG or WebP."
+        ),
+        widget=MultipleImageInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/webp",
+                "multiple": True,
+                "data-image-input": "",
+                "data-preview-target": "#image-preview",
+            }
+        ),
+    )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, emirate=None, instance: Auction | None = None, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.is_bound and not self.initial.get("start_at"):
+        self.emirate = emirate
+        self.instance = instance
+        self.fields["category"].queryset = Category.objects.filter(is_active=True).order_by(
+            "name"
+        )
+        self.fields["service_area"].queryset = (
+            service_areas_for_emirate(emirate) if emirate is not None else self.fields["service_area"].queryset.none()
+        )
+        if instance is not None and not self.is_bound:
+            self.initial.update(
+                {
+                    "title": instance.title,
+                    "description": instance.description,
+                    "category": instance.category_id,
+                    "condition": instance.condition,
+                    "service_area": instance.service_area_id,
+                    "start_at": timezone.localtime(instance.start_at).replace(
+                        second=0, microsecond=0
+                    ),
+                    "end_at": timezone.localtime(instance.end_at).replace(
+                        second=0, microsecond=0
+                    ),
+                    "reserve_price": instance.reserve_price,
+                    "agree_fallback": True,
+                }
+            )
+        elif not self.is_bound and not self.initial.get("start_at"):
             now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
             self.initial.setdefault("start_at", now)
             self.initial.setdefault("end_at", now + timedelta(days=3))
+            self.initial.setdefault("agree_fallback", True)
 
-    def clean(self):
-        cleaned = super().clean()
-        start_at = cleaned.get("start_at")
-        end_at = cleaned.get("end_at")
+    def clean_end_at(self):
+        start_at = self.cleaned_data.get("start_at")
+        end_at = self.cleaned_data.get("end_at")
         if start_at and end_at and end_at <= start_at:
-            self.add_error("end_at", "The end time must be after the start time.")
-        return cleaned
+            raise forms.ValidationError("The end time must be after the start time.")
+        return end_at
 
 
 class BidForm(forms.Form):

@@ -61,3 +61,51 @@ class ListingReview(models.Model):
         if self.pk is not None:
             raise ValueError("ListingReview rows are append-only.")
         return super().save(*args, **kwargs)
+
+
+class AuctionReview(models.Model):
+    """
+    One moderation decision on a standalone auction.
+
+    Kept separate from the auction row so the decision history is append-only: an edited
+    auction that is resubmitted gets a new review instead of overwriting the old one.
+    """
+
+    class Decision(models.TextChoices):
+        APPROVE = "approve", "Approved"
+        REJECT = "reject", "Rejected"
+
+    auction = models.ForeignKey(
+        "auctions.Auction", on_delete=models.CASCADE, related_name="reviews"
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="auction_reviews",
+    )
+    decision = models.CharField(max_length=16, choices=Decision.choices)
+    reason = models.TextField(
+        blank=True,
+        help_text="Shown to the seller when an auction is rejected. Required for rejections.",
+    )
+    previous_status = models.CharField(max_length=16, blank=True)
+    new_status = models.CharField(max_length=16, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "auction review"
+        verbose_name_plural = "auction reviews"
+        indexes = [
+            models.Index(fields=["auction", "-created_at"], name="auctionreview_auction_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_decision_display()} - auction {self.auction_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError("AuctionReview rows are append-only.")
+        return super().save(*args, **kwargs)

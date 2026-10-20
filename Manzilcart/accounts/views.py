@@ -291,8 +291,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         context["member"] = user
-        context["emirate"] = user.emirate or getattr(self.request, "emirate", None)
+        emirate = user.emirate or getattr(self.request, "emirate", None)
+        context["emirate"] = emirate
         context["service_area"] = user.service_area
+        if emirate is not None and getattr(emirate, "is_active", False):
+            context["auction_create_url"] = reverse(
+                "auction_marketplace:create",
+                kwargs={"emirate_slug": emirate.slug},
+            )
         return context
 
 

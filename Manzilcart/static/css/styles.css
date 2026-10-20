@@ -2069,7 +2069,7 @@ select.input { appearance: auto; }
 }
 
 @media (max-width: 760px) {
-  .nav-toggle { display: inline-block; order: 4; }
+  .nav-toggle { display: inline-block; order: -1; }
 
   .header-controls { order: 3; }
 

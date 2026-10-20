@@ -1,28 +1,36 @@
 """
-Auction tests: creation rules, bidding and tie-breaks, seller locking, confirmation,
-fallback order, reserve prices, deadline processing and HTTP access control.
+Standalone auction tests: moderation, public visibility, seller edits, bidding,
+locking, fallback, awarding and the HTTP entry points.
+
+An auction is its own item; no test here creates or relies on a catalog listing.
 """
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 import uuid
 from datetime import timedelta
 from decimal import Decimal
-from io import StringIO
+from io import BytesIO, StringIO
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image as PILImage
 
 from auctions import services
-from auctions.models import Auction, AuctionEvent, AuctionSelection, Bid
+from auctions.models import Auction, AuctionEvent, AuctionImage, AuctionSelection
 from catalog.models import Category, Listing
-from core.exceptions import PermissionDeniedError, StateTransitionError
+from core.exceptions import LocationError, PermissionDeniedError, StateTransitionError
+from core.models import AuditEvent
 from deals.models import Deal
 from locations.models import Emirate, ServiceArea
+from moderation.models import AuctionReview
 from notifications.models import Notification
 
 User = get_user_model()
@@ -32,9 +40,11 @@ class AuctionTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.emirate = Emirate.objects.get(slug="abu-dhabi")
-        cls.other_emirate = Emirate.objects.get(slug="ras-al-khaimah")
         cls.area = ServiceArea.objects.filter(emirate=cls.emirate, is_active=True).first()
-        cls.category = Category.objects.filter(is_active=True).first()
+        cls.category = (
+            Category.objects.filter(is_active=True, parent__isnull=False).first()
+            or Category.objects.filter(is_active=True).first()
+        )
 
         cls.seller = User.objects.create_user(
             phone="+971508000001",
@@ -47,6 +57,7 @@ class AuctionTestBase(TestCase):
         cls.bidder_one = User.objects.create_user(
             phone="+971508000002",
             display_name="Bidder One",
+            email="bidder1@example.test",
             emirate=cls.emirate,
             service_area=cls.area,
             phone_verified_at=timezone.now(),
@@ -54,6 +65,7 @@ class AuctionTestBase(TestCase):
         cls.bidder_two = User.objects.create_user(
             phone="+971508000003",
             display_name="Bidder Two",
+            email="bidder2@example.test",
             emirate=cls.emirate,
             service_area=cls.area,
             phone_verified_at=timezone.now(),
@@ -71,60 +83,58 @@ class AuctionTestBase(TestCase):
             emirate=cls.emirate,
             service_area=cls.area,
         )
-        cls.listing = Listing.objects.create(
-            seller=cls.seller,
-            title="Leather sofa",
-            slug="auction-leather-sofa",
-            description="Three-seater, good condition.",
-            category=cls.category,
-            condition=Listing.Condition.GOOD,
-            asking_price=Decimal("1200.00"),
+        cls.moderator = User.objects.create_user(
+            phone="+971508000006",
+            display_name="Moderator",
             emirate=cls.emirate,
             service_area=cls.area,
-            status=Listing.Status.APPROVED,
-            submitted_at=timezone.now(),
-            approved_at=timezone.now(),
-            published_at=timezone.now(),
+            phone_verified_at=timezone.now(),
+            is_staff=True,
         )
 
     # -- helpers -----------------------------------------------------------
-    def make_listing(self, slug: str, *, seller=None, emirate=None, area=None):
-        emirate = emirate or self.emirate
-        area = area or self.area
-        return Listing.objects.create(
-            seller=seller or self.seller,
-            title=f"Item {slug}",
-            slug=slug,
-            description="Auction test item.",
-            category=self.category,
-            condition=Listing.Condition.GOOD,
-            asking_price=Decimal("500.00"),
-            emirate=emirate,
-            service_area=area,
-            status=Listing.Status.APPROVED,
-            submitted_at=timezone.now(),
-            approved_at=timezone.now(),
-            published_at=timezone.now(),
-        )
-
-    def make_auction(
+    def create_auction(
         self,
         *,
-        listing=None,
         seller=None,
+        title="Leather sofa",
         start_delta=timedelta(minutes=-5),
-        end_delta=timedelta(hours=2),
+        end_delta=timedelta(hours=3),
         reserve=None,
+        submit_for_review=True,
+        agree_fallback=True,
     ) -> Auction:
         now = timezone.now()
         return services.create_auction(
-            listing=listing or self.listing,
             seller=seller or self.seller,
+            emirate=self.emirate,
+            title=title,
+            description=(
+                "A well-kept three-seater sofa with minor marks on the base. "
+                "Collection from the building lobby."
+            ),
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
             start_at=now + start_delta,
             end_at=now + end_delta,
             reserve_price=reserve,
-            agree_fallback=True,
+            agree_fallback=agree_fallback,
+            submit_for_review=submit_for_review,
         )
+
+    def approve(self, auction) -> Auction:
+        return services.approve_auction(auction, reviewer=self.moderator)
+
+    def make_approved(self, **kwargs) -> Auction:
+        return self.approve(self.create_auction(**kwargs))
+
+    def make_live(self, **kwargs) -> Auction:
+        auction = self.make_approved(**kwargs)
+        services.open_scheduled_auction(auction.pk)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.LIVE)
+        return auction
 
     def place(self, auction, bidder, amount, client_bid_id=None):
         return services.place_bid(
@@ -134,579 +144,574 @@ class AuctionTestBase(TestCase):
             client_bid_id=client_bid_id,
         )
 
+    def list_url(self):
+        return reverse(
+            "auction_marketplace:list", kwargs={"emirate_slug": self.emirate.slug}
+        )
 
-class AuctionCreationTests(AuctionTestBase):
-    def test_only_the_listing_owner_can_create_an_auction(self):
-        with self.assertRaises(PermissionDeniedError):
-            self.make_auction(seller=self.stranger)
+    def detail_url(self, auction):
+        return reverse(
+            "auction_marketplace:detail",
+            kwargs={"emirate_slug": self.emirate.slug, "pk": auction.pk},
+        )
 
-    def test_unpublished_listing_cannot_be_auctioned(self):
-        draft = self.make_listing("auction-draft")
-        draft.status = Listing.Status.PENDING
-        draft.published_at = None
-        draft.save(update_fields=["status", "published_at"])
+    def create_url(self):
+        return reverse(
+            "auction_marketplace:create", kwargs={"emirate_slug": self.emirate.slug}
+        )
 
-        with self.assertRaises(StateTransitionError):
-            self.make_auction(listing=draft)
 
-    def test_seller_must_agree_to_fallback_rules(self):
+class StandaloneCreationTests(AuctionTestBase):
+    def test_condition_choices_exclude_new_items(self):
+        values = {value for value, _label in Auction.Condition.choices}
+        self.assertNotIn("new", values)
+        self.assertIn(Auction.Condition.LIKE_NEW, values)
+
+    def test_creation_never_creates_a_listing(self):
+        before = Listing.objects.count()
+        auction = self.create_auction()
+
+        self.assertEqual(Listing.objects.count(), before)
+        self.assertEqual(auction.title, "Leather sofa")
+        self.assertEqual(auction.category, self.category)
+        self.assertEqual(auction.condition, Auction.Condition.GOOD)
+        self.assertEqual(auction.emirate, self.emirate)
+        self.assertEqual(auction.service_area, self.area)
+        self.assertTrue(auction.seller_agreed_fallback)
+        self.assertEqual(auction.status, Auction.Status.SCHEDULED)
+        self.assertEqual(auction.moderation_status, Auction.ModerationStatus.PENDING)
+        self.assertIsNotNone(auction.submitted_at)
+        self.assertTrue(
+            auction.events.filter(event_type=AuctionEvent.Type.CREATED).exists()
+        )
+        self.assertTrue(
+            auction.events.filter(event_type=AuctionEvent.Type.SUBMITTED).exists()
+        )
+
+    def test_save_as_draft_starts_draft_and_not_submitted(self):
+        auction = self.create_auction(submit_for_review=False)
+        self.assertEqual(auction.moderation_status, Auction.ModerationStatus.DRAFT)
+        self.assertIsNone(auction.submitted_at)
+        self.assertFalse(
+            auction.events.filter(event_type=AuctionEvent.Type.SUBMITTED).exists()
+        )
+
+    def test_fallback_agreement_is_required(self):
+        with self.assertRaises(ValidationError):
+            self.create_auction(agree_fallback=False)
+
+    def test_schedule_duration_is_validated(self):
         now = timezone.now()
         with self.assertRaises(ValidationError):
             services.create_auction(
-                listing=self.listing,
                 seller=self.seller,
-                start_at=now,
-                end_at=now + timedelta(hours=2),
-                agree_fallback=False,
-            )
-
-    def test_auction_duration_is_validated(self):
-        now = timezone.now()
-        with self.assertRaises(ValidationError):
-            services.create_auction(
-                listing=self.listing,
-                seller=self.seller,
+                emirate=self.emirate,
+                title="Too short",
+                description="This description is long enough for validation.",
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=self.area,
                 start_at=now,
                 end_at=now + timedelta(minutes=30),
                 agree_fallback=True,
             )
-
         with self.assertRaises(ValidationError):
             services.create_auction(
-                listing=self.listing,
                 seller=self.seller,
+                emirate=self.emirate,
+                title="Too long",
+                description="This description is long enough for validation.",
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=self.area,
                 start_at=now,
-                end_at=now + timedelta(days=15),
+                end_at=now + timedelta(days=30),
                 agree_fallback=True,
             )
 
-    def test_auction_starts_live_and_inherits_the_listing_emirate(self):
-        auction = self.make_auction()
+    def test_auction_in_wrong_emirate_is_rejected(self):
+        other = Emirate.objects.get(slug="ras-al-khaimah")
+        other_area = ServiceArea.objects.filter(emirate=other, is_active=True).first()
+        with self.assertRaises(LocationError):
+            services.create_auction(
+                seller=self.seller,
+                emirate=self.emirate,
+                title="Wrong area",
+                description="This description is long enough for validation.",
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=other_area,
+                start_at=timezone.now(),
+                end_at=timezone.now() + timedelta(hours=3),
+                agree_fallback=True,
+            )
 
-        self.assertEqual(auction.status, Auction.Status.LIVE)
-        self.assertEqual(auction.emirate, self.emirate)
-        self.assertEqual(auction.seller, self.seller)
-        self.assertTrue(auction.seller_agreed_fallback)
-        self.assertTrue(auction.events.filter(event_type=AuctionEvent.Type.CREATED).exists())
 
-    def test_future_start_creates_a_scheduled_auction(self):
-        auction = self.make_auction(
-            start_delta=timedelta(hours=1), end_delta=timedelta(hours=3)
+class ModerationTests(AuctionTestBase):
+    def test_approval_is_separate_from_lifecycle_and_notifies_seller(self):
+        auction = self.create_auction()
+        approved = self.approve(auction)
+
+        self.assertEqual(approved.moderation_status, Auction.ModerationStatus.APPROVED)
+        self.assertEqual(approved.status, Auction.Status.SCHEDULED)
+        self.assertEqual(approved.approved_by, self.moderator)
+        self.assertIsNotNone(approved.approved_at)
+        self.assertTrue(auction.reviews.filter(decision=AuctionReview.Decision.APPROVE).exists())
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.AUCTION_APPROVED, entity_id=auction.pk
+            ).exists()
         )
-        self.assertEqual(auction.status, Auction.Status.SCHEDULED)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.seller, kind=Notification.Kind.AUCTION_OUTCOME
+            ).exists()
+        )
 
-    def test_a_listing_cannot_have_two_active_auctions(self):
-        self.make_auction()
+    def test_rejection_requires_a_reason_and_notifies_seller(self):
+        auction = self.create_auction()
+        with self.assertRaises(ValidationError):
+            services.reject_auction(auction, reviewer=self.moderator, reason=" ")
+
+        rejected = services.reject_auction(
+            auction,
+            reviewer=self.moderator,
+            reason="Please add clearer photos of the marks.",
+        )
+        self.assertEqual(rejected.moderation_status, Auction.ModerationStatus.REJECTED)
+        self.assertIn("clearer photos", rejected.moderation_note)
+        review = auction.reviews.get()
+        self.assertEqual(review.decision, AuctionReview.Decision.REJECT)
+        self.assertIn("clearer photos", review.reason)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.AUCTION_REJECTED, entity_id=auction.pk
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.seller, kind=Notification.Kind.AUCTION_OUTCOME
+            ).exists()
+        )
+
+    def test_reviews_are_append_only(self):
+        auction = self.create_auction()
+        self.approve(auction)
+        review = auction.reviews.get()
+        review.reason = "changed"
+        with self.assertRaises(ValueError):
+            review.save()
+
+    def test_only_pending_auctions_can_be_approved(self):
+        auction = self.create_auction(submit_for_review=False)
         with self.assertRaises(StateTransitionError):
-            self.make_auction()
+            self.approve(auction)
+
+    def test_draft_and_pending_are_never_opened_by_the_worker(self):
+        draft = self.create_auction(submit_for_review=False)
+        pending = self.create_auction(title="Pending item")
+
+        self.assertIsNone(services.open_scheduled_auction(draft.pk))
+        self.assertIsNone(services.open_scheduled_auction(pending.pk))
+        draft.refresh_from_db()
+        pending.refresh_from_db()
+        self.assertEqual(draft.status, Auction.Status.SCHEDULED)
+        self.assertEqual(pending.status, Auction.Status.SCHEDULED)
+
+    def test_approved_auction_opens_when_start_passes(self):
+        auction = self.make_live()
+        self.assertEqual(auction.status, Auction.Status.LIVE)
+        self.assertTrue(
+            auction.events.filter(event_type=AuctionEvent.Type.STARTED).exists()
+        )
 
 
-class BidTests(AuctionTestBase):
+class SellerEditTests(AuctionTestBase):
+    def test_draft_and_rejected_can_be_edited_freely(self):
+        draft = self.create_auction(submit_for_review=False)
+        updated = services.update_auction(
+            draft,
+            actor=self.seller,
+            title="Renamed sofa",
+            description="A longer description for the renamed sofa item.",
+            category=self.category,
+            condition=Auction.Condition.LIKE_NEW,
+            service_area=self.area,
+            start_at=draft.start_at,
+            end_at=draft.end_at,
+            agree_fallback=True,
+            submit_for_review=True,
+        )
+        self.assertEqual(updated.title, "Renamed sofa")
+        self.assertEqual(updated.moderation_status, Auction.ModerationStatus.PENDING)
+
+        rejected = services.reject_auction(
+            self.create_auction(title="Rejected item"),
+            reviewer=self.moderator,
+            reason="Needs a better description.",
+        )
+        resubmitted = services.update_auction(
+            rejected,
+            actor=self.seller,
+            title="Rejected item",
+            description="An improved description with dimensions and condition details.",
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
+            start_at=rejected.start_at,
+            end_at=rejected.end_at,
+            agree_fallback=True,
+            submit_for_review=True,
+        )
+        self.assertEqual(
+            resubmitted.moderation_status, Auction.ModerationStatus.PENDING
+        )
+        self.assertEqual(resubmitted.moderation_note, "")
+
+    def test_approved_auction_returns_to_review_when_edited_before_bids(self):
+        auction = self.make_approved()
+        updated = services.update_auction(
+            auction,
+            actor=self.seller,
+            title="Updated before bidding",
+            description="Updated description before the first bid was placed.",
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
+            start_at=auction.start_at,
+            end_at=auction.end_at,
+            agree_fallback=True,
+            submit_for_review=True,
+        )
+        self.assertEqual(updated.moderation_status, Auction.ModerationStatus.PENDING)
+        self.assertEqual(updated.status, Auction.Status.SCHEDULED)
+
+    def test_content_is_frozen_after_the_first_bid(self):
+        auction = self.make_live()
+        self.place(auction, self.bidder_one, "1000.00")
+        with self.assertRaises(StateTransitionError):
+            services.update_auction(
+                auction,
+                actor=self.seller,
+                title="Changed after bids",
+                description="This edit must be rejected because bidding started.",
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=self.area,
+                start_at=auction.start_at,
+                end_at=auction.end_at,
+                agree_fallback=True,
+            )
+
+    def test_only_the_owner_may_edit(self):
+        draft = self.create_auction(submit_for_review=False)
+        with self.assertRaises(PermissionDeniedError):
+            services.update_auction(
+                draft,
+                actor=self.stranger,
+                title="Hijacked",
+                description="This description is long enough for validation.",
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=self.area,
+                start_at=draft.start_at,
+                end_at=draft.end_at,
+                agree_fallback=True,
+            )
+
+
+class VisibilityTests(AuctionTestBase):
+    def test_public_list_only_contains_approved_auctions(self):
+        approved = self.make_approved(title="Approved visible item")
+        self.create_auction(title="Pending hidden item")
+        self.create_auction(title="Draft hidden item", submit_for_review=False)
+        services.reject_auction(
+            self.create_auction(title="Rejected hidden item"),
+            reviewer=self.moderator,
+            reason="Not suitable.",
+        )
+
+        response = self.client.get(self.list_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, approved.title)
+        self.assertContains(response, self.create_url())
+        self.assertNotContains(response, "Pending hidden item")
+        self.assertNotContains(response, "Draft hidden item")
+        self.assertNotContains(response, "Rejected hidden item")
+
+    def test_unapproved_detail_is_404_for_visitors_but_visible_to_owner(self):
+        pending = self.create_auction()
+        self.assertEqual(self.client.get(self.detail_url(pending)).status_code, 404)
+
+        self.client.force_login(self.seller)
+        self.assertEqual(self.client.get(self.detail_url(pending)).status_code, 200)
+
+    def test_logged_out_create_redirects_to_login_with_next(self):
+        response = self.client.get(self.create_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+        self.assertIn(self.create_url(), response.url)
+
+    def test_ineligible_seller_sees_the_same_message_as_listing_creation(self):
+        self.client.force_login(self.unverified)
+        auction_response = self.client.get(self.create_url())
+        listing_response = self.client.get(
+            reverse(
+                "catalog:listing_create",
+                kwargs={"emirate_slug": self.emirate.slug},
+            )
+        )
+        self.assertEqual(auction_response.status_code, 403)
+        self.assertEqual(listing_response.status_code, 403)
+        self.assertContains(
+            auction_response,
+            "Your account is not ready to sell yet.",
+            status_code=403,
+        )
+        self.assertContains(
+            listing_response,
+            "Your account is not ready to sell yet.",
+            status_code=403,
+        )
+
+    def test_my_auctions_lists_pending_and_rejected_with_reason(self):
+        pending = self.create_auction(title="Waiting item")
+        rejected = services.reject_auction(
+            self.create_auction(title="Needs work item"),
+            reviewer=self.moderator,
+            reason="Please show the damaged corner.",
+        )
+        self.client.force_login(self.seller)
+        response = self.client.get(reverse("auctions:mine"))
+
+        self.assertContains(response, pending.title)
+        self.assertContains(response, rejected.title)
+        self.assertContains(response, "Please show the damaged corner.")
+        self.assertContains(response, self.create_url())
+
+    def test_dashboard_offers_a_create_auction_entry_point(self):
+        self.client.force_login(self.seller)
+        response = self.client.get(reverse("accounts:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.create_url())
+        self.assertContains(response, "Create auction")
+
+
+class BiddingTests(AuctionTestBase):
     def setUp(self):
-        self.auction = self.make_auction()
+        self.auction = self.make_live()
 
     def test_bid_must_beat_the_highest_bid_by_the_increment(self):
         self.place(self.auction, self.bidder_one, "1000.00")
-
         with self.assertRaises(ValidationError):
             self.place(self.auction, self.bidder_two, "1000.00")
-
         bid, created = self.place(self.auction, self.bidder_two, "1001.00")
         self.assertTrue(created)
         self.assertEqual(bid.amount, Decimal("1001.00"))
 
-    def test_unverified_member_cannot_bid(self):
+    def test_unverified_and_anonymous_cannot_bid(self):
         with self.assertRaises(PermissionDeniedError):
             self.place(self.auction, self.unverified, "1000.00")
-
-    def test_anonymous_user_cannot_bid(self):
         with self.assertRaises(PermissionDeniedError):
             services.place_bid(self.auction, bidder=None, amount=Decimal("1000.00"))
 
-    def test_seller_cannot_bid_on_their_own_auction(self):
+    def test_seller_cannot_bid_on_own_auction(self):
         with self.assertRaises(PermissionDeniedError):
             self.place(self.auction, self.seller, "1000.00")
 
-    def test_bids_are_rejected_after_the_scheduled_end(self):
-        now = timezone.now()
-        Auction.objects.filter(pk=self.auction.pk).update(
-            start_at=now - timedelta(hours=2),
-            end_at=now - timedelta(minutes=1),
+    def test_unapproved_auction_cannot_receive_bids(self):
+        pending = self.create_auction()
+        services.open_scheduled_auction(pending.pk)
+        with self.assertRaises(StateTransitionError):
+            self.place(pending, self.bidder_one, "1000.00")
+
+    def test_bids_are_rejected_after_the_end(self):
+        auction = self.make_live()
+        Auction.objects.filter(pk=auction.pk).update(
+            start_at=timezone.now() - timedelta(hours=2),
+            end_at=timezone.now() - timedelta(minutes=1),
         )
-        self.auction.refresh_from_db()
-
+        auction.refresh_from_db()
         with self.assertRaises(StateTransitionError):
-            self.place(self.auction, self.bidder_one, "1000.00")
+            self.place(auction, self.bidder_one, "1000.00")
 
-    def test_bids_are_rejected_once_the_seller_locks(self):
-        first, _ = self.place(self.auction, self.bidder_one, "1000.00")
-        services.lock_bid(self.auction, seller=self.seller, bid_id=first.pk)
-
-        with self.assertRaises(StateTransitionError):
-            self.place(self.auction, self.bidder_two, "1200.00")
-
-    def test_duplicate_client_bid_id_is_idempotent(self):
+    def test_client_bid_id_is_idempotent(self):
         client_id = uuid.uuid4()
         first, created = self.place(
             self.auction, self.bidder_one, "1000.00", client_bid_id=client_id
         )
         second, created_again = self.place(
-            self.auction, self.bidder_one, "1000.00", client_bid_id=client_id
+            self.auction, self.bidder_one, "1200.00", client_bid_id=client_id
         )
-
         self.assertTrue(created)
         self.assertFalse(created_again)
         self.assertEqual(first.pk, second.pk)
-        self.assertEqual(self.auction.bids.count(), 1)
+        self.assertEqual(second.amount, Decimal("1000.00"))
 
-    def test_bids_below_reserve_are_stored_but_not_eligible(self):
-        auction = self.make_auction(
-            listing=self.make_listing("auction-reserve-item"), reserve="1500.00"
-        )
+    def test_reserve_excludes_low_bids_from_winner_selection(self):
+        auction = self.make_live(title="Reserve item", reserve="1500.00")
         self.place(auction, self.bidder_one, "1000.00")
-
-        self.assertEqual(auction.bids.count(), 1)
-        self.assertEqual(services.eligible_bids(auction), [])
-        self.assertIsNone(services.highest_eligible_bid(auction))
-
-
-class TieBreakTests(AuctionTestBase):
-    def test_earliest_bid_wins_a_tie(self):
-        auction = self.make_auction()
-        now = timezone.now()
-
-        earlier = Bid.objects.create(
-            auction=auction, bidder=self.bidder_one, amount=Decimal("1000.00")
-        )
-        later = Bid.objects.create(
-            auction=auction, bidder=self.bidder_two, amount=Decimal("1000.00")
-        )
-        Bid.objects.filter(pk=earlier.pk).update(created_at=now - timedelta(minutes=10))
-        Bid.objects.filter(pk=later.pk).update(created_at=now - timedelta(minutes=5))
-
-        winner = services.highest_eligible_bid(auction)
-        self.assertEqual(winner.pk, earlier.pk)
-        self.assertEqual(winner.bidder, self.bidder_one)
-
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=winner.pk)
-        self.assertEqual(selection.bidder, self.bidder_one)
-
-
-class SellerLockTests(AuctionTestBase):
-    def test_only_the_highest_eligible_bid_can_be_locked(self):
-        low, _ = self.place(self.make_auction(), self.bidder_one, "1000.00")
-        auction = Auction.objects.get(pk=low.auction_id)
         self.place(auction, self.bidder_two, "1200.00")
-
         with self.assertRaises(StateTransitionError):
-            services.lock_bid(auction, seller=self.seller, bid_id=low.pk)
+            services.lock_bid(
+                auction,
+                seller=self.seller,
+                bid_id=auction.bids.order_by("-amount").first().pk,
+            )
+        self.place(auction, self.bidder_two, "1500.00")
+        highest = services.highest_eligible_bid(auction)
+        self.assertEqual(highest.bidder, self.bidder_two)
 
-    def test_lock_freezes_bidding_and_starts_the_confirmation_window(self):
-        auction = self.make_auction()
-        bid, _ = self.place(auction, self.bidder_one, "1000.00")
 
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=bid.pk)
+class AwardTests(AuctionTestBase):
+    def test_confirming_a_locked_bid_creates_an_auction_deal_without_a_listing(self):
+        auction = self.make_live()
+        self.place(auction, self.bidder_one, "1000.00")
+        self.place(auction, self.bidder_two, "1100.00")
+        highest = services.highest_eligible_bid(auction)
+
+        selection = services.lock_bid(
+            auction, seller=self.seller, bid_id=highest.pk
+        )
+        self.assertEqual(selection.status, AuctionSelection.Status.PENDING)
         auction.refresh_from_db()
-
         self.assertEqual(auction.status, Auction.Status.LOCKED)
-        self.assertEqual(auction.selected_bid, bid)
-        self.assertEqual(auction.selected_bidder, self.bidder_one)
-        self.assertGreater(selection.confirmation_deadline, timezone.now())
-        self.assertTrue(
-            auction.events.filter(event_type=AuctionEvent.Type.BID_LOCKED).exists()
-        )
-        self.assertTrue(
-            Notification.objects.filter(
-                kind=Notification.Kind.AUCTION_SELECTION,
-                entity_id=str(auction.pk),
-            ).exists()
-        )
-
-    def test_reserve_price_prevents_locking_an_ineligible_bid(self):
-        auction = self.make_auction(reserve="1500.00")
-        self.place(auction, self.bidder_one, "1000.00")
-
-        with self.assertRaises(StateTransitionError):
-            services.lock_bid(auction, seller=self.seller, bid_id=auction.bids.get().pk)
-        auction.refresh_from_db()
-        self.assertEqual(auction.status, Auction.Status.LIVE)
-
-
-class ConfirmationAndFallbackTests(AuctionTestBase):
-    def _locked_auction(self):
-        auction = self.make_auction()
-        bid, _ = self.place(auction, self.bidder_one, "1000.00")
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=bid.pk)
-        return auction, selection
-
-    def test_confirm_creates_exactly_one_deal_at_the_winner_price(self):
-        auction = self.make_auction()
-        self.place(auction, self.bidder_one, "1000.00")
-        top, _ = self.place(auction, self.bidder_two, "1200.00")
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
 
         deal = services.confirm_selection(selection, actor=self.bidder_two)
         auction.refresh_from_db()
-        selection.refresh_from_db()
 
-        self.assertEqual(deal.agreed_price, Decimal("1200.00"))
         self.assertEqual(auction.status, Auction.Status.AWARDED)
         self.assertEqual(auction.awarded_deal, deal)
-        self.assertEqual(selection.status, AuctionSelection.Status.CONFIRMED)
-        self.assertEqual(Deal.objects.count(), 1)
-        self.assertEqual(deal.listing, self.listing)
-        self.assertEqual(self.listing.__class__.objects.get(pk=self.listing.pk).status, Listing.Status.RESERVED)
-
-        # A repeated confirmation (double click / retry) is idempotent.
-        again = services.confirm_selection(selection, actor=self.bidder_two)
-        self.assertEqual(again.pk, deal.pk)
-        self.assertEqual(Deal.objects.count(), 1)
-
-    def test_only_the_invited_bidder_can_confirm(self):
-        auction, selection = self._locked_auction()
-        with self.assertRaises(PermissionDeniedError):
-            services.confirm_selection(selection, actor=self.bidder_two)
-
-    def test_confirm_after_deadline_times_out_and_offers_the_next_bidder(self):
-        auction = self.make_auction()
-        self.place(auction, self.bidder_one, "1000.00")
-        top, _ = self.place(auction, self.bidder_two, "1200.00")
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
-        AuctionSelection.objects.filter(pk=selection.pk).update(
-            confirmation_deadline=timezone.now() - timedelta(minutes=1)
-        )
-        selection.refresh_from_db()
-
-        with self.assertRaises(StateTransitionError):
-            services.confirm_selection(selection, actor=self.bidder_two)
-
-        selection.refresh_from_db()
-        self.assertEqual(selection.status, AuctionSelection.Status.TIMED_OUT)
-        fallback = auction.selections.get(bidder=self.bidder_one)
-        self.assertEqual(fallback.status, AuctionSelection.Status.PENDING)
-        self.assertEqual(fallback.sequence, 2)
-        self.assertGreater(fallback.confirmation_deadline, timezone.now())
-        auction.refresh_from_db()
-        self.assertEqual(auction.status, Auction.Status.LOCKED)
-        self.assertEqual(auction.selected_bidder, self.bidder_one)
-
-    def test_decline_offers_the_next_bidder_a_fresh_deadline(self):
-        auction = self.make_auction()
-        self.place(auction, self.bidder_one, "1000.00")
-        top, _ = self.place(auction, self.bidder_two, "1200.00")
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
-
-        services.decline_selection(selection, actor=self.bidder_two, reason="Changed my mind")
-
-        selection.refresh_from_db()
-        fallback = auction.selections.get(bidder=self.bidder_one)
-        self.assertEqual(selection.status, AuctionSelection.Status.DECLINED)
-        self.assertEqual(fallback.status, AuctionSelection.Status.PENDING)
-        self.assertEqual(fallback.bid.amount, Decimal("1000.00"))
-        self.assertGreater(fallback.confirmation_deadline, selection.confirmation_deadline)
+        self.assertEqual(deal.auction, auction)
+        self.assertIsNone(deal.listing_id)
+        self.assertEqual(deal.buyer, self.bidder_two)
+        self.assertEqual(deal.agreed_price, Decimal("1100.00"))
+        self.assertEqual(deal.status, Deal.Status.ACCEPTED)
+        self.assertEqual(Listing.objects.count(), 0)
         self.assertTrue(
-            Notification.objects.filter(kind=Notification.Kind.AUCTION_FALLBACK).exists()
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.AUCTION_AWARDED, entity_id=auction.pk
+            ).exists()
         )
 
-    def test_each_bidder_is_offered_at_most_once_then_the_auction_is_unsold(self):
-        auction = self.make_auction()
+    def test_declining_offers_the_auction_to_the_next_bidder(self):
+        auction = self.make_live()
+        self.place(auction, self.bidder_two, "900.00")
         self.place(auction, self.bidder_one, "1000.00")
-        top, _ = self.place(auction, self.bidder_two, "1200.00")
-        first = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
+        highest = services.highest_eligible_bid(auction)
+        first = services.lock_bid(auction, seller=self.seller, bid_id=highest.pk)
 
-        services.decline_selection(first, actor=self.bidder_two)
-        second = auction.selections.get(bidder=self.bidder_one)
-        services.decline_selection(second, actor=self.bidder_one)
-
+        services.decline_selection(first, actor=self.bidder_one, reason="Changed my mind")
         auction.refresh_from_db()
-        self.assertEqual(auction.status, Auction.Status.UNSOLD)
-        self.assertEqual(auction.selections.count(), 2)
-        self.assertFalse(
-            auction.selections.filter(status=AuctionSelection.Status.PENDING).exists()
-        )
-        self.assertFalse(auction.awarded_deal_id)
-
-    def test_fallback_uses_each_bidders_own_highest_bid_and_price(self):
-        auction = self.make_auction()
-        # Bidder one first bids low, then raises. Bidder two is in between.
-        self.place(auction, self.bidder_one, "900.00")
-        self.place(auction, self.bidder_two, "1200.00")
-        top, _ = self.place(auction, self.bidder_one, "1300.00")
-
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
-        self.assertEqual(selection.bidder, self.bidder_one)
-        self.assertEqual(selection.bid.amount, Decimal("1300.00"))
-
-        services.decline_selection(selection, actor=self.bidder_one)
-        fallback = auction.selections.get(bidder=self.bidder_two)
-        self.assertEqual(fallback.bid.amount, Decimal("1200.00"))
-
-        deal = services.confirm_selection(fallback, actor=self.bidder_two)
-        self.assertEqual(deal.agreed_price, Decimal("1200.00"))
-
-    def test_expire_selection_is_idempotent(self):
-        auction = self.make_auction()
-        self.place(auction, self.bidder_one, "1000.00")
-        top, _ = self.place(auction, self.bidder_two, "1200.00")
-        selection = services.lock_bid(auction, seller=self.seller, bid_id=top.pk)
-        AuctionSelection.objects.filter(pk=selection.pk).update(
-            confirmation_deadline=timezone.now() - timedelta(minutes=1)
-        )
-
-        services.expire_selection(selection.pk)
-        services.expire_selection(selection.pk)
-
-        selection.refresh_from_db()
-        self.assertEqual(selection.status, AuctionSelection.Status.TIMED_OUT)
-        self.assertEqual(auction.selections.count(), 2)
-        self.assertEqual(
-            auction.selections.filter(status=AuctionSelection.Status.PENDING).count(), 1
-        )
-
-    def test_expiring_the_last_confirmation_marks_the_auction_unsold(self):
-        auction, selection = self._locked_auction()
-        AuctionSelection.objects.filter(pk=selection.pk).update(
-            confirmation_deadline=timezone.now() - timedelta(minutes=1)
-        )
-
-        services.expire_selection(selection.pk)
-
-        auction.refresh_from_db()
-        selection.refresh_from_db()
-        self.assertEqual(selection.status, AuctionSelection.Status.TIMED_OUT)
-        self.assertEqual(auction.status, Auction.Status.UNSOLD)
-
-
-class DeadlineTests(AuctionTestBase):
-    def test_live_auction_closes_unsold_when_the_seller_never_locked(self):
-        auction = self.make_auction()
-        now = timezone.now()
-        Auction.objects.filter(pk=auction.pk).update(
-            start_at=now - timedelta(hours=2),
-            end_at=now - timedelta(minutes=1),
-        )
-
-        services.close_expired_auction(auction.pk)
-
-        auction.refresh_from_db()
-        self.assertEqual(auction.status, Auction.Status.UNSOLD)
-        self.assertIn("did not lock", auction.outcome_note)
-        self.assertFalse(auction.awarded_deal_id)
-
-    def test_locked_auction_is_not_closed_by_the_auction_end_worker(self):
-        auction = self.make_auction()
-        bid, _ = self.place(auction, self.bidder_one, "1000.00")
-        services.lock_bid(auction, seller=self.seller, bid_id=bid.pk)
-        now = timezone.now()
-        Auction.objects.filter(pk=auction.pk).update(
-            start_at=now - timedelta(hours=2),
-            end_at=now - timedelta(minutes=1),
-        )
-
-        result = services.close_expired_auction(auction.pk)
-
-        auction.refresh_from_db()
-        self.assertIsNone(result)
         self.assertEqual(auction.status, Auction.Status.LOCKED)
 
-    def test_scheduled_auction_opens_for_bids(self):
-        auction = self.make_auction(
-            start_delta=timedelta(minutes=10), end_delta=timedelta(hours=2)
+        second = (
+            auction.selections.filter(status=AuctionSelection.Status.PENDING)
+            .order_by("-sequence")
+            .first()
         )
-        opened = services.open_scheduled_auction(
-            auction.pk, now=timezone.now() + timedelta(minutes=11)
-        )
+        self.assertIsNotNone(second)
+        self.assertEqual(second.bidder, self.bidder_two)
+        self.assertNotEqual(second.pk, first.pk)
 
-        self.assertIsNotNone(opened)
+    def test_seller_can_only_lock_the_highest_eligible_bid(self):
+        auction = self.make_live()
+        low, _ = self.place(auction, self.bidder_one, "1000.00")
+        self.place(auction, self.bidder_two, "1100.00")
+        with self.assertRaises(StateTransitionError):
+            services.lock_bid(auction, seller=self.seller, bid_id=low.pk)
+
+    def test_unsold_when_seller_does_not_lock_before_the_end(self):
+        auction = self.make_live(end_delta=timedelta(hours=2))
+        self.place(auction, self.bidder_one, "1000.00")
+        result = services.close_expired_auction(
+            auction.pk, now=timezone.now() + timedelta(hours=3)
+        )
+        self.assertEqual(result.status, Auction.Status.UNSOLD)
+        self.assertFalse(Deal.objects.filter(auction=auction).exists())
+
+    def test_cancelled_auction_is_not_public(self):
+        auction = self.make_approved(title="Cancel me")
+        services.cancel_auction(auction, actor=self.seller, reason="No longer available")
         auction.refresh_from_db()
-        self.assertEqual(auction.status, Auction.Status.LIVE)
-        self.assertTrue(auction.events.filter(event_type=AuctionEvent.Type.STARTED).exists())
+        self.assertEqual(auction.status, Auction.Status.CANCELLED)
+        self.client.force_login(self.seller)
+        response = self.client.get(self.list_url())
+        self.assertEqual(response.context["total_active"], 0)
+        self.assertContains(response, "No live auctions yet")
 
-    def test_command_processes_opening_closing_and_confirmation_deadlines(self):
-        now = timezone.now()
 
-        scheduled_listing = self.make_listing("auction-scheduled-item")
-        scheduled = self.make_auction(
-            listing=scheduled_listing,
-            start_delta=timedelta(minutes=10),
-            end_delta=timedelta(hours=2),
+class AuctionImageTests(AuctionTestBase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def _upload(self, name="sofa.png"):
+        buffer = BytesIO()
+        PILImage.new("RGB", (300, 300), (200, 120, 80)).save(buffer, format="PNG")
+        return SimpleUploadedFile(
+            name, buffer.getvalue(), content_type="image/png"
         )
-        Auction.objects.filter(pk=scheduled.pk).update(start_at=now - timedelta(minutes=1))
 
-        expired_listing = self.make_listing("auction-expired-item")
-        expired = self.make_auction(listing=expired_listing)
-        Auction.objects.filter(pk=expired.pk).update(
-            start_at=now - timedelta(hours=2),
-            end_at=now - timedelta(minutes=1),
+    def test_first_photo_becomes_cover_and_is_stored_on_the_auction(self):
+        auction = self.create_auction()
+        image = services.add_auction_image(
+            auction, self._upload(), actor=self.seller, caption="Front view"
         )
+        self.assertTrue(image.is_cover)
+        self.assertEqual(image.caption, "Front view")
+        self.assertEqual(auction.images.count(), 1)
+        self.assertEqual(auction.cover_image, image)
+        self.assertGreater(image.width, 0)
+        self.assertGreater(image.byte_size, 0)
 
-        locked_listing = self.make_listing("auction-locked-item")
-        locked = self.make_auction(listing=locked_listing)
-        bid, _ = self.place(locked, self.bidder_one, "800.00")
-        selection = services.lock_bid(locked, seller=self.seller, bid_id=bid.pk)
-        AuctionSelection.objects.filter(pk=selection.pk).update(
-            confirmation_deadline=now - timedelta(minutes=1)
+    def test_detail_uses_the_same_gallery_as_a_fixed_price_listing(self):
+        auction = self.create_auction()
+        services.add_auction_image(
+            auction, self._upload("front.png"), actor=self.seller, caption="Front view"
         )
-
-        call_command("process_auction_deadlines", stdout=StringIO())
-
-        scheduled.refresh_from_db()
-        expired.refresh_from_db()
-        locked.refresh_from_db()
-        selection.refresh_from_db()
-        self.assertEqual(scheduled.status, Auction.Status.LIVE)
-        self.assertEqual(expired.status, Auction.Status.UNSOLD)
-        self.assertEqual(selection.status, AuctionSelection.Status.TIMED_OUT)
-        self.assertEqual(locked.status, Auction.Status.UNSOLD)
-
-
-class AuctionHttpTests(AuctionTestBase):
-    def setUp(self):
-        self.auction = self.make_auction()
-
-    def _selection_token(self, selection):
-        return services.selection_token(selection)
-
-    def test_auction_board_is_scoped_to_the_url_emirate(self):
-        response = self.client.get(
-            reverse("auction_marketplace:list", kwargs={"emirate_slug": "abu-dhabi"})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Leather sofa")
-
-        response = self.client.get(
-            reverse(
-                "auction_marketplace:list", kwargs={"emirate_slug": "ras-al-khaimah"}
-            )
-        )
-        self.assertNotContains(response, "Leather sofa")
-
-    def test_bidder_identities_are_private_to_other_bidders(self):
-        self.place(self.auction, self.bidder_one, "1000.00")
-        self.place(self.auction, self.bidder_two, "1200.00")
-        url = reverse(
-            "auction_marketplace:detail",
-            kwargs={"emirate_slug": "abu-dhabi", "pk": self.auction.pk},
+        services.add_auction_image(
+            auction, self._upload("side.png"), actor=self.seller, caption="Side view"
         )
 
         self.client.force_login(self.seller)
-        response = self.client.get(url)
-        self.assertContains(response, "Bidder One")
-        self.assertContains(response, "Bidder Two")
+        response = self.client.get(self.detail_url(auction))
 
-        self.client.force_login(self.bidder_two)
-        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Bidder One")
-        self.assertContains(response, "You")
-
-    def test_seller_sees_the_lock_control(self):
-        self.place(self.auction, self.bidder_one, "1000.00")
-        url = reverse(
-            "auction_marketplace:detail",
-            kwargs={"emirate_slug": "abu-dhabi", "pk": self.auction.pk},
-        )
-        self.client.force_login(self.seller)
-        response = self.client.get(url)
-        self.assertContains(response, "Lock this bid")
-        self.assertContains(response, "Bidder One")
-
-    def test_bidder_can_place_a_bid_over_http(self):
-        self.client.force_login(self.bidder_one)
-        response = self.client.post(
-            reverse(
-                "auction_marketplace:bid",
-                kwargs={"emirate_slug": "abu-dhabi", "pk": self.auction.pk},
-            ),
-            {"amount": "950.00", "client_bid_id": str(uuid.uuid4())},
+        self.assertContains(response, "data-product-gallery")
+        self.assertContains(response, "gallery-main-img")
+        self.assertContains(response, "data-thumb-btn", count=2)
+        self.assertContains(response, "data-gallery-prev")
+        self.assertContains(response, "data-gallery-next")
+        self.assertContains(response, "auction-bidding-panel")
+        self.assertContains(response, "auction-about-panel")
+        self.assertLess(
+            response.content.index(b"<h2>Bidding</h2>"),
+            response.content.index(b"<h2>About this item</h2>"),
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.auction.bids.count(), 1)
-        self.assertEqual(self.auction.bids.get().bidder, self.bidder_one)
 
-    def test_bids_are_rejected_after_lock_over_http(self):
-        bid, _ = self.place(self.auction, self.bidder_one, "1000.00")
-        services.lock_bid(self.auction, seller=self.seller, bid_id=bid.pk)
+class AuditCommandTests(AuctionTestBase):
+    def test_dry_run_is_read_only_and_reports_schema(self):
+        self.make_approved()
+        before = (Auction.objects.count(), Listing.objects.count(), Deal.objects.count())
+        output = StringIO()
+        call_command("audit_auction_decoupling", stdout=output)
+        text = output.getvalue()
 
-        self.client.force_login(self.bidder_two)
-        self.client.post(
-            reverse(
-                "auction_marketplace:bid",
-                kwargs={"emirate_slug": "abu-dhabi", "pk": self.auction.pk},
-            ),
-            {"amount": "1500.00", "client_bid_id": str(uuid.uuid4())},
+        self.assertIn("Auction decoupling dry run", text)
+        self.assertIn("Legacy Auction.listing column present: False", text)
+        self.assertIn("Dry run complete; nothing was modified.", text)
+        self.assertEqual(
+            (Auction.objects.count(), Listing.objects.count(), Deal.objects.count()),
+            before,
         )
-
-        self.assertEqual(self.auction.bids.count(), 1)
-
-    def test_confirmation_link_is_private_to_the_selected_bidder(self):
-        bid, _ = self.place(self.auction, self.bidder_one, "1000.00")
-        selection = services.lock_bid(self.auction, seller=self.seller, bid_id=bid.pk)
-        url = reverse(
-            "auctions:selection", kwargs={"token": self._selection_token(selection)}
-        )
-
-        self.client.force_login(self.bidder_two)
-        self.assertEqual(self.client.get(url).status_code, 404)
-
-        self.client.force_login(self.bidder_one)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Confirm and create the deal")
-
-    def test_selected_bidder_confirms_over_http_and_gets_a_deal(self):
-        bid, _ = self.place(self.auction, self.bidder_one, "1000.00")
-        selection = services.lock_bid(self.auction, seller=self.seller, bid_id=bid.pk)
-        url = reverse(
-            "auctions:selection", kwargs={"token": self._selection_token(selection)}
-        )
-
-        self.client.force_login(self.bidder_one)
-        response = self.client.post(url, {"action": "confirm"})
-
-        deal = Deal.objects.get()
-        self.assertRedirects(response, reverse("deals:detail", kwargs={"pk": deal.pk}))
-        self.assertEqual(deal.agreed_price, Decimal("1000.00"))
-
-    def test_my_auctions_lists_the_members_activity(self):
-        self.place(self.auction, self.bidder_one, "1000.00")
-        self.client.force_login(self.bidder_one)
-        response = self.client.get(reverse("auctions:mine"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Leather sofa")
-
-    def test_only_the_owner_can_open_the_create_page(self):
-        url = reverse(
-            "auction_marketplace:create",
-            kwargs={"emirate_slug": "abu-dhabi", "listing_slug": self.listing.slug},
-        )
-        self.client.force_login(self.stranger)
-        self.assertEqual(self.client.get(url).status_code, 404)
-
-        self.client.force_login(self.seller)
-        self.assertEqual(self.client.get(url).status_code, 200)
-
-    def test_owner_can_create_an_auction_over_http(self):
-        other = self.make_listing("auction-http-create")
-        url = reverse(
-            "auction_marketplace:create",
-            kwargs={"emirate_slug": "abu-dhabi", "listing_slug": other.slug},
-        )
-        now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
-        self.client.force_login(self.seller)
-
-        response = self.client.post(
-            url,
-            {
-                "start_at": now.strftime("%Y-%m-%dT%H:%M"),
-                "end_at": (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
-                "reserve_price": "",
-                "agree_fallback": "on",
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        auction = Auction.objects.get(listing=other)
-        self.assertEqual(auction.status, Auction.Status.LIVE)
-        self.assertEqual(auction.seller, self.seller)

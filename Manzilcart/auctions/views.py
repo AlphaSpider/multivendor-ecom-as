@@ -1,11 +1,11 @@
 """
-HTTP views for auctions.
+HTTP views for standalone auctions.
 
-Sellers create an auction from one of their published listings, bidders place bids
-from the emirate-scoped detail page, and the seller explicitly locks the current
+Sellers create and edit their own auction item (never a catalog listing). Bidders place
+bids from the emirate-scoped detail page, and the seller explicitly locks the current
 highest eligible bid. The bidder then confirms or declines through a signed,
-participant-only link. Deadline processing itself lives in the management command,
-not in a request/response cycle.
+participant-only link. Deadline processing itself lives in the management command, not
+in a request/response cycle.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
 
+from accounts.eligibility import SellerEligibleMixin
 from auctions import services
 from auctions.forms import AuctionForm, BidForm
 from auctions.models import Auction, AuctionSelection
@@ -35,12 +36,7 @@ from auctions.selectors import (
     pending_selection_for,
     selections_visible_to,
 )
-from catalog.models import Listing
-from core.exceptions import (
-    DomainError,
-    PermissionDeniedError,
-    StateTransitionError,
-)
+from core.exceptions import DomainError
 from locations.mixins import EmirateRequiredMixin
 
 
@@ -58,19 +54,31 @@ def _get_auction(pk: int, emirate, user) -> Auction:
     auction = auction_for_emirate(pk, emirate)
     if auction is None:
         raise Http404("Auction not found.")
-    if auction.listing.published_at is None:
-        allowed = bool(
-            getattr(user, "is_authenticated", False)
-            and (user.pk == auction.seller_id or user.is_staff)
-        )
-        if not allowed:
-            # Same response as a missing auction: never disclose an unpublished item.
-            raise Http404("Auction not found.")
+    approved = auction.moderation_status == Auction.ModerationStatus.APPROVED
+    allowed = bool(
+        getattr(user, "is_authenticated", False)
+        and (user.pk == auction.seller_id or user.is_staff)
+    )
+    if not approved and not allowed:
+        # Same response as a missing auction: never disclose a draft or rejected item.
+        raise Http404("Auction not found.")
     return auction
 
 
+def _validate_uploads(uploaded_files) -> list[str]:
+    from core.images import validate_image_upload
+
+    errors: list[str] = []
+    for index, uploaded in enumerate(uploaded_files, start=1):
+        try:
+            validate_image_upload(uploaded)
+        except ValidationError as exc:
+            errors.append(f"Photo {index}: {' '.join(exc.messages)}")
+    return errors
+
+
 class AuctionListView(EmirateRequiredMixin, TemplateView):
-    """Emirate-scoped auction board: active first, then recent outcomes."""
+    """Paginated board: approved live/scheduled auctions, then recent outcomes."""
 
     template_name = "auctions/list.html"
 
@@ -80,6 +88,11 @@ class AuctionListView(EmirateRequiredMixin, TemplateView):
         paginator = Paginator(active, settings.AUCTIONS_PER_PAGE)
         page = paginator.get_page(self.request.GET.get("page"))
 
+        create_url = reverse(
+            "auction_marketplace:create",
+            kwargs={"emirate_slug": self.emirate.slug},
+        )
+
         context.update(
             {
                 "emirate": self.emirate,
@@ -88,13 +101,14 @@ class AuctionListView(EmirateRequiredMixin, TemplateView):
                 "total_active": paginator.count,
                 "ended_auctions": ended_auctions_for_emirate(self.emirate)[:12],
                 "now": timezone.now(),
+                "create_url": create_url,
             }
         )
         return context
 
 
 class AuctionDetailView(EmirateRequiredMixin, TemplateView):
-    """Auction detail with public bid amounts and privacy-aware bidder labels."""
+    """Standalone auction detail with public bid amounts and privacy-aware labels."""
 
     template_name = "auctions/detail.html"
 
@@ -124,7 +138,6 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
             is_authenticated
             and not is_seller
             and auction.is_open_for_bids
-            and auction.listing.is_public
             and getattr(user, "is_mobile_verified", False)
             and viewer_bid_count < settings.AUCTION_MAX_BIDS_PER_USER
         )
@@ -170,17 +183,23 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
 
         can_lock = bool(
             is_seller
+            and auction.is_public
             and auction.status == Auction.Status.LIVE
             and now < auction.end_at
             and highest_eligible is not None
         )
         has_bids = bool(bids)
         can_cancel = bool(
-            auction.status
+            auction.is_public
+            and auction.status
             in {Auction.Status.SCHEDULED, Auction.Status.LIVE}
             and (
                 (is_seller and not has_bids)
-                or (is_staff and auction.status in {Auction.Status.SCHEDULED, Auction.Status.LIVE})
+                or (
+                    is_staff
+                    and auction.status
+                    in {Auction.Status.SCHEDULED, Auction.Status.LIVE}
+                )
             )
         )
 
@@ -188,7 +207,8 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
             {
                 "emirate": self.emirate,
                 "auction": auction,
-                "listing": auction.listing,
+                "images": auction.images.all(),
+                "cover_image": auction.cover_image,
                 "now": now,
                 "bids": bids,
                 "top_bid": top_bid,
@@ -209,87 +229,196 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
                 ),
                 "can_lock": can_lock,
                 "can_cancel": can_cancel,
+                "can_edit": is_seller and auction.is_editable_by_owner,
                 "reserve_met": highest_eligible is not None,
             }
         )
         return context
 
 
-class AuctionCreateView(LoginRequiredMixin, EmirateRequiredMixin, View):
-    """Create an auction for one of the member's published listings."""
+class AuctionCreateView(
+    LoginRequiredMixin, SellerEligibleMixin, EmirateRequiredMixin, View
+):
+    """Create a standalone auction item at ``/<emirate>/auctions/new/``."""
 
     template_name = "auctions/form.html"
     login_url = "accounts:login"
 
-    def get_listing(self) -> Listing:
-        listing = get_object_or_404(
-            Listing.objects.select_related(
-                "seller", "emirate", "service_area", "category"
-            ),
-            slug=self.kwargs["listing_slug"],
-        )
-        if listing.emirate_id != self.emirate.pk:
-            raise Http404("Listing not found.")
-        if listing.seller_id != self.request.user.pk and not self.request.user.is_staff:
-            raise Http404("Listing not found.")
-        return listing
+    def _context(self, form):
+        return {
+            "emirate": self.emirate,
+            "form": form,
+            "mode": "create",
+            "confirmation_hours": settings.AUCTION_CONFIRMATION_WINDOW_HOURS,
+            "max_images": settings.MAX_IMAGES_PER_LISTING,
+        }
 
     def get(self, request, *args, **kwargs):
-        listing = self.get_listing()
         return render(
             request,
             self.template_name,
-            {
-                "emirate": self.emirate,
-                "listing": listing,
-                "form": AuctionForm(),
-                "confirmation_hours": settings.AUCTION_CONFIRMATION_WINDOW_HOURS,
-            },
+            self._context(AuctionForm(emirate=self.emirate)),
         )
 
     def post(self, request, *args, **kwargs):
-        listing = self.get_listing()
-        form = AuctionForm(request.POST)
+        form = AuctionForm(request.POST, request.FILES, emirate=self.emirate)
+        images = request.FILES.getlist("images")
+        submit_for_review = request.POST.get("action") != "draft"
 
-        if form.is_valid():
-            try:
-                auction = services.create_auction(
-                    listing=listing,
-                    seller=request.user,
-                    start_at=form.cleaned_data["start_at"],
-                    end_at=form.cleaned_data["end_at"],
-                    reserve_price=form.cleaned_data.get("reserve_price"),
-                    agree_fallback=form.cleaned_data["agree_fallback"],
-                    request=request,
-                )
-            except ValidationError as exc:
-                _apply_service_errors(form, exc)
-            except PermissionDeniedError:
-                raise Http404("Listing not found.")
-            except StateTransitionError as exc:
-                form.add_error(None, exc.message)
-            else:
-                messages.success(
-                    request,
-                    "Your auction is set up. Bidders can see it in the marketplace.",
-                )
-                return redirect(
-                    "auction_marketplace:detail",
-                    emirate_slug=self.emirate.slug,
-                    pk=auction.pk,
-                )
+        if not form.is_valid():
+            return render(request, self.template_name, self._context(form), status=400)
 
-        return render(
-            request,
-            self.template_name,
-            {
-                "emirate": self.emirate,
-                "listing": listing,
-                "form": form,
-                "confirmation_hours": settings.AUCTION_CONFIRMATION_WINDOW_HOURS,
-            },
-            status=400,
+        if not images:
+            form.add_error("images", "Please add at least one photo of the item.")
+        for error in _validate_uploads(images):
+            form.add_error("images", error)
+
+        if form.errors:
+            return render(request, self.template_name, self._context(form), status=400)
+
+        try:
+            auction = services.create_auction(
+                seller=request.user,
+                emirate=self.emirate,
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                category=form.cleaned_data["category"],
+                condition=form.cleaned_data["condition"],
+                service_area=form.cleaned_data["service_area"],
+                start_at=form.cleaned_data["start_at"],
+                end_at=form.cleaned_data["end_at"],
+                reserve_price=form.cleaned_data.get("reserve_price"),
+                agree_fallback=form.cleaned_data["agree_fallback"],
+                submit_for_review=submit_for_review,
+                request=request,
+            )
+            for uploaded in images:
+                services.add_auction_image(
+                    auction, uploaded, actor=request.user
+                )
+        except ValidationError as exc:
+            _apply_service_errors(form, exc)
+            return render(request, self.template_name, self._context(form), status=400)
+        except DomainError as exc:
+            form.add_error(None, exc.message)
+            return render(request, self.template_name, self._context(form), status=400)
+
+        if submit_for_review:
+            messages.success(
+                request,
+                "Your auction has been submitted for review. It will be public once "
+                "approved.",
+            )
+        else:
+            messages.success(
+                request, "Your auction draft has been saved. Submit it when you are ready."
+            )
+        return redirect("auctions:mine")
+
+
+class AuctionUpdateView(LoginRequiredMixin, EmirateRequiredMixin, View):
+    """Edit an auction the member owns, then send it back through moderation."""
+
+    template_name = "auctions/form.html"
+    login_url = "accounts:login"
+
+    def get_auction(self) -> Auction:
+        auction = get_object_or_404(
+            Auction.objects.select_related("emirate", "category", "service_area"),
+            pk=self.kwargs["pk"],
+            seller=self.request.user,
         )
+        if auction.emirate_id != self.emirate.pk:
+            raise Http404("Auction not found.")
+        return auction
+
+    def _context(self, form, auction):
+        return {
+            "emirate": self.emirate,
+            "form": form,
+            "auction": auction,
+            "mode": "edit",
+            "confirmation_hours": settings.AUCTION_CONFIRMATION_WINDOW_HOURS,
+            "max_images": settings.MAX_IMAGES_PER_LISTING,
+        }
+
+    def get(self, request, *args, **kwargs):
+        auction = self.get_auction()
+        if not auction.is_editable_by_owner:
+            messages.error(
+                request,
+                "This auction can no longer be edited. Bidding has already started.",
+            )
+            return redirect(
+                "auction_marketplace:detail",
+                emirate_slug=self.emirate.slug,
+                pk=auction.pk,
+            )
+        form = AuctionForm(instance=auction, emirate=self.emirate)
+        return render(request, self.template_name, self._context(form, auction))
+
+    def post(self, request, *args, **kwargs):
+        auction = self.get_auction()
+        form = AuctionForm(
+            request.POST, request.FILES, instance=auction, emirate=self.emirate
+        )
+        images = request.FILES.getlist("images")
+        submit_for_review = request.POST.get("action") != "draft"
+
+        if not form.is_valid():
+            return render(
+                request, self.template_name, self._context(form, auction), status=400
+            )
+
+        if not auction.images.exists() and not images:
+            form.add_error("images", "Please add at least one photo of the item.")
+        for error in _validate_uploads(images):
+            form.add_error("images", error)
+
+        if form.errors:
+            return render(
+                request, self.template_name, self._context(form, auction), status=400
+            )
+
+        try:
+            auction = services.update_auction(
+                auction,
+                actor=request.user,
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                category=form.cleaned_data["category"],
+                condition=form.cleaned_data["condition"],
+                service_area=form.cleaned_data["service_area"],
+                start_at=form.cleaned_data["start_at"],
+                end_at=form.cleaned_data["end_at"],
+                reserve_price=form.cleaned_data.get("reserve_price"),
+                agree_fallback=form.cleaned_data["agree_fallback"],
+                submit_for_review=submit_for_review,
+                request=request,
+            )
+            for uploaded in images:
+                services.add_auction_image(
+                    auction, uploaded, actor=request.user
+                )
+        except ValidationError as exc:
+            _apply_service_errors(form, exc)
+            return render(
+                request, self.template_name, self._context(form, auction), status=400
+            )
+        except DomainError as exc:
+            form.add_error(None, exc.message)
+            return render(
+                request, self.template_name, self._context(form, auction), status=400
+            )
+
+        if auction.moderation_status == Auction.ModerationStatus.PENDING:
+            messages.success(
+                request,
+                "Your changes were saved and the auction is back in review.",
+            )
+        else:
+            messages.success(request, "Your auction draft was saved.")
+        return redirect("auctions:mine")
 
 
 class AuctionBidView(LoginRequiredMixin, EmirateRequiredMixin, View):
@@ -393,7 +522,7 @@ class AuctionCancelView(LoginRequiredMixin, EmirateRequiredMixin, View):
 
 
 class MyAuctionsView(LoginRequiredMixin, TemplateView):
-    """Auctions the member is selling in or bidding on."""
+    """Auctions the member is selling in or bidding on, including drafts/rejections."""
 
     template_name = "auctions/my_auctions.html"
     login_url = "accounts:login"
@@ -418,10 +547,21 @@ class MyAuctionsView(LoginRequiredMixin, TemplateView):
                     "is_seller": auction.seller_id == user.pk,
                     "pending_selection": pending,
                     "selection_url": selection_url,
+                    "can_edit": auction.seller_id == user.pk
+                    and auction.is_editable_by_owner,
                 }
             )
         context["rows"] = rows
         context["now"] = timezone.now()
+
+        emirate = getattr(self.request, "emirate", None) or getattr(
+            user, "emirate", None
+        )
+        if emirate is not None and getattr(emirate, "is_active", False):
+            context["create_url"] = reverse(
+                "auction_marketplace:create",
+                kwargs={"emirate_slug": emirate.slug},
+            )
         return context
 
 
@@ -460,7 +600,8 @@ class AuctionSelectionView(LoginRequiredMixin, View):
         return {
             "selection": selection,
             "auction": auction,
-            "listing": auction.listing,
+            "images": auction.images.all(),
+            "cover_image": auction.cover_image,
             "bid": selection.bid,
             "now": now,
             "is_bidder": is_bidder,

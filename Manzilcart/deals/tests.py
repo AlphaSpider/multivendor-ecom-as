@@ -6,6 +6,7 @@ cancellation, optional services and operations notifications.
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Category, Listing
+from auctions.models import Auction
 from core.exceptions import PermissionDeniedError, StateTransitionError
 from deals import services
 from deals.models import Deal, DealOffer, DealServiceSelection
@@ -429,3 +431,98 @@ class DealHTTPTests(DealTestBase):
         self.client.force_login(self.stranger)
         response = self.client.get(reverse("deals:list"))
         self.assertNotContains(response, deal.reference)
+
+class AuctionDealTests(DealTestBase):
+    """Deals created from standalone auction awards, with no catalog listing."""
+
+    def make_auction(self):
+        now = timezone.now()
+        return Auction.objects.create(
+            seller=self.seller,
+            title="Auctioned sideboard",
+            description="Teak sideboard with two doors and a small water mark.",
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            emirate=self.emirate,
+            service_area=self.area,
+            start_at=now - timedelta(hours=2),
+            end_at=now + timedelta(hours=2),
+            status=Auction.Status.LIVE,
+            moderation_status=Auction.ModerationStatus.APPROVED,
+            seller_agreed_fallback=True,
+            submitted_at=now,
+            approved_at=now,
+        )
+
+    def test_create_awarded_deal_links_the_auction_and_not_a_listing(self):
+        auction = self.make_auction()
+        before_listing_status = self.listing.status
+        deal = services.create_awarded_deal(
+            auction=auction,
+            buyer=self.buyer,
+            amount=Decimal("950.00"),
+        )
+
+        self.assertEqual(deal.auction, auction)
+        self.assertIsNone(deal.listing_id)
+        self.assertEqual(deal.status, Deal.Status.ACCEPTED)
+        self.assertEqual(deal.seller, self.seller)
+        self.assertEqual(deal.emirate, self.emirate)
+        self.assertEqual(deal.agreed_price, Decimal("950.00"))
+        self.assertEqual(deal.item_title, auction.title)
+        self.assertEqual(deal.item_kind, "auction")
+        self.assertTrue(deal.item_url.endswith(f"/auctions/{auction.pk}/"))
+        self.assertTrue(deal.item_reference.startswith("MC-A"))
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.status, before_listing_status)
+        self.assertTrue(
+            Notification.objects.filter(
+                kind=Notification.Kind.DEAL_ACCEPTED,
+                entity_id=str(deal.pk),
+            ).exists()
+        )
+
+    def test_auction_award_is_unique_per_auction(self):
+        auction = self.make_auction()
+        services.create_awarded_deal(
+            auction=auction, buyer=self.buyer, amount=Decimal("950.00")
+        )
+        with self.assertRaises(StateTransitionError):
+            services.create_awarded_deal(
+                auction=auction, buyer=self.buyer_two, amount=Decimal("980.00")
+            )
+
+    def test_deal_source_is_exactly_one_of_listing_or_auction(self):
+        auction = self.make_auction()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Deal.objects.create(
+                listing=self.listing,
+                auction=auction,
+                buyer=self.buyer,
+                seller=self.seller,
+                emirate=self.emirate,
+                status=Deal.Status.ACCEPTED,
+                agreed_price=Decimal("950.00"),
+                accepted_at=timezone.now(),
+            )
+
+    def test_auction_deal_page_and_list_work_for_participants(self):
+        auction = self.make_auction()
+        deal = services.create_awarded_deal(
+            auction=auction, buyer=self.buyer, amount=Decimal("950.00")
+        )
+
+        self.client.force_login(self.buyer)
+        response = self.client.get(reverse("deals:detail", args=[deal.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, auction.title)
+        self.assertContains(response, deal.reference)
+
+        response = self.client.get(reverse("deals:list"))
+        self.assertContains(response, deal.reference)
+        self.assertNotContains(response, self.listing.title)
+
+        self.client.force_login(self.stranger)
+        response = self.client.get(reverse("deals:detail", args=[deal.pk]))
+        self.assertEqual(response.status_code, 404)

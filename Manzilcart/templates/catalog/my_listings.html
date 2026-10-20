@@ -66,7 +66,6 @@
             <div class="my-listing-actions">
               {% if listing.is_public %}
                 <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}" data-i18n="btn_view">View</a>
-                <a class="btn btn-secondary btn-small" href="{% url 'auction_marketplace:create' emirate_slug=listing.emirate.slug listing_slug=listing.slug %}" data-i18n="create_auction">Create auction</a>
               {% endif %}
 
               {% if listing.is_editable_by_owner %}

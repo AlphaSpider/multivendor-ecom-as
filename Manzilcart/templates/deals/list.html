@@ -22,7 +22,7 @@
       {% for deal in deals %}
         <article class="panel deal-row">
           <div class="deal-thumb">
-            {% with cover=deal.listing.cover_image %}
+            {% with cover=deal.cover_image %}
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
@@ -34,9 +34,9 @@
           <div class="deal-row-body">
             <div class="deal-row-head">
               <div>
-                <h2><a href="{% url 'deals:detail' pk=deal.pk %}">{{ deal.listing.title }}</a></h2>
+                <h2><a href="{% url 'deals:detail' pk=deal.pk %}">{{ deal.item_title }}</a></h2>
                 <p class="muted small">
-                  {{ deal.reference }} · <span data-area-name="{{ deal.listing.service_area.name }}">{{ deal.listing.service_area.name }}</span>, <span data-emirate-name="{{ deal.emirate.name }}">{{ deal.emirate.name }}</span>
+                  {{ deal.reference }} · <span data-area-name="{{ deal.service_area.name }}">{{ deal.service_area.name }}</span>, <span data-emirate-name="{{ deal.emirate.name }}">{{ deal.emirate.name }}</span>
                 </p>
               </div>
               <span class="status-pill status-{{ deal.status }}">{{ deal.get_status_display }}</span>
@@ -53,8 +53,10 @@
             <p class="deal-row-price">
               {% if deal.agreed_price %}
                 Agreed: <strong>AED {{ deal.agreed_price|floatformat:0|intcomma }}</strong>
-              {% else %}
+              {% elif deal.listing_id %}
                 Asking: AED {{ deal.listing.asking_price|floatformat:0|intcomma }}
+              {% else %}
+                Winning bid: AED {{ deal.agreed_price|floatformat:0|intcomma }}
               {% endif %}
             </p>
           </div>

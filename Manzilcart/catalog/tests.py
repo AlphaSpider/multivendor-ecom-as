@@ -55,6 +55,11 @@ class CatalogTestCase(TestCase):
             published_at=timezone.now(),
         )
 
+    def test_condition_choices_exclude_new_items(self):
+        values = {value for value, _label in Listing.Condition.choices}
+        self.assertNotIn("new", values)
+        self.assertIn(Listing.Condition.LIKE_NEW, values)
+
     def test_public_list_is_scoped_to_the_url_emirate(self):
         response = self.client.get(
             reverse("catalog:listing_list", kwargs={"emirate_slug": "abu-dhabi"})

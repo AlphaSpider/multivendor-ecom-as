@@ -1,0 +1,47 @@
+{% comment %}An auction card using the same visual language as a fixed-price listing card.{% endcomment %}
+{% load humanize %}
+<article class="listing-card">
+  <a class="listing-card-media" href="{{ auction.get_absolute_url }}" tabindex="-1" aria-hidden="true">
+    {% with cover=auction.cover_image %}
+      {% if cover %}
+        <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width|default:640 }}" height="{{ cover.height|default:480 }}">
+      {% else %}
+        <span class="listing-placeholder" aria-hidden="true">{{ auction.category.name|slice:":1" }}</span>
+      {% endif %}
+    {% endwith %}
+  </a>
+  <div class="listing-card-body">
+    <div class="listing-card-top">
+      <span class="badge" data-condition="{{ auction.condition }}">{{ auction.get_condition_display }}</span>
+      <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
+    </div>
+    <h3 class="listing-card-title">
+      <a href="{{ auction.get_absolute_url }}">{{ auction.title }}</a>
+    </h3>
+    <p class="listing-card-price">
+      {% if auction.awarded_deal %}
+        AED {{ auction.awarded_deal.agreed_price|floatformat:0|intcomma }}
+      {% elif auction.top_bid %}
+        AED {{ auction.top_bid|floatformat:0|intcomma }}
+      {% elif auction.status == "scheduled" %}
+        Bids open soon
+      {% else %}
+        No bids yet
+      {% endif %}
+    </p>
+    <p class="listing-card-meta">
+      <span data-area-name="{{ auction.service_area.name }}">{{ auction.service_area.name }}</span>
+      <span aria-hidden="true">·</span>
+      <span data-category-name="{{ auction.category.name }}">{{ auction.category.name }}</span>
+    </p>
+    <p class="auction-card-timing">
+      {% if auction.status == "live" %}
+        Closes {{ auction.end_at|date:"d M Y H:i" }}
+      {% elif auction.status == "scheduled" %}
+        Opens {{ auction.start_at|date:"d M Y H:i" }}
+      {% else %}
+        Closed {{ auction.end_at|date:"d M Y H:i" }}
+      {% endif %}
+    </p>
+  </div>
+</article>

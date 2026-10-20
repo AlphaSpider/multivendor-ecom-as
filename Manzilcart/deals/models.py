@@ -37,8 +37,18 @@ class Deal(TimeStampedModel):
 
     listing = models.ForeignKey(
         "catalog.Listing",
+        null=True,
+        blank=True,
         on_delete=models.PROTECT,
         related_name="deals",
+    )
+    auction = models.ForeignKey(
+        "auctions.Auction",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="deals",
+        help_text="Set when the deal was created from an auction award.",
     )
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -103,29 +113,49 @@ class Deal(TimeStampedModel):
                 ),
                 name="deal_agreed_price_required_when_accepted",
             ),
+            models.CheckConstraint(
+                condition=(
+                    (Q(listing__isnull=False) & Q(auction__isnull=True))
+                    | (Q(listing__isnull=True) & Q(auction__isnull=False))
+                ),
+                name="deal_exactly_one_source",
+            ),
             # The core guarantee: one listing cannot be promised to two buyers.
             models.UniqueConstraint(
                 fields=["listing"],
-                condition=Q(status__in=["accepted", "cancellation_requested"]),
+                condition=Q(
+                    status__in=["accepted", "cancellation_requested"],
+                    listing__isnull=False,
+                ),
                 name="deal_one_active_per_listing",
             ),
             # A buyer keeps one open negotiation per listing; cancelled deals do not
             # block a fresh attempt if the seller puts the item back on the market.
             models.UniqueConstraint(
                 fields=["listing", "buyer"],
-                condition=Q(status="negotiating"),
+                condition=Q(status="negotiating", listing__isnull=False),
                 name="deal_one_open_per_buyer_listing",
+            ),
+            # Auction awards are one-per-auction while active, mirroring listings.
+            models.UniqueConstraint(
+                fields=["auction"],
+                condition=Q(
+                    status__in=["accepted", "cancellation_requested"],
+                    auction__isnull=False,
+                ),
+                name="deal_one_active_per_auction",
             ),
         ]
         indexes = [
             models.Index(fields=["buyer", "status", "-created_at"], name="deal_buyer_status_idx"),
             models.Index(fields=["seller", "status", "-created_at"], name="deal_seller_status_idx"),
             models.Index(fields=["listing", "status"], name="deal_listing_status_idx"),
+            models.Index(fields=["auction", "status"], name="deal_auction_status_idx"),
             models.Index(fields=["emirate", "status"], name="deal_emirate_status_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"{self.reference} — {self.listing}"
+        return f"{self.reference} — {self.item_title}"
 
     @property
     def reference(self) -> str:
@@ -144,6 +174,56 @@ class Deal(TimeStampedModel):
     @property
     def is_active(self) -> bool:
         return self.status in {self.Status.ACCEPTED, self.Status.CANCELLATION_REQUESTED}
+
+    # -- item facade --------------------------------------------------------
+    # Deal pages and notifications must work whether the source is a fixed-price
+    # listing or a standalone auction.
+
+    @property
+    def item_title(self) -> str:
+        if self.listing_id:
+            return self.listing.title
+        return self.auction.title if self.auction_id else "Item"
+
+    @property
+    def item_category(self):
+        if self.listing_id:
+            return self.listing.category
+        return self.auction.category if self.auction_id else None
+
+    @property
+    def service_area(self):
+        if self.listing_id:
+            return self.listing.service_area
+        return self.auction.service_area if self.auction_id else None
+
+    @property
+    def condition_display(self) -> str:
+        if self.listing_id:
+            return self.listing.get_condition_display()
+        return self.auction.get_condition_display() if self.auction_id else ""
+
+    @property
+    def cover_image(self):
+        if self.listing_id:
+            return self.listing.cover_image
+        return self.auction.cover_image if self.auction_id else None
+
+    @property
+    def item_url(self) -> str:
+        if self.listing_id:
+            return self.listing.get_absolute_url()
+        return self.auction.get_absolute_url() if self.auction_id else ""
+
+    @property
+    def item_kind(self) -> str:
+        return "auction" if self.auction_id else "listing"
+
+    @property
+    def item_reference(self) -> str:
+        if self.listing_id:
+            return f"MC-L-{self.listing_id:06d}"
+        return self.auction.reference if self.auction_id else ""
 
 
 class DealOffer(models.Model):

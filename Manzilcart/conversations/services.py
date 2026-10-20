@@ -61,30 +61,46 @@ def _broadcast(message: Message) -> None:
 
 
 @transaction.atomic
-def start_conversation(listing, buyer, *, request=None) -> Conversation:
+def start_conversation(
+    item=None, buyer=None, *, listing=None, auction=None, request=None
+) -> Conversation:
     """
-    Return the buyer's existing thread for ``listing`` or create it.
+    Return the buyer's existing thread for an item or create it.
 
-    Only public listings can start a thread. Once a thread exists it remains readable
-    and writable by both parties even if the listing is later reserved or sold, because
-    the history is needed to resolve the deal.
+    Exactly one of ``listing`` / ``auction`` is used. Only public items can start a
+    thread. Once a thread exists it remains readable and writable by both parties even
+    if the item is later reserved, awarded or sold, because the history is needed to
+    resolve the deal.
     """
+    if listing is None and auction is None and item is not None:
+        if getattr(item, "_meta", None) is not None and item._meta.model_name == "auction":
+            auction = item
+        else:
+            listing = item
+    if (listing is None) == (auction is None):
+        raise ValidationError("A conversation must have exactly one source item.")
+    source = listing if listing is not None else auction
+
     if buyer is None or not getattr(buyer, "is_authenticated", False):
         raise PermissionDeniedError("Please sign in to contact the seller.")
-    if listing.seller_id == buyer.pk:
-        raise PermissionDeniedError("You cannot start a conversation about your own listing.")
-    if not listing.is_public:
-        raise PermissionDeniedError("This listing is not available for new messages.")
+    if source.seller_id == buyer.pk:
+        raise PermissionDeniedError("You cannot start a conversation about your own item.")
+    if not source.is_public:
+        raise PermissionDeniedError("This item is not available for new messages.")
 
+    lookup = {"listing": listing} if listing is not None else {"auction": auction}
     try:
-        conversation, _ = Conversation.objects.get_or_create(
-            listing=listing,
-            buyer=buyer,
-            defaults={"seller": listing.seller, "emirate": listing.emirate},
-        )
+        # Savepoint so a concurrent insert that trips the unique constraint does not
+        # poison the outer transaction.
+        with transaction.atomic():
+            conversation, _ = Conversation.objects.get_or_create(
+                buyer=buyer,
+                defaults={"seller": source.seller, "emirate": source.emirate, **lookup},
+                **lookup,
+            )
     except IntegrityError:
         # Two tabs / two requests raced; the unique constraint picked a winner.
-        conversation = Conversation.objects.get(listing=listing, buyer=buyer)
+        conversation = Conversation.objects.get(buyer=buyer, **lookup)
 
     return conversation
 
