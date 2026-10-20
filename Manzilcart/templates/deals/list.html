@@ -11,9 +11,9 @@
 <section class="container section">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Your account</p>
-      <h1>Offers and deals</h1>
-      <p class="muted">Negotiations you are buying or selling, newest first.</p>
+      <p class="eyebrow" data-i18n="your_account">Your account</p>
+      <h1 data-i18n="deals_title">Offers and deals</h1>
+      <p class="muted" data-i18n="deals_desc">Negotiations you are buying or selling, newest first.</p>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
-                <span class="muted small">No photo</span>
+                <span class="muted small" data-i18n="no_photo">No photo</span>
               {% endif %}
             {% endwith %}
           </div>
@@ -36,7 +36,7 @@
               <div>
                 <h2><a href="{% url 'deals:detail' pk=deal.pk %}">{{ deal.listing.title }}</a></h2>
                 <p class="muted small">
-                  {{ deal.reference }} · {{ deal.listing.service_area.name }}, {{ deal.emirate.name }}
+                  {{ deal.reference }} · <span data-area-name="{{ deal.listing.service_area.name }}">{{ deal.listing.service_area.name }}</span>, <span data-emirate-name="{{ deal.emirate.name }}">{{ deal.emirate.name }}</span>
                 </p>
               </div>
               <span class="status-pill status-{{ deal.status }}">{{ deal.get_status_display }}</span>
@@ -44,9 +44,9 @@
 
             <p class="muted small">
               {% if deal.buyer_id == user.pk %}
-                You are buying from {{ deal.seller.display_name|default:"the seller" }}.
+                <span data-i18n="you_are_buying_from">You are buying from</span> {{ deal.seller.display_name|default:"the seller" }}.
               {% else %}
-                You are selling to {{ deal.buyer.display_name|default:"the buyer" }}.
+                <span data-i18n="you_are_selling_to">You are selling to</span> {{ deal.buyer.display_name|default:"the buyer" }}.
               {% endif %}
             </p>
 

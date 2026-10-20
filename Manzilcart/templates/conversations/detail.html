@@ -10,7 +10,7 @@
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'conversations:list' %}">Messages</a>
+    <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
     <span aria-hidden="true">/</span>
     <span>{{ conversation.listing.title }}</span>
   </nav>
@@ -26,20 +26,20 @@
         <div>
           <h1>{{ listing.title }}</h1>
           <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
-          <p class="muted small">{{ listing.service_area.name }}, {{ listing.emirate.name }}</p>
-          <p class="muted small">{{ listing.get_status_display }}</p>
+          <p class="muted small"><span data-area-name>{{ listing.service_area.name }}</span>, <span data-emirate-name>{{ listing.emirate.name }}</span></p>
+          <p class="muted small" data-status>{{ listing.get_status_display }}</p>
         </div>
       </div>
 
       <dl class="detail-list">
         <div>
-          <dt>{% if is_seller %}Buyer{% else %}Seller{% endif %}</dt>
+          <dt>{% if is_seller %}<span data-i18n="deals_buyer">Buyer</span>{% else %}<span data-i18n="deals_seller">Seller</span>{% endif %}</dt>
           <dd>{{ other.display_name|default:"ManzilCart member" }}</dd>
         </div>
       </dl>
 
       {% if listing.is_public %}
-        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View listing</a>
+        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}" data-i18n="deals_view_listing">View listing</a>
       {% endif %}
 
       <p class="safety-note">
@@ -50,13 +50,13 @@
 
     <div class="panel chat-panel">
       <div class="chat-header">
-        <h2>Conversation</h2>
-        <span class="chat-status" id="chat-status" data-state="connecting">Connecting…</span>
+        <h2 data-i18n="chat_conversation_heading">Conversation</h2>
+        <span class="chat-status" id="chat-status" data-state="connecting" data-i18n="chat_connecting">Connecting…</span>
       </div>
 
       {% if page_obj.has_next %}
         <div class="chat-history-link">
-          <a class="btn btn-quiet btn-small" href="?page={{ page_obj.next_page_number }}">Load older messages</a>
+          <a class="btn btn-quiet btn-small" href="?page={{ page_obj.next_page_number }}" data-i18n="chat_load_older">Load older messages</a>
         </div>
       {% endif %}
 
@@ -81,7 +81,7 @@
             <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
           </li>
         {% empty %}
-          <li class="chat-empty muted">No messages yet. Say hello and ask about the furniture.</li>
+          <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet. Say hello and ask about the furniture.</li>
         {% endfor %}
       </ol>
 
@@ -92,7 +92,7 @@
         action="{% url 'conversations:send' pk=conversation.pk %}"
       >
         {% csrf_token %}
-        <label class="sr-only" for="chat-input">Message</label>
+        <label class="sr-only" for="chat-input" data-i18n="chat_input_label">Message</label>
         <textarea
           class="input"
           id="chat-input"
@@ -100,9 +100,10 @@
           rows="2"
           maxlength="{{ max_message_length }}"
           placeholder="Write a message…"
+          data-placeholder-i18n="chat_placeholder"
           required
         ></textarea>
-        <button class="btn btn-primary" type="submit" id="chat-submit">Send</button>
+        <button class="btn btn-primary" type="submit" id="chat-submit" data-i18n="chat_send">Send</button>
       </form>
       <p class="chat-hint muted small" id="chat-hint">
         Messages are saved. If the connection drops, your unsent message is retried automatically.

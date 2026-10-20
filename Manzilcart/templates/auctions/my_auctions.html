@@ -11,12 +11,12 @@
 <section class="container section">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Your account</p>
-      <h1>My auctions</h1>
-      <p class="muted">Auctions you are selling in, bidding on, or have been offered.</p>
+      <p class="eyebrow" data-i18n="your_account">Your account</p>
+      <h1 data-i18n="my_auctions">My auctions</h1>
+      <p class="muted" data-i18n="my_auctions_desc">Auctions you are selling in, bidding on, or have been offered.</p>
     </div>
     {% if current_emirate %}
-      <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}">Browse auctions</a>
+      <a class="btn btn-quiet" href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}" data-i18n="browse_auctions">Browse auctions</a>
     {% endif %}
   </div>
 
@@ -29,7 +29,7 @@
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
-                <span class="muted small">No photo</span>
+                <span class="muted small" data-i18n="no_photo">No photo</span>
               {% endif %}
             {% endwith %}
           </div>
@@ -43,8 +43,8 @@
                   </a>
                 </h2>
                 <p class="muted small">
-                  {{ row.auction.reference }} · {{ row.auction.listing.service_area.name }}, {{ row.auction.emirate.name }}
-                  · {% if row.is_seller %}You are selling{% else %}You are bidding{% endif %}
+                  {{ row.auction.reference }} · <span data-area-name="{{ row.auction.listing.service_area.name }}">{{ row.auction.listing.service_area.name }}</span>, <span data-emirate-name="{{ row.auction.emirate.name }}">{{ row.auction.emirate.name }}</span>
+                  · {% if row.is_seller %}<span data-i18n="you_are_selling">You are selling</span>{% else %}<span data-i18n="you_are_bidding">You are bidding</span>{% endif %}
                 </p>
               </div>
               <span class="status-pill status-auction-{{ row.auction.status }}">{{ row.auction.get_status_display }}</span>
@@ -52,9 +52,9 @@
 
             <p class="deal-row-price">
               {% if row.auction.top_bid %}
-                Highest bid: <strong>AED {{ row.auction.top_bid|floatformat:0|intcomma }}</strong>
+                <span data-i18n="highest_bid">Highest bid</span>: <strong>AED {{ row.auction.top_bid|floatformat:0|intcomma }}</strong>
               {% else %}
-                No bids yet
+                <span data-i18n="no_bids_yet">No bids yet</span>
               {% endif %}
               <span class="muted small">
                 · {% if row.auction.status == "live" %}Ends {{ row.auction.end_at|date:"j M Y, H:i" }}{% else %}{{ row.auction.end_at|date:"j M Y, H:i" }}{% endif %}

@@ -100,8 +100,36 @@ class LandingTests(LocationTestBase):
         self.assertTrue(response.context["no_emirates_available"])
         self.assertEqual(list(response.context["emirates"]), [])
 
+    def test_landing_header_only_shows_centered_logo_without_marketplace_options(self):
+        session = self.client.session
+        session[settings.EMIRATE_SESSION_KEY] = "abu-dhabi"
+        session.save()
+
+        response = self.client.get(reverse("locations:landing"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "site-header-landing")
+        self.assertContains(response, "brand-landing")
+        self.assertContains(response, "data-theme-toggle")
+        self.assertContains(response, "data-lang-toggle")
+        self.assertNotContains(response, 'id="primary-nav"')
+        self.assertNotContains(response, 'data-i18n="nav_sell_plus"')
+        self.assertNotContains(response, 'data-i18n="nav_browse"')
+        self.assertNotContains(response, 'data-i18n="nav_auctions"')
+        self.assertNotContains(response, 'class="marketplace-chip"')
+
 
 class MarketplaceHomeTests(LocationTestBase):
+    def test_logo_redirects_to_browse_page_when_emirate_chosen(self):
+        response = self.client.get(
+            reverse("marketplace:home", kwargs={"emirate_slug": "abu-dhabi"})
+        )
+        self.assertEqual(response.status_code, 200)
+        browse_url = reverse("marketplace:home", kwargs={"emirate_slug": "abu-dhabi"})
+        self.assertContains(
+            response,
+            f'href="{browse_url}" aria-label="ManzilCart home"',
+        )
+
     def test_direct_emirate_url_renders_and_remembers_the_choice(self):
         response = self.client.get(
             reverse("marketplace:home", kwargs={"emirate_slug": "abu-dhabi"})

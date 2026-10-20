@@ -14,11 +14,11 @@
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">{{ emirate.name }}</p>
-      <h1>{% if mode == "edit" %}Edit your listing{% else %}Sell an item{% endif %}</h1>
+      <p class="eyebrow" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</p>
+      <h1>{% if mode == "edit" %}<span data-i18n="edit_listing_title">Edit your listing</span>{% else %}<span data-i18n="sell_an_item">Sell an item</span>{% endif %}</h1>
       <p class="muted">
-        Listings are reviewed before they go live. You will see the status in
-        <a href="{% url 'accounts:listings' %}">My listings</a>.
+        <span data-i18n="listing_reviewed_notice">Listings are reviewed before they go live. You will see the status in</span>
+        <a href="{% url 'accounts:listings' %}" data-i18n="my_listings">My listings</a>.
       </p>
     </div>
   </div>
@@ -77,21 +77,21 @@
       {% endif %}
 
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">
+        <button class="btn btn-primary" type="submit" data-i18n="{% if mode == 'edit' %}btn_save_submit{% else %}btn_submit_review{% endif %}">
           {% if mode == "edit" %}Save and submit for review{% else %}Submit for review{% endif %}
         </button>
-        <a class="btn btn-quiet" href="{% url 'accounts:listings' %}">Cancel</a>
+        <a class="btn btn-quiet" href="{% url 'accounts:listings' %}" data-i18n="btn_cancel">Cancel</a>
       </div>
     </form>
   </div>
 
   <div class="panel panel-muted">
-    <h2>Tips for a quick sale</h2>
+    <h2 data-i18n="tips_title">Tips for a quick sale</h2>
     <ul>
-      <li>Use daylight photos from a few angles, including any marks.</li>
-      <li>Give dimensions — buyers measure before they travel.</li>
-      <li>Be honest about condition; it builds trust and avoids disputes.</li>
-      <li>Set a realistic asking price. Negotiation happens in chat.</li>
+      <li data-i18n="tip_1">Use daylight photos from a few angles, including any marks.</li>
+      <li data-i18n="tip_2">Give dimensions — buyers measure before they travel.</li>
+      <li data-i18n="tip_3">Be honest about condition; it builds trust and avoids disputes.</li>
+      <li data-i18n="tip_4">Set a realistic asking price. Negotiation happens in chat.</li>
     </ul>
   </div>
 </section>

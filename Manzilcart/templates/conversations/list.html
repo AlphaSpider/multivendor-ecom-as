@@ -11,9 +11,9 @@
 <section class="container section">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Your account</p>
-      <h1>Messages</h1>
-      <p class="muted">Conversations with buyers and sellers, newest first.</p>
+      <p class="eyebrow" data-i18n="your_account">Your account</p>
+      <h1 data-i18n="messages_title">Messages</h1>
+      <p class="muted" data-i18n="messages_desc">Conversations with buyers and sellers, newest first.</p>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
-                <span class="muted small">No photo</span>
+                <span class="muted small" data-i18n="no_photo">No photo</span>
               {% endif %}
             {% endwith %}
           </div>
@@ -37,23 +37,23 @@
                 {{ conversation.listing.title }}
               </a>
               {% if conversation.unread_count %}
-                <span class="badge">{{ conversation.unread_count }} new</span>
+                <span class="badge">{{ conversation.unread_count }} <span data-i18n="new_badge">new</span></span>
               {% endif %}
             </div>
             <p class="muted small">
-              With
+              <span data-i18n="with_prefix">With</span>
               {% if conversation.buyer_id == user.pk %}
                 {{ conversation.seller.display_name|default:"the seller" }}
               {% else %}
                 {{ conversation.buyer.display_name|default:"a buyer" }}
               {% endif %}
-              · {{ conversation.listing.service_area.name }}, {{ conversation.listing.emirate.name }}
+              · <span data-area-name="{{ conversation.listing.service_area.name }}">{{ conversation.listing.service_area.name }}</span>, <span data-emirate-name="{{ conversation.listing.emirate.name }}">{{ conversation.listing.emirate.name }}</span>
             </p>
             <p class="muted small">
               {% if conversation.last_message_at %}
-                Last message {{ conversation.last_message_at|naturaltime }}
+                <span data-i18n="last_message_prefix">Last message</span> {{ conversation.last_message_at|naturaltime }}
               {% else %}
-                No messages yet
+                <span data-i18n="no_messages_yet">No messages yet</span>
               {% endif %}
             </p>
           </div>

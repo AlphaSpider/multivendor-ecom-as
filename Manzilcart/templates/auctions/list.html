@@ -10,22 +10,21 @@
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</a>
     <span aria-hidden="true">/</span>
-    <span>Auctions</span>
+    <span data-i18n="nav_auctions">Auctions</span>
   </nav>
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">{{ emirate.name }} marketplace</p>
-      <h1>Furniture auctions</h1>
+      <p class="eyebrow"><span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span> <span data-i18n="marketplace_label">marketplace</span></p>
+      <h1 data-i18n="furniture_auctions">Furniture auctions</h1>
       <p class="muted">
-        {{ total_active }} auction{{ total_active|pluralize }} open or scheduled.
-        Sellers lock the highest eligible bid; the selected bidder then confirms.
+        {{ total_active }} <span data-i18n="auctions_active_suffix">auctions open or scheduled. Sellers lock the highest eligible bid; the selected bidder then confirms.</span>
       </p>
     </div>
     {% if current_emirate %}
-      <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}">Browse fixed-price listings</a>
+      <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}" data-i18n="browse_fixed_price">Browse fixed-price listings</a>
     {% endif %}
   </div>
 
@@ -38,13 +37,13 @@
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width }}" height="{{ cover.height }}">
               {% else %}
-                <span class="auction-no-photo">No photo</span>
+                <span class="auction-no-photo" data-i18n="no_photo">No photo</span>
               {% endif %}
             {% endwith %}
           </a>
           <div class="listing-card-body">
             <div class="listing-card-top">
-              <span class="badge">Auction</span>
+              <span class="badge" data-i18n="auction_label">Auction</span>
               <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
             </div>
             <h2 class="listing-card-title">
@@ -52,13 +51,13 @@
             </h2>
             <p class="auction-card-price">
               {% if auction.top_bid %}
-                Highest bid <strong>AED {{ auction.top_bid|floatformat:0|intcomma }}</strong>
+                <span data-i18n="highest_bid">Highest bid</span> <strong>AED {{ auction.top_bid|floatformat:0|intcomma }}</strong>
               {% else %}
-                No bids yet
+                <span data-i18n="no_bids_yet">No bids yet</span>
               {% endif %}
             </p>
             <p class="listing-card-meta muted small">
-              {{ auction.listing.service_area.name }}
+              <span data-area-name="{{ auction.listing.service_area.name }}">{{ auction.listing.service_area.name }}</span>
               {% if auction.status == "live" %}
                 · Ends {{ auction.end_at|date:"j M, H:i" }}
               {% elif auction.status == "scheduled" %}
@@ -75,11 +74,11 @@
     {% if page_obj.paginator.num_pages > 1 %}
       <nav class="pagination" aria-label="Pagination">
         {% if page_obj.has_previous %}
-          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}">Previous</a>
+          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.previous_page_number %}" data-i18n="btn_previous">Previous</a>
         {% endif %}
         <span class="pagination-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}">Next</a>
+          <a class="btn btn-quiet btn-small" href="{% querystring page=page_obj.next_page_number %}" data-i18n="btn_next">Next</a>
         {% endif %}
       </nav>
     {% endif %}

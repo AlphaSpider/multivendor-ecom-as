@@ -37,251 +37,566 @@
       applyTheme(nextTheme);
     });
   }
-
   // --- English / Arabic Bilingual Feature ---------------------------------
-  var i18n = {
-    en: {
-      skip_to_content: "Skip to content",
-      switch_emirate: "Switch emirate",
-      btn_switch: "Switch",
-      nav_browse: "Browse",
-      nav_sell: "Sell",
-      nav_sell_plus: "Sell+",
-      nav_auctions: "Auctions",
-      nav_messages: "Messages",
-      nav_deals: "Deals",
-      nav_my_account: "My account",
-      nav_sign_out: "Sign out",
-      nav_sign_in: "Sign in",
-      nav_join: "Join ManzilCart",
-      hero_eyebrow: "Furniture marketplace · UAE",
-      hero_title: "Give good furniture<br>a second home.",
-      hero_lede: "Buy and sell new and refurbished furniture with people in your own community. Choose your emirate to see what is available near you.",
-      picker_title: "Where are you looking?",
-      picker_subtitle: "You can switch at any time. We never guess your location.",
-      no_marketplaces_title: "No marketplaces are open right now",
-      no_marketplaces_desc: "We are preparing our launch. Please check back soon.",
-      card_marketplace: "Marketplace",
-      card_continue: "Continue where you left off",
-      enter_emirate: "Enter",
-      neighbourhoods: "neighbourhoods",
-      remembered_note_prefix: "Last time you were browsing",
-      val_moderated_title: "Moderated listings",
-      val_moderated_desc: "Every item is reviewed before it appears, so what you see is real furniture from real people.",
-      val_direct_title: "Talk directly",
-      val_direct_desc: "Message the seller, ask questions and agree a price without leaving the platform.",
-      val_local_title: "Local by design",
-      val_local_desc: "Your marketplace is your emirate. Optional delivery and assembly help can be requested with a deal.",
-      invalid_emirate_alert: "That marketplace is not currently available. Please select an active emirate below.",
-      marketplace_label: "Marketplace",
-      market_hero_title: "Furniture looking for<br>its next home.",
-      market_hero_lede: "New and refurbished pieces from sellers across the emirate. Every listing is reviewed before it goes live.",
-      search_furniture: "Search furniture",
-      search_placeholder: "Search sofas, desks, beds…",
-      btn_search: "Search",
-      browse_category: "Browse by category",
-      category_tagline: "Find the piece that finishes the room.",
-      all_listings: "All listings",
-      categories_setting_up: "Categories are being set up.",
-      fresh_in: "Fresh in",
-      fresh_tagline: "The newest approved listings.",
-      no_listings_title: "No listings yet",
-      no_listings_desc: "Be the first to list a piece of furniture in this emirate.",
-      sell_an_item: "Sell an item",
-      join_to_sell: "Join to sell",
-      selling_in: "Selling in",
-      operate_neighbourhoods_prefix: "We operate in",
-      operate_neighbourhoods_suffix: "neighbourhoods here.",
-      list_an_item: "List an item",
-      no_active_neighbourhoods: "No neighbourhoods are currently active.",
-      footer_brand_desc: "New and refurbished furniture, from homes in the UAE to homes in the UAE.",
-      footer_marketplaces: "Marketplaces",
-      footer_no_marketplaces: "No marketplaces are currently open.",
-      footer_account: "Account",
-      footer_my_auctions: "My auctions",
-      footer_profile: "Profile",
-      footer_create_account: "Create an account",
-      footer_legal_p1: "Payments for furniture are arranged directly between buyer and seller. ManzilCart does not process or hold the purchase price.",
-      uae_country: "United Arab Emirates.",
-      detail_category: "Category",
-      detail_area: "Area",
-      detail_emirate: "Emirate",
-      detail_listed: "Listed",
-      member_since: "Member since",
-      edit_listing: "Edit listing",
-      view_auction: "View auction",
-      create_auction: "Create auction",
-      all_my_listings: "All my listings",
-      msg_seller: "Message the seller",
-      chat_instructions: "Ask questions, then agree a price in chat.",
-      make_offer: "Or make an offer (AED)",
-      btn_make_offer: "Make offer",
-      handover_note: "There is no online payment. You agree handover and payment directly.",
-      sign_in_to_message: "Sign in to message the seller",
-      chat_verified_only: "Chat is available to verified members.",
-      stay_safe: "Stay safe.",
-      safety_text: "View the furniture before paying. ManzilCart does not process, hold or guarantee the purchase price — payment is agreed directly between buyer and seller.",
-      about_piece: "About this piece",
-      hover_to_zoom: "Hover to zoom",
-      no_photos_yet: "No photos yet",
-      status_reserved: "Reserved",
-      status_sold: "Sold",
-      filters_button: "Filters",
-      filter_modal_title: "Filters",
-      filter_search_label: "Search",
-      filter_category_label: "Category",
-      filter_all_categories: "All categories",
-      filter_condition_label: "Condition",
-      filter_any_condition: "Any condition",
-      filter_price_label: "Price range",
-      filter_min_label: "Minimum",
-      filter_max_label: "Maximum",
-      filter_sort_label: "Sort",
-      filter_apply_btn: "Apply filters",
-      filter_reset_btn: "Reset filters",
-      filter_clear_all: "Reset all",
-      filter_active_filters: "Active filters:",
-      all_furniture: "All furniture",
-      items_available: "items available",
-      no_matching_filters: "Nothing matches those filters",
-      empty_filters_help: "Try widening your price range or choosing another category.",
-      price_under_500: "Under AED 500",
-      price_500_1500: "AED 500 – 1.5k",
-      price_1500_4000: "AED 1.5k – 4k",
-      price_4000_plus: "AED 4,000+",
-      price_any: "Any price"
-    },
-    ar: {
-      skip_to_content: "الانتقال إلى المحتوى",
-      switch_emirate: "تغيير الإمارة",
-      btn_switch: "تبديل",
-      nav_browse: "تصفح",
-      nav_sell: "بيع",
-      nav_sell_plus: "بيع+",
-      nav_auctions: "المزادات",
-      nav_messages: "الرسائل",
-      nav_deals: "الصفقات",
-      nav_my_account: "حسابي",
-      nav_sign_out: "تسجيل الخروج",
-      nav_sign_in: "تسجيل الدخول",
-      nav_join: "انضم إلى منزل كارت",
-      hero_eyebrow: "سوق الأثاث · الإمارات",
-      hero_title: "امنح الأثاث الجيد<br>بيتاً ثانياً.",
-      hero_lede: "بيع واشترِ أثاثاً جديداً ومجدداً مع سكان مجتمعك. اختر إمارتك لمعرفة ما هو متوفر بالقرب منك.",
-      picker_title: "أين تبحث؟",
-      picker_subtitle: "يمكنك التغيير في أي وقت. نحن لا نخمن موقعك أبداً.",
-      no_marketplaces_title: "لا توجد أسواق مفتوحة حالياً",
-      no_marketplaces_desc: "نحن نجهز لإطلاقنا. يُرجى التحقق قريباً.",
-      card_marketplace: "السوق",
-      card_continue: "تابع من حيث توقفت",
-      enter_emirate: "دخول",
-      neighbourhoods: "أحياء",
-      remembered_note_prefix: "في المرة الأخيرة كنت تتصفح",
-      val_moderated_title: "إعلانات مفحوصة ومراجعة",
-      val_moderated_desc: "تتم مراجعة كل قطعة قبل ظهورها، لتضمن أثاثاً حقيقياً من أشخاص حقيقيين.",
-      val_direct_title: "تواصل مباشرة",
-      val_direct_desc: "راسل البائع واستفسر وتفاوض على السعر دون مغادرة المنصة.",
-      val_local_title: "محلي بطبيعته",
-      val_local_desc: "سوقك هو إمارتك. يمكنك طلب المساعدة في التوصيل والتركيب مع كل صفقة.",
-      invalid_emirate_alert: "هذا السوق غير متوفر حالياً. يُرجى اختيار إمارة نشطة أدناه.",
-      marketplace_label: "السوق",
-      market_hero_title: "أثاث يبحث عن<br>بيته القادم.",
-      market_hero_lede: "قطع جديدة ومجددة من بائعين في جميع أنحاء الإمارة. يتم فحص كل إعلان قبل نشره.",
-      search_furniture: "ابحث عن أثاث",
-      search_placeholder: "ابحث عن أرائك، مكاتب، أسِرّة…",
-      btn_search: "بحث",
-      browse_category: "تصفح حسب الفئة",
-      category_tagline: "اعثر على القطعة التي تكمل غرفتك.",
-      all_listings: "جميع الإعلانات",
-      categories_setting_up: "يتم إعداد الفئات حالياً.",
-      fresh_in: "جديد في",
-      fresh_tagline: "أحدث الإعلانات المعتمدة.",
-      no_listings_title: "لا توجد إعلانات بعد",
-      no_listings_desc: "كن أول من يعلن عن قطعة أثاث في هذه الإمارة.",
-      sell_an_item: "بيع قطعة",
-      join_to_sell: "انضم للبيع",
-      selling_in: "البيع في",
-      operate_neighbourhoods_prefix: "نعمل في",
-      operate_neighbourhoods_suffix: "حياً هنا.",
-      list_an_item: "أضف إعلاناً",
-      no_active_neighbourhoods: "لا توجد أحياء نشطة حالياً.",
-      footer_brand_desc: "أثاث جديد ومجدد، من بيوت الإمارات إلى بيوت الإمارات.",
-      footer_marketplaces: "الأسواق",
-      footer_no_marketplaces: "لا توجد أسواق مفتوحة حالياً.",
-      footer_account: "الحساب",
-      footer_my_auctions: "مزاداتي",
-      footer_profile: "الملف الشخصي",
-      footer_create_account: "إنشاء حساب",
-      footer_legal_p1: "يتم ترتيب الدفع للأثاث مباشرة بين المشتري والبائع. لا تقوم منزل كارت بمعالجة أو احتجاز سعر الشراء.",
-      uae_country: "الإمارات العربية المتحدة.",
-      detail_category: "الفئة",
-      detail_area: "المنطقة",
-      detail_emirate: "الإمارة",
-      detail_listed: "تاريخ العرض",
-      member_since: "عضو منذ",
-      edit_listing: "تعديل الإعلان",
-      view_auction: "عرض المزاد",
-      create_auction: "إنشاء مزاد",
-      all_my_listings: "جميع إعلاناتي",
-      msg_seller: "راسل البائع",
-      chat_instructions: "اسأل واستفسر، ثم اتفق على السعر في المحادثة.",
-      make_offer: "أو قدم عرضاً (بالدرهم)",
-      btn_make_offer: "تقديم العرض",
-      handover_note: "لا يوجد دفع إلكتروني. يتم الاتفاق على التسليم والدفع مباشرة.",
-      sign_in_to_message: "سجل الدخول لمراسلة البائع",
-      chat_verified_only: "المحادثة متاحة للأعضاء الموثقين فقط.",
-      stay_safe: "ابقَ آمناً.",
-      safety_text: "عاين الأثاث قبل الدفع. لا تعالج منزل كارت سعر الشراء أو تحتجزه أو تضمنه — يتم الاتفاق على الدفع مباشرة بين المشتري والبائع.",
-      about_piece: "حول هذه القطعة",
-      hover_to_zoom: "مرر للتكبير",
-      no_photos_yet: "لا توجد صور بعد",
-      status_reserved: "محجوز",
-      status_sold: "تم البيع",
-      filters_button: "عوامل التصفية",
-      filter_modal_title: "تصفية الإعلانات",
-      filter_search_label: "البحث",
-      filter_category_label: "الفئة",
-      filter_all_categories: "جميع الفئات",
-      filter_condition_label: "الحالة",
-      filter_any_condition: "أي حالة",
-      filter_price_label: "نطاق السعر",
-      filter_min_label: "الحد الأدنى",
-      filter_max_label: "الحد الأقصى",
-      filter_sort_label: "الترتيب",
-      filter_apply_btn: "تطبيق التصفية",
-      filter_reset_btn: "إعادة ضبط",
-      filter_clear_all: "مسح الكل",
-      filter_active_filters: "عوامل التصفية النشطة:",
-      all_furniture: "جميع الأثاث",
-      items_available: "قطعة متوفرة",
-      no_matching_filters: "لا توجد نتائج تطابق عوامل التصفية",
-      empty_filters_help: "جرّب توسيع نطاق السعر أو اختيار فئة أخرى.",
-      price_under_500: "أقل من 500 درهم",
-      price_500_1500: "500 – 1,500 درهم",
-      price_1500_4000: "1,500 – 4,000 درهم",
-      price_4000_plus: "+4,000 درهم",
-      price_any: "أي سعر"
-    }
-  };
+var emirateNames = {
+  "Abu Dhabi": "أبوظبي",
+  "Dubai": "دبي",
+  "Sharjah": "الشارقة",
+  "Ajman": "عجمان",
+  "Umm Al Quwain": "أم القيوين",
+  "Ras Al Khaimah": "رأس الخيمة",
+  "Fujairah": "الفجيرة"
+};
 
-  var emirateNames = {
-    "Abu Dhabi": "أبوظبي",
-    "Ras Al Khaimah": "رأس الخيمة",
-    "Sharjah": "الشارقة",
-    "Dubai": "دبي",
-    "Ajman": "عجمان",
-    "Umm Al Quwain": "أم القيوين",
-    "Fujairah": "الفجيرة"
-  };
+var categoryNames = {
+  "Sofas & Seating": "كنب ومقاعد",
+  "Sofas": "كنب",
+  "Living Room": "غرفة المعيشة",
+  "Tables": "طاولات",
+  "Dining Tables": "طاولات طعام",
+  "Dining": "غرفة الطعام",
+  "Beds & Mattresses": "أسرة ومراتب",
+  "Beds": "أسرة",
+  "Bedroom": "غرفة النوم",
+  "Storage & Wardrobes": "خزائن وتخزين",
+  "Storage": "وحدات تخزين",
+  "Wardrobes": "خزائن ملابس",
+  "Desks & Office": "مكاتب وأثاث مكتبي",
+  "Desks": "مكاتب",
+  "Office": "مكتبي",
+  "Outdoor": "أثاث خارجي وحدائق",
+  "Lighting & Decor": "إضاءة وديكور",
+  "Lighting": "إضاءة",
+  "Decor": "ديكور",
+  "Kids": "أثاث أطفال",
+  "Kids & Baby": "أطفال ورضع",
+  "Kitchen": "مطابخ",
+  "Rugs & Carpets": "سجاد وموكيت",
+  "Other": "أخرى"
+};
+
+var conditionNames = {
+  "New": "جديد",
+  "Brand new": "جديد تماماً",
+  "Like new": "كالجديد",
+  "Good": "جيد",
+  "Fair": "مقبول"
+};
+
+var statusNames = {
+  "Draft": "مسودة",
+  "Pending": "قيد المراجعة",
+  "Pending review": "قيد المراجعة",
+  "Approved": "معتمد",
+  "Approved / published": "معتمد ومتاح",
+  "Live": "نشط",
+  "Active": "نشط",
+  "Rejected": "مرفوض",
+  "Archived": "مؤرشف",
+  "Reserved": "محجوز",
+  "Sold": "تم البيع",
+  "Negotiating": "قيد التفاوض",
+  "Accepted": "مقبول",
+  "Countered": "تم تقديم عرض مقابل",
+  "Withdrawn": "مسحوب",
+  "Scheduled": "مجدول",
+  "Bid locked — awaiting confirmation": "تم قفل العرض — بانتظار التأكيد",
+  "Awaiting bidder confirmation": "بانتظار تأكيد المزايد",
+  "Confirmed": "مؤكد",
+  "Declined": "مرفوض",
+  "Timed out": "انتهت المهلة",
+  "Awarded": "تمت الترسية",
+  "Unsold": "لم يتم البيع",
+  "Cancelled": "ملغى",
+  "Cancellation requested": "تم طلب الإلغاء",
+  "Awaiting response": "بانتظار الرد",
+  "Rejected by the other party": "رفضه الطرف الآخر",
+  "Accepted by the other party": "قبله الطرف الآخر",
+  "Escalated to operations": "تم التصعيد للإدارة",
+  "Cancellation finalised by staff": "تم إنهاء الإلغاء بواسطة الإدارة",
+  "Verified": "موثق"
+};
+
+var areaNames = {
+  "Al Reem Island": "جزيرة الريم",
+  "Al Maryah Island": "جزيرة الماريه",
+  "Saadiyat Island": "جزيرة السعديات",
+  "Yas Island": "جزيرة ياس",
+  "Khalifa City": "مدينة خليفة",
+  "Al Raha Beach": "شاطئ الراحة",
+  "Al Khalidiyah": "الخالدية",
+  "Al Bateen": "البطين",
+  "Corniche": "الكورنيش",
+  "Al Mushrif": "المشرف",
+  "Al Muroor": "المرور",
+  "Mohammed Bin Zayed City": "مدينة محمد بن زايد",
+  "Shakhbout City": "مدينة شخبوط",
+  "Downtown Dubai": "وسط مدينة دبي",
+  "Dubai Marina": "دبي مارينا",
+  "Jumeirah Beach Residence (JBR)": "جميرا بيتش ريزيدنس (JBR)",
+  "Jumeirah": "جميرا",
+  "Palm Jumeirah": "نخلة جميرا",
+  "Business Bay": "الخليج التجاري",
+  "Dubai Hills Estate": "دبي هيلز استيت",
+  "Arabian Ranches": "المرابع العربية",
+  "Jumeirah Lake Towers (JLT)": "أبراج بحيرات جميرا (JLT)",
+  "Al Barsha": "البرشاء",
+  "Mirdif": "مردف",
+  "Deira": "ديرة",
+  "Bur Dubai": "بر دبي",
+  "Dubai Silicon Oasis": "واحة دبي للسيليكون",
+  "Al Majaz": "المجاز",
+  "Al Nahda": "النهدة",
+  "Al Taawun": "التعاون",
+  "Al Qasimia": "القاسمية",
+  "Muwaileh": "مویلح",
+  "Al Khan": "الخان",
+  "Al Nuaimiya": "النعيمية",
+  "Al Rashidiya": "الراشدية",
+  "Al Rawda": "الروضة",
+  "Al Mowaihat": "المويهات",
+  "Al Salamah": "السلامة",
+  "Al Ramlah": "الرملة",
+  "Al Humrah": "الحمرة",
+  "Al Hamra Village": "قرية الحمراء",
+  "Mina Al Arab": "ميناء العرب",
+  "Al Nakheel": "النخيل",
+  "Dhaid": "الذيد",
+  "Khor Fakkan": "خورفكان",
+  "Kalba": "كلباء",
+  "Al Faseel": "الفصيل",
+  "Dibba": "دبا",
+  "Sakamkam": "سكمكم"
+};
+
+var uiPhrases = {
+  "ManzilCart": "منزل كارت",
+  "Choose your Emirate": "اختر إمارتك",
+  "Choose your Emirate — ManzilCart": "اختر إمارتك — منزل كارت",
+  "Where are you looking?": "أين تبحث؟",
+  "You can switch at any time. We never guess your location.": "يمكنك التبديل في أي وقت. نحن لا نخمن موقعك أبداً.",
+  "Continue where you left off": "متابعة من حيث توقفت",
+  "Marketplace": "السوق",
+  "Enter": "دخول",
+  "neighbourhood": "حي",
+  "neighbourhoods": "أحياء",
+  "Moderated listings": "إعلانات مفحوصة وموثوقة",
+  "Every item is reviewed before it appears, so what you see is real furniture from real people.": "تتم مراجعة كل قطعة قبل ظهورها، لتضمن أثاثاً حقيقياً من أشخاص حقيقيين.",
+  "Talk directly": "تواصل مباشرة",
+  "Message the seller, ask questions and agree a price without leaving the platform.": "راسل البائع، واستفسر وتفاوض على السعر دون مغادرة المنصة.",
+  "Local by design": "محلي ومخصص لإمارتك",
+  "Your marketplace is your emirate. Optional delivery and assembly help can be requested with a deal.": "سوقك هو إمارتك. يمكنك طلب خدمات التوصيل والتركيب الاختيارية مع كل صفقة.",
+  "Last time you were browsing": "في المرة السابقة كنت تتصفح",
+  "No marketplaces are open right now": "لا توجد أسواق مفتوحة حالياً",
+  "We are preparing our launch. Please check back soon.": "نحن نستعد للإطلاق قريباً. يرجى التحقق لاحقاً.",
+  "That marketplace is not currently available. Please select an active emirate below.": "هذا السوق غير متاح حالياً. يرجى اختيار إمارة نشطة أدناه.",
+  "That marketplace isn’t available": "هذا السوق غير متاح حالياً",
+  "Browse": "تصفح",
+  "Auctions": "المزادات",
+  "Messages": "الرسائل",
+  "Deals": "الصفقات",
+  "My account": "حسابي",
+  "Sign in": "تسجيل الدخول",
+  "Sign out": "تسجيل الخروج",
+  "Sell+": "بيع+",
+  "Sell an item": "بيع قطعة",
+  "Join to sell": "انضم للبيع",
+  "List an item": "أضف قطعة",
+  "New and refurbished furniture, from homes in the UAE to homes in the UAE.": "أثاث جديد ومجدد، من منازل الإمارات إلى منازل الإمارات.",
+  "Marketplaces": "الأسواق",
+  "Account": "الحساب",
+  "My auctions": "مزاداتي",
+  "Profile": "الملف الشخصي",
+  "Create an account": "إنشاء حساب",
+  "Payments for furniture are arranged directly between buyer and seller. ManzilCart does not process or hold the purchase price.": "يتم ترتيب دفع ثمن الأثاث مباشرة بين المشتري والبائع. لا تقوم منزل كارت بمعالجة أو الاحتفاظ بسعر الشراء.",
+  "United Arab Emirates.": "الإمارات العربية المتحدة.",
+  "Skip to content": "الانتقال إلى المحتوى",
+  "Switch emirate": "تبديل الإمارة",
+  "Switch language to Arabic": "تغيير اللغة إلى العربية",
+  "Switch to English": "التبديل إلى الإنجليزية",
+  "Toggle dark and light mode": "تبديل الوضع الليلي والنهاري",
+  "Furniture looking for its next home.": "أثاث يبحث عن منزله التالي.",
+  "Furniture looking for\nits next home.": "أثاث يبحث عن منزله التالي.",
+  "New and refurbished pieces from sellers across the emirate. Every listing is reviewed before it goes live.": "قطع جديدة ومجددة من بائعين في جميع أنحاء الإمارة. يتم فحص كل إعلان قبل نشره.",
+  "Search furniture": "ابحث عن أثاث",
+  "Search sofas, desks, beds…": "ابحث عن كنب، مكاتب، أسرة…",
+  "Search": "بحث",
+  "Browse by category": "تصفح حسب الفئة",
+  "Find the piece that finishes the room.": "اعثر على القطعة المثالية لغرفتك.",
+  "All listings": "جميع المعروضات",
+  "All furniture": "كل الأثاث",
+  "Categories are being set up.": "جاري إعداد الفئات.",
+  "The newest approved listings.": "أحدث المعروضات المعتمدة.",
+  "No listings yet": "لا توجد معروضات حتى الآن",
+  "We operate in": "نعمل في",
+  "neighbourhoods here.": "أحياء هنا.",
+  "No neighbourhoods are currently active.": "لا توجد أحياء نشطة حالياً.",
+  "item available": "معروض متوفر",
+  "items available": "معروضات متوفرة",
+  "Filters": "الفلاتر",
+  "Reset all": "إعادة ضبط",
+  "Sort": "ترتيب",
+  "Sort order": "طريقة الترتيب",
+  "Active filters:": "الفلاتر المطبقة:",
+  "Previous": "السابق",
+  "Next": "التالي",
+  "Clear all filters": "مسح كل الفلاتر",
+  "Open filters": "فتح الفلاتر",
+  "Nothing matches those filters": "لا توجد نتائج تطابق هذه الفلاتر",
+  "Try widening your price range or choosing another category.": "جرب توسيع نطاق السعر أو اختيار فئة أخرى.",
+  "Price range": "نطاق السعر",
+  "Min AED": "الحد الأدنى (درهم)",
+  "Max AED": "الحد الأقصى (درهم)",
+  "Minimum price": "الحد الأدنى للسعر",
+  "Maximum price": "الحد الأقصى للسعر",
+  "Under AED 500": "أقل من 500 درهم",
+  "AED 500 – 1.5k": "500 – 1.5 ألف درهم",
+  "AED 1.5k – 4k": "1.5 ألف – 4 آلاف درهم",
+  "AED 4,000+": "4,000+ درهم",
+  "Any price": "أي سعر",
+  "All categories": "جميع الفئات",
+  "Any condition": "أي حالة",
+  "Newest first": "الأحدث أولاً",
+  "Price: low to high": "السعر: من الأقل للأعلى",
+  "Price: high to low": "السعر: من الأعلى للأقل",
+  "Oldest first": "الأقدم أولاً",
+  "Reset filters": "إعادة ضبط الفلاتر",
+  "Apply filters": "تطبيق الفلاتر",
+  "Clear search": "مسح البحث",
+  "About this piece": "عن هذه القطعة",
+  "Category / condition:": "الفئة / الحالة:",
+  "Category": "الفئة",
+  "Condition": "الحالة",
+  "Service area": "منطقة الخدمة",
+  "Asking price": "السعر المطلوب",
+  "Buyer": "المشتري",
+  "Seller": "البائع",
+  "Seller area": "منطقة البائع",
+  "Ask questions, then agree a price in chat.": "اطرح الأسئلة، ثم اتفق على السعر في المحادثة.",
+  "Message seller": "مراسلة البائع",
+  "Create auction": "إنشاء مزاد",
+  "Edit listing": "تعديل الإعلان",
+  "Edit your listing": "تعديل إعلانك",
+  "Stay safe.": "حافظ على سلامتك.",
+  "Never pay a deposit before seeing the furniture. ManzilCart does not hold or process the purchase price.": "لا تدفع أي عربون قبل معاينة الأثاث شخصياً. منزل كارت لا تحتفظ أو تعالج مبالغ الشراء.",
+  "View the furniture before paying. ManzilCart does not process or hold the purchase price.": "عاين الأثاث قبل الدفع. منزل كارت لا تعالج أو تحتفظ بسعر الشراء.",
+  "Tips for a quick sale": "نصائح لبيع سريع",
+  "Set a realistic asking price. Negotiation happens in chat.": "حدد سعراً واقعياً. التفاوض يتم عبر المحادثة.",
+  "Give dimensions — buyers measure before they travel.": "حدد الأبعاد والقياسات بدقة — فالمشترون يقيسون قبل الحضور.",
+  "Be honest about condition; it builds trust and avoids disputes.": "كن صادقاً بشأن حالة القطعة لبناء الثقة وتجنب أي خلاف.",
+  "Use daylight photos from a few angles, including any marks.": "استخدم صوراً واضحة في ضوء النهار ومن عدة زوايا.",
+  "Hover to zoom": "مرر المؤشر للتكبير",
+  "Click to select as main cover image": "انقر للتعيين كصورة رئيسية",
+  "Title": "العنوان",
+  "Price (AED)": "السعر (درهم)",
+  "Description": "الوصف",
+  "Photos": "الصور",
+  "Images": "الصور",
+  "Cover photo": "صورة الغلاف",
+  "Current photos": "الصور الحالية",
+  "Choose the cover photo or remove a photo.": "اختر صورة الغلاف أو احذف صورة.",
+  "Save changes": "حفظ التعديلات",
+  "Submit for review": "إرسال للمراجعة",
+  "Mark as sold": "تحديد كـ تم البيع",
+  "Archive": "أرشفة",
+  "Cancel": "إلغاء",
+  "Confirm": "تأكيد",
+  "Delete": "حذف",
+  "optional": "اختياري",
+  "All my listings": "جميع إعلاناتي",
+  "Drafts, reviews and items you have sold.": "المسودات، قيد المراجعة، والمعروضات المباعة.",
+  "Drafts, items in review, and everything you have sold.": "المسودات، قيد المراجعة، وكل ما قمت ببيعه.",
+  "Create your first listing": "أضف أول إعلان لك",
+  "You have not listed anything yet": "لم تقم بإضافة أي أثاث حتى الآن",
+  "Clear some space and turn unused furniture into cash.": "وفر مساحة في منزلك وحوّل أثاثك غير المستخدم إلى نقد.",
+  "View": "عرض",
+  "Edit": "تعديل",
+  "Auction": "المزاد",
+  "Furniture auctions": "مزادات الأثاث",
+  "Auctions you are selling in, bidding on, or have been offered.": "مزادات تشارك بها كبائع، مزايد، أو تلقيت عرضاً بشأنها.",
+  "Current highest bid": "أعلى عرض حالي",
+  "current highest bid": "أعلى عرض حالي",
+  "No bids yet": "لا توجد عروض بعد",
+  "No bids have been placed.": "لم يتم تقديم أي عروض بعد.",
+  "Starts": "يبدأ في",
+  "Ends": "ينتهي في",
+  "Reserve": "الحد الأدنى",
+  "Reserve price": "السعر الأدنى المطلوب",
+  "Your bid (AED)": "عرضك (درهم)",
+  "Place bid": "تقديم العرض",
+  "Sign in to bid": "سجل الدخول للمزايدة",
+  "Lock this bid": "قفل هذا العرض",
+  "Lock the highest eligible bid": "قفل أعلى عرض مؤهل",
+  "Cancel auction": "إلغاء المزاد",
+  "Cancel this auction (optional reason)": "إلغاء المزاد (سبب اختياري)",
+  "Bid history": "سجل المزايدة",
+  "Bid": "العرض",
+  "Bidder": "المزايد",
+  "Placed": "وقت التقديم",
+  "Highest": "الأعلى",
+  "Confirmation rounds": "جولات التأكيد",
+  "Auction history": "سجل المزاد",
+  "View the listing": "عرض الإعلان الأصلي",
+  "Your confirmation": "تأكيدك",
+  "Waiting for confirmation": "بانتظار التأكيد",
+  "Confirm your winning bid": "تأكيد عرضك الفائز",
+  "Auction confirmation": "تأكيد المزاد",
+  "Your locked bid": "عرضك المقفول",
+  "Confirm your bid": "تأكيد العرض",
+  "Confirm and create the deal": "تأكيد وإنشاء الصفقة",
+  "Decline this offer": "رفض هذا العرض",
+  "Accepted deal": "الصفقة المقبولة",
+  "Open the deal": "فتح تفاصيل الصفقة",
+  "View the auction": "عرض المزاد",
+  "View your response": "عرض ردك",
+  "Start auction": "بدء المزاد",
+  "Starting bid (AED)": "سعر بدء المزاد (درهم)",
+  "Duration": "المدة",
+  "Deal": "الصفقة",
+  "Price": "السعر",
+  "Agreed at": "تم الاتفاق على",
+  "Offer history": "سجل العروض",
+  "Respond to the current offer": "الرد على العرض الحالي",
+  "Accept offer": "قبول العرض",
+  "Reject": "رفض",
+  "Counter with (AED)": "عرض مقابل بـ (درهم)",
+  "Send counteroffer": "إرسال عرض مقابل",
+  "Make an offer": "تقديم عرض",
+  "Amount (AED)": "المبلغ (درهم)",
+  "Note (optional)": "ملاحظة (اختياري)",
+  "Send offer": "إرسال العرض",
+  "Optional services": "خدمات اختيارية",
+  "Save service selections": "حفظ الخدمات المختارة",
+  "Cancellation": "الإلغاء",
+  "Accept cancellation": "قبول الإلغاء",
+  "Reject cancellation": "رفض الإلغاء",
+  "Why should operations step in?": "لماذا يجب تدخل فريق العمليات؟",
+  "Track negotiations and accepted deals.": "متابعة المفاوضات والصفقات المقبولة.",
+  "Buying": "الشراء",
+  "Selling": "البيع",
+  "You are the buyer": "أنت المشتري",
+  "You are the seller": "أنت البائع",
+  "Conversation": "المحادثة",
+  "Connecting…": "جاري الاتصال…",
+  "Load older messages": "تحميل الرسائل السابقة",
+  "No messages yet. Say hello and ask about the furniture.": "لا توجد رسائل بعد. ابدأ بالتحية واسأل عن تفاصيل الأثاث.",
+  "Send": "إرسال",
+  "Message": "الرسالة",
+  "Write a message…": "اكتب رسالة…",
+  "Conversations with buyers and sellers, newest first.": "المحادثات مع المشترين والبائعين، الأحدث أولاً.",
+  "View listing": "عرض الإعلان",
+  "Your details": "بياناتك",
+  "Enter with your mobile number": "الدخول برقم هاتفك المتحرك",
+  "We send a one-time code on WhatsApp. New here? Verifying your number creates your account.": "نرسل رمز تحقق لمرة واحدة عبر واتساب. مستخدم جديد؟ التحقق من رقمك ينشئ حسابك تلقائياً.",
+  "Phone number": "رقم الهاتف",
+  "Display name": "اسم العرض",
+  "Choose your area.": "اختر منطقتك السكنية.",
+  "Create my account": "إنشاء حسابي",
+  "Check your WhatsApp": "تحقق من تطبيق واتساب",
+  "Verify your mobile.": "تحقق من رقم هاتفك.",
+  "We sent a verification code to": "أرسلنا رمز تحقق إلى",
+  "The code expires in about": "تنتهي صلاحية الرمز خلال",
+  "Didn’t get it?": "لم يصلك الرمز؟",
+  "Send a new code": "إرسال رمز جديد",
+  "Verify and continue": "التحقق والمتابعة",
+  "Use a different number": "استخدام رقم هاتف مختلف",
+  "Edit profile": "تعديل الملف الشخصي",
+  "Account status": "حالة الحساب",
+  "Verified number:": "الرقم الموثق:",
+  "We couldn’t find that page": "لم نتمكن من العثور على تلك الصفحة",
+  "The link may be incomplete, or the item may no longer be listed.": "قد يكون الرابط غير مكتمل أو أن القطعة لم تعد معروضة.",
+  "Back to the home page": "العودة للصفحة الرئيسية",
+  "Go to the home page": "الانتقال للصفحة الرئيسية",
+  "Something went wrong": "حدث خطأ غير متوقع",
+  "We have been notified. Please try again in a moment.": "تم إشعار فريقنا. يرجى إعادة المحاولة بعد قليل.",
+  "AED": "درهم",
+  "from": "من",
+  "to": "إلى",
+  "in": "في",
+  "by": "بواسطة",
+  "at": "عند",
+  "for": "لـ",
+  "with": "مع",
+  "You": "أنت",
+  "you": "أنت",
+  "Member": "عضو",
+  "just now": "الآن",
+  "yesterday": "أمس"
+};
+
 
   var langToggle = document.querySelector("[data-lang-toggle]");
   var langDisplay = document.querySelector("[data-lang-display]");
+
+  function translateString(str) {
+    if (!str || typeof str !== "string") return str;
+    var leading = (str.match(/^\s*/) || [""])[0];
+    var trailing = (str.match(/\s*$/) || [""])[0];
+    var trimmed = str.trim();
+    if (!trimmed) return str;
+
+    // 1. Direct dictionary matches
+    if (uiPhrases[trimmed]) return leading + uiPhrases[trimmed] + trailing;
+    if (emirateNames[trimmed]) return leading + emirateNames[trimmed] + trailing;
+    if (categoryNames[trimmed]) return leading + categoryNames[trimmed] + trailing;
+    if (conditionNames[trimmed]) return leading + conditionNames[trimmed] + trailing;
+    if (statusNames[trimmed]) return leading + statusNames[trimmed] + trailing;
+    if (areaNames[trimmed]) return leading + areaNames[trimmed] + trailing;
+
+    // 2. Category with count: e.g. "Sofas & Seating (5)"
+    var catMatch = trimmed.match(/^(.*?)\s*\((\d+)\)$/);
+    if (catMatch && categoryNames[catMatch[1].trim()]) {
+      return leading + categoryNames[catMatch[1].trim()] + " (" + catMatch[2] + ")" + trailing;
+    }
+
+    // 3. Dynamic patterns:
+    // "Enter X"
+    var enterMatch = trimmed.match(/^Enter\s+(.*)$/i);
+    if (enterMatch) {
+      var em = enterMatch[1].trim();
+      return leading + "دخول " + (emirateNames[em] || em) + trailing;
+    }
+
+    // "Fresh in X"
+    var freshMatch = trimmed.match(/^Fresh in\s+(.*)$/i);
+    if (freshMatch) {
+      var em2 = freshMatch[1].trim();
+      return leading + "جديد في " + (emirateNames[em2] || em2) + trailing;
+    }
+
+    // "Selling in X"
+    var sellMatch = trimmed.match(/^Selling in\s+(.*)$/i);
+    if (sellMatch) {
+      var em3 = sellMatch[1].trim();
+      return leading + "البيع في " + (emirateNames[em3] || em3) + trailing;
+    }
+
+    // "X marketplace"
+    var mktMatch = trimmed.match(/^(.*?)\s+marketplace$/i);
+    if (mktMatch) {
+      var em4 = mktMatch[1].trim();
+      return leading + "سوق " + (emirateNames[em4] || em4) + trailing;
+    }
+
+    // "X items available" / "X item available"
+    var itemMatch = trimmed.match(/^(\d+)\s+items?\s+available$/i);
+    if (itemMatch) {
+      return leading + itemMatch[1] + " معروضات متوفرة" + trailing;
+    }
+
+    // "X listings" / "X listing"
+    var listMatch = trimmed.match(/^(\d+)\s+listings?$/i);
+    if (listMatch) {
+      return leading + listMatch[1] + " إعلانات" + trailing;
+    }
+
+    // "X neighbourhoods" / "X neighbourhood"
+    var nghMatch = trimmed.match(/^(\d+)\s+neighbourhoods?$/i);
+    if (nghMatch) {
+      return leading + nghMatch[1] + " أحياء" + trailing;
+    }
+
+    // "Page X of Y"
+    var pageMatch = trimmed.match(/^Page\s+(\d+)\s+of\s+(\d+)$/i);
+    if (pageMatch) {
+      return leading + "صفحة " + pageMatch[1] + " من " + pageMatch[2] + trailing;
+    }
+
+    // Price patterns:
+    // "AED 1,200" or "AED 500"
+    var priceMatch = trimmed.match(/^AED\s*([\d,]+(?:\.\d+)?)$/i);
+    if (priceMatch) {
+      return leading + priceMatch[1] + " درهم" + trailing;
+    }
+
+    // "From AED 500"
+    var fromPrice = trimmed.match(/^From\s+AED\s*([\d,]+)$/i);
+    if (fromPrice) {
+      return leading + "من " + fromPrice[1] + " درهم" + trailing;
+    }
+
+    // "Up to AED 1000"
+    var upToPrice = trimmed.match(/^Up to\s+AED\s*([\d,]+)$/i);
+    if (upToPrice) {
+      return leading + "حتى " + upToPrice[1] + " درهم" + trailing;
+    }
+
+    // "AED X – Y"
+    var rangeMatch = trimmed.match(/^AED\s*([\d,]+)\s*[–—\-]\s*([\d,]+)$/i);
+    if (rangeMatch) {
+      return leading + rangeMatch[1] + " – " + rangeMatch[2] + " درهم" + trailing;
+    }
+
+    // "Deal X · AED Y"
+    var dealMatch = trimmed.match(/^Deal\s+(\S+)\s*·\s*AED\s*([\d,]+)$/i);
+    if (dealMatch) {
+      return leading + "صفقة " + dealMatch[1] + " · " + dealMatch[2] + " درهم" + trailing;
+    }
+
+    // Arrows
+    if (trimmed === "→") return leading + "←" + trailing;
+    if (trimmed === "←") return leading + "→" + trailing;
+
+    // Document title: e.g. "Choose your Emirate — ManzilCart"
+    if (trimmed.indexOf("— ManzilCart") !== -1 || trimmed.indexOf("- ManzilCart") !== -1) {
+      var parts = trimmed.split(/[-—]\s*ManzilCart/);
+      var head = parts[0].trim();
+      var headTrans = uiPhrases[head] || emirateNames[head] || head;
+      return leading + headTrans + " — منزل كارت" + trailing;
+    }
+
+    // Substring replacements for remaining known terms
+    var modified = trimmed;
+    var changed = false;
+
+    for (var phrase in uiPhrases) {
+      if (phrase.length > 5 && modified.indexOf(phrase) !== -1) {
+        modified = modified.split(phrase).join(uiPhrases[phrase]);
+        changed = true;
+      }
+    }
+    for (var emName in emirateNames) {
+      if (modified.indexOf(emName) !== -1) {
+        modified = modified.split(emName).join(emirateNames[emName]);
+        changed = true;
+      }
+    }
+    for (var cat in categoryNames) {
+      if (cat.length > 4 && modified.indexOf(cat) !== -1) {
+        modified = modified.split(cat).join(categoryNames[cat]);
+        changed = true;
+      }
+    }
+    for (var area in areaNames) {
+      if (area.length > 4 && modified.indexOf(area) !== -1) {
+        modified = modified.split(area).join(areaNames[area]);
+        changed = true;
+      }
+    }
+
+    if (modified.indexOf("AED ") !== -1 || modified.indexOf("AED") !== -1) {
+      modified = modified.replace(/AED\s*([\d,]+)/gi, "$1 درهم");
+      changed = true;
+    }
+    if (modified.indexOf("ManzilCart") !== -1) {
+      modified = modified.replace(/ManzilCart/g, "منزل كارت");
+      changed = true;
+    }
+
+    if (changed) {
+      return leading + modified + trailing;
+    }
+
+    return str;
+  }
 
   function applyLanguage(lang) {
     var isArabic = lang === "ar";
     document.documentElement.setAttribute("lang", isArabic ? "ar" : "en");
     document.documentElement.setAttribute("dir", isArabic ? "rtl" : "ltr");
-    localStorage.setItem("lang", isArabic ? "ar" : "en");
+    try {
+      localStorage.setItem("lang", isArabic ? "ar" : "en");
+    } catch (e) {}
 
     if (langDisplay) {
       langDisplay.textContent = isArabic ? "English" : "العربية";
@@ -292,58 +607,134 @@
       langToggle.setAttribute("title", nextLabel);
     }
 
-    // Translate all [data-i18n] elements
-    document.querySelectorAll("[data-i18n]").forEach(function (el) {
-      var key = el.getAttribute("data-i18n");
-      if (el._origEnContent === undefined) {
-        el._origEnContent = el.innerHTML;
-      }
-      if (isArabic) {
-        if (key === "enter_emirate") {
-          var emName = el.getAttribute("data-emirate") || "";
-          var arEm = emirateNames[emName] || emName;
-          el.textContent = (i18n.ar.enter_emirate || "دخول") + " " + arEm;
-        } else if (i18n.ar[key]) {
-          el.innerHTML = i18n.ar[key];
+    // 1. Document Title
+    if (document._origTitle === undefined) {
+      document._origTitle = document.title;
+    }
+    if (isArabic) {
+      document.title = translateString(document._origTitle);
+    } else {
+      document.title = document._origTitle;
+    }
+
+    // 2. Comprehensive DOM Text Walker
+    if (document.body) {
+      var walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: function (node) {
+            if (!node.parentElement) return NodeFilter.FILTER_REJECT;
+            var tag = node.parentElement.tagName.toLowerCase();
+            if (tag === "script" || tag === "style" || tag === "textarea") {
+              return NodeFilter.FILTER_REJECT;
+            }
+            return NodeFilter.FILTER_ACCEPT;
+          }
         }
-      } else {
-        el.innerHTML = el._origEnContent;
+      );
+
+      var textNode;
+      while ((textNode = walker.nextNode())) {
+        if (textNode._origVal === undefined) {
+          textNode._origVal = textNode.nodeValue;
+        }
+        if (isArabic) {
+          textNode.nodeValue = translateString(textNode._origVal);
+        } else {
+          textNode.nodeValue = textNode._origVal;
+        }
+      }
+    }
+
+    // 3. Inputs & textareas (placeholder)
+    document.querySelectorAll("input, textarea").forEach(function (el) {
+      if (el.placeholder) {
+        if (el._origPlaceholder === undefined) {
+          el._origPlaceholder = el.placeholder;
+        }
+        if (isArabic) {
+          el.placeholder = translateString(el._origPlaceholder);
+        } else {
+          el.placeholder = el._origPlaceholder;
+        }
       }
     });
 
-    // Translate emirate names in [data-emirate-name]
-    document.querySelectorAll("[data-emirate-name]").forEach(function (el) {
-      if (el._origEmirateName === undefined) {
-        el._origEmirateName = el.getAttribute("data-emirate-name") || el.textContent.trim();
+    // 4. Select dropdown options
+    document.querySelectorAll("select option").forEach(function (opt) {
+      if (opt._origOptionText === undefined) {
+        opt._origOptionText = opt.textContent;
       }
       if (isArabic) {
-        el.textContent = emirateNames[el._origEmirateName] || el._origEmirateName;
+        opt.textContent = translateString(opt._origOptionText);
       } else {
-        el.textContent = el._origEmirateName;
+        opt.textContent = opt._origOptionText;
       }
     });
 
-    // Translate placeholder attributes in [data-placeholder-i18n]
-    document.querySelectorAll("[data-placeholder-i18n]").forEach(function (input) {
-      var key = input.getAttribute("data-placeholder-i18n");
-      if (input._origPlaceholder === undefined) {
-        input._origPlaceholder = input.placeholder;
-      }
-      if (isArabic && i18n.ar[key]) {
-        input.placeholder = i18n.ar[key];
-      } else {
-        input.placeholder = input._origPlaceholder;
+    // 5. Submit / action buttons with value attributes
+    document.querySelectorAll("input[type=submit], input[type=button]").forEach(function (btn) {
+      if (btn.value) {
+        if (btn._origBtnVal === undefined) {
+          btn._origBtnVal = btn.value;
+        }
+        if (isArabic) {
+          btn.value = translateString(btn._origBtnVal);
+        } else {
+          btn.value = btn._origBtnVal;
+        }
       }
     });
 
+    // 6. Tooltips and accessibility labels
+    document.querySelectorAll("[aria-label], [title]").forEach(function (el) {
+      if (el.hasAttribute("data-lang-toggle") || el.hasAttribute("data-theme-toggle")) return;
+      var aria = el.getAttribute("aria-label");
+      if (aria) {
+        if (el._origAriaLabel === undefined) el._origAriaLabel = aria;
+        if (isArabic) {
+          el.setAttribute("aria-label", translateString(el._origAriaLabel));
+        } else {
+          el.setAttribute("aria-label", el._origAriaLabel);
+        }
+      }
+      var t = el.getAttribute("title");
+      if (t) {
+        if (el._origTitleAttr === undefined) el._origTitleAttr = t;
+        if (isArabic) {
+          el.setAttribute("title", translateString(el._origTitleAttr));
+        } else {
+          el.setAttribute("title", el._origTitleAttr);
+        }
+      }
+    });
+
+    // 7. Synchronize price dual-slider if present
     if (window._syncPriceSlider) {
       window._syncPriceSlider();
     }
   }
 
   // Initialize language from storage
-  var savedLang = localStorage.getItem("lang") || "en";
+  var savedLang = "en";
+  try {
+    savedLang = localStorage.getItem("lang") || "en";
+  } catch (e) {}
+
+  window.applyCurrentLanguage = function () {
+    var l = "en";
+    try { l = localStorage.getItem("lang") || "en"; } catch (e) {}
+    applyLanguage(l);
+  };
+
   applyLanguage(savedLang);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      applyLanguage(savedLang);
+    });
+  }
 
   if (langToggle) {
     langToggle.addEventListener("click", function () {
@@ -352,6 +743,11 @@
       applyLanguage(nextLang);
     });
   }
+
+
+
+
+
 
   // --- Mobile navigation ---------------------------------------------------
   var toggle = document.querySelector("[data-nav-toggle]");

@@ -6,9 +6,9 @@
 <section class="container section narrow">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Profile</p>
-      <h1>Your details</h1>
-      <p class="muted">Changing your area applies to future browsing and listings.</p>
+      <p class="eyebrow" data-i18n="profile_eyebrow">Profile</p>
+      <h1 data-i18n="your_details">Your details</h1>
+      <p class="muted" data-i18n="profile_desc">Changing your area applies to future browsing and listings.</p>
     </div>
   </div>
 
@@ -27,19 +27,19 @@
       {% include "partials/field.html" with field=form.email %}
 
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Save changes</button>
-        <a class="btn btn-quiet" href="{% url 'accounts:dashboard' %}">Cancel</a>
+        <button class="btn btn-primary" type="submit" data-i18n="save_changes">Save changes</button>
+        <a class="btn btn-quiet" href="{% url 'accounts:dashboard' %}" data-i18n="btn_cancel">Cancel</a>
       </div>
     </form>
   </div>
 
   <div class="panel">
-    <h2>Mobile number</h2>
+    <h2 data-i18n="mobile_number">Mobile number</h2>
     <p>
       <strong>{{ member.phone }}</strong>
-      {% if member.is_mobile_verified %}<span class="status-pill status-approved">Verified</span>{% endif %}
+      {% if member.is_mobile_verified %}<span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}
     </p>
-    <p class="muted small">
+    <p class="muted small" data-i18n="change_number_note">
       To change your number, sign out and register again with the new number. This keeps
       account ownership verifiable.
     </p>

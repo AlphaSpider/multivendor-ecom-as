@@ -10,20 +10,20 @@
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}">{{ emirate.name }}</a>
+    <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name>{{ emirate.name }}</a>
     <span aria-hidden="true">/</span>
-    <a href="{% url 'auction_marketplace:list' emirate_slug=emirate.slug %}">Auctions</a>
+    <a href="{% url 'auction_marketplace:list' emirate_slug=emirate.slug %}" data-i18n="nav_auctions">Auctions</a>
     <span aria-hidden="true">/</span>
     <span>{{ auction.reference }}</span>
   </nav>
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Auction · {{ auction.reference }}</p>
+      <p class="eyebrow"><span data-i18n="breadcrumb_auctions">Auction</span> · {{ auction.reference }}</p>
       <h1>{{ listing.title }}</h1>
       <p class="muted">
-        {{ listing.category.name }} · {{ listing.service_area.name }}, {{ emirate.name }}
-        {% if is_seller %} · You are the seller{% endif %}
+        <span data-category-name>{{ listing.category.name }}</span> · <span data-area-name>{{ listing.service_area.name }}</span>, <span data-emirate-name>{{ emirate.name }}</span>
+        {% if is_seller %} · <span data-i18n="auction_you_are_seller">You are the seller</span>{% endif %}
       </p>
     </div>
     <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
@@ -260,21 +260,21 @@
         {% endif %}
       {% endwith %}
       <h2>{{ listing.title }}</h2>
-      <p class="muted small">{{ listing.get_condition_display }}</p>
+      <p class="muted small" data-condition>{{ listing.get_condition_display }}</p>
       {% if listing.is_public %}
-        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View the listing</a>
+        <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}" data-i18n="auction_view_listing">View the listing</a>
       {% endif %}
 
-      <h2>Auction</h2>
+      <h2 data-i18n="auction_heading">Auction</h2>
       <dl class="detail-list">
-        <div><dt>Status</dt><dd>{{ auction.get_status_display }}</dd></div>
-        <div><dt>Starts</dt><dd>{{ auction.start_at|date:"j M Y, H:i" }}</dd></div>
-        <div><dt>Ends</dt><dd>{{ auction.end_at|date:"j M Y, H:i" }}</dd></div>
+        <div><dt data-i18n="detail_status">Status</dt><dd data-status>{{ auction.get_status_display }}</dd></div>
+        <div><dt data-i18n="detail_starts">Starts</dt><dd>{{ auction.start_at|date:"j M Y, H:i" }}</dd></div>
+        <div><dt data-i18n="detail_ends">Ends</dt><dd>{{ auction.end_at|date:"j M Y, H:i" }}</dd></div>
         {% if auction.reserve_price and is_seller or auction.reserve_price and is_staff_viewer %}
-          <div><dt>Reserve</dt><dd>AED {{ auction.reserve_price|floatformat:0|intcomma }}</dd></div>
+          <div><dt data-i18n="detail_reserve">Reserve</dt><dd>AED {{ auction.reserve_price|floatformat:0|intcomma }}</dd></div>
         {% endif %}
-        <div><dt>Seller</dt><dd>{{ auction.seller.display_name|default:"ManzilCart member" }}</dd></div>
-        <div><dt>Area</dt><dd>{{ listing.service_area.name }}</dd></div>
+        <div><dt data-i18n="detail_seller">Seller</dt><dd>{{ auction.seller.display_name|default:"ManzilCart member" }}</dd></div>
+        <div><dt data-i18n="detail_area">Area</dt><dd data-area-name>{{ listing.service_area.name }}</dd></div>
       </dl>
 
       {% if viewer_selection and selection_url %}

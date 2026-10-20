@@ -188,6 +188,32 @@ a:hover { color: var(--brand-strong); }
   padding-block: 0.6rem;
 }
 
+.site-header-landing .header-inner-landing {
+  position: relative;
+  justify-content: center;
+  align-items: center;
+}
+
+.brand-landing,
+.site-header-landing .brand,
+[dir="rtl"] .site-header-landing .brand {
+  margin-inline: auto !important;
+  margin-inline-start: auto !important;
+  margin-inline-end: auto !important;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.header-controls-landing {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;

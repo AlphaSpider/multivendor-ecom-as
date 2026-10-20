@@ -19,11 +19,11 @@
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Auction</p>
-      <h1>Auction “{{ listing.title }}”</h1>
+      <p class="eyebrow" data-i18n="auction_label">Auction</p>
+      <h1><span data-i18n="auction_label">Auction</span> “{{ listing.title }}”</h1>
       <p class="muted">
-        Asking price AED {{ listing.asking_price|floatformat:0|intcomma }} ·
-        {{ listing.service_area.name }}, {{ emirate.name }}
+        <span data-i18n="asking_price_label">Asking price</span> AED {{ listing.asking_price|floatformat:0|intcomma }} ·
+        <span data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}</span>, <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span>
       </p>
     </div>
   </div>
@@ -54,8 +54,8 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Start auction</button>
-        <a class="btn btn-quiet" href="{{ listing.get_absolute_url }}">Cancel</a>
+        <button class="btn btn-primary" type="submit" data-i18n="start_auction">Start auction</button>
+        <a class="btn btn-quiet" href="{{ listing.get_absolute_url }}" data-i18n="btn_cancel">Cancel</a>
       </div>
     </form>
   </div>

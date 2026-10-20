@@ -11,12 +11,12 @@
 <section class="container section">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Seller area</p>
-      <h1>My listings</h1>
-      <p class="muted">Drafts, items in review, and everything you have sold.</p>
+      <p class="eyebrow" data-i18n="seller_area">Seller area</p>
+      <h1 data-i18n="my_listings">My listings</h1>
+      <p class="muted" data-i18n="my_listings_desc">Drafts, items in review, and everything you have sold.</p>
     </div>
     {% if emirate %}
-      <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}">Sell an item</a>
+      <a class="btn btn-primary" href="{% url 'catalog:listing_create' emirate_slug=emirate.slug %}" data-i18n="sell_an_item">Sell an item</a>
     {% endif %}
   </div>
 
@@ -29,7 +29,7 @@
               {% if cover %}
                 <img src="{{ cover.image.url }}" alt="" loading="lazy">
               {% else %}
-                <span class="muted small">No photo</span>
+                <span class="muted small" data-i18n="no_photo">No photo</span>
               {% endif %}
             {% endwith %}
           </div>
@@ -45,7 +45,7 @@
                   {% endif %}
                 </h2>
                 <p class="muted small">
-                  {{ listing.category.name }} · {{ listing.service_area.name }}, {{ listing.emirate.name }}
+                  <span data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</span> · <span data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}</span>, <span data-emirate-name="{{ listing.emirate.name }}">{{ listing.emirate.name }}</span>
                 </p>
               </div>
               <span class="status-pill status-{{ listing.status }}">{{ listing.get_status_display }}</span>
@@ -56,28 +56,28 @@
             {% if listing.status == "rejected" and listing.moderation_note %}
               <p class="form-alert small"><strong>Moderator note:</strong> {{ listing.moderation_note }}</p>
             {% elif listing.status == "pending" %}
-              <p class="muted small">Waiting for a moderator. You can still edit it, which re-submits it.</p>
+              <p class="muted small" data-i18n="pending_moderator_note">Waiting for a moderator. You can still edit it, which re-submits it.</p>
             {% elif listing.status == "draft" %}
-              <p class="muted small">Not submitted yet. Submit it for review when you are ready.</p>
+              <p class="muted small" data-i18n="draft_note">Not submitted yet. Submit it for review when you are ready.</p>
             {% elif listing.status == "archived" %}
-              <p class="muted small">Archived listings are hidden from buyers.</p>
+              <p class="muted small" data-i18n="archived_note">Archived listings are hidden from buyers.</p>
             {% endif %}
 
             <div class="my-listing-actions">
               {% if listing.is_public %}
-                <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}">View</a>
-                <a class="btn btn-secondary btn-small" href="{% url 'auction_marketplace:create' emirate_slug=listing.emirate.slug listing_slug=listing.slug %}">Create auction</a>
+                <a class="btn btn-quiet btn-small" href="{{ listing.get_absolute_url }}" data-i18n="btn_view">View</a>
+                <a class="btn btn-secondary btn-small" href="{% url 'auction_marketplace:create' emirate_slug=listing.emirate.slug listing_slug=listing.slug %}" data-i18n="create_auction">Create auction</a>
               {% endif %}
 
               {% if listing.is_editable_by_owner %}
-                <a class="btn btn-quiet btn-small" href="{% url 'catalog:listing_edit' emirate_slug=listing.emirate.slug slug=listing.slug %}">Edit</a>
+                <a class="btn btn-quiet btn-small" href="{% url 'catalog:listing_edit' emirate_slug=listing.emirate.slug slug=listing.slug %}" data-i18n="btn_edit">Edit</a>
               {% endif %}
 
               {% if listing.status == "draft" or listing.status == "rejected" %}
                 <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="submit">
-                  <button class="btn btn-primary btn-small" type="submit">Submit for review</button>
+                  <button class="btn btn-primary btn-small" type="submit" data-i18n="btn_submit_review">Submit for review</button>
                 </form>
               {% endif %}
 
@@ -85,7 +85,7 @@
                 <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="sold">
-                  <button class="btn btn-quiet btn-small" type="submit">Mark as sold</button>
+                  <button class="btn btn-quiet btn-small" type="submit" data-i18n="btn_mark_sold">Mark as sold</button>
                 </form>
               {% endif %}
 
@@ -93,7 +93,7 @@
                 <form method="post" action="{% url 'catalog:listing_action' emirate_slug=listing.emirate.slug slug=listing.slug %}">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="archive">
-                  <button class="btn btn-quiet btn-small" type="submit">Archive</button>
+                  <button class="btn btn-quiet btn-small" type="submit" data-i18n="btn_archive">Archive</button>
                 </form>
               {% endif %}
             </div>

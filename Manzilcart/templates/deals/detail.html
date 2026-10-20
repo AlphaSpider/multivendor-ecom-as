@@ -10,18 +10,18 @@
 {% block content %}
 <section class="container section">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'deals:list' %}">Deals</a>
+    <a href="{% url 'deals:list' %}" data-i18n="nav_deals">Deals</a>
     <span aria-hidden="true">/</span>
     <span>{{ deal.reference }}</span>
   </nav>
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">{{ deal.get_status_display }}</p>
+      <p class="eyebrow" data-status>{{ deal.get_status_display }}</p>
       <h1>{{ deal.listing.title }}</h1>
       <p class="muted">
-        {{ deal.reference }} · {{ deal.listing.service_area.name }}, {{ deal.emirate.name }}
-        · {% if is_buyer %}You are the buyer{% else %}You are the seller{% endif %}
+        {{ deal.reference }} · <span data-area-name>{{ deal.listing.service_area.name }}</span>, <span data-emirate-name>{{ deal.emirate.name }}</span>
+        · {% if is_buyer %}<span data-i18n="deals_you_are_buyer">You are the buyer</span>{% else %}<span data-i18n="deals_you_are_seller">You are the seller</span>{% endif %}
       </p>
     </div>
     <span class="status-pill status-{{ deal.status }}">{{ deal.get_status_display }}</span>
@@ -75,12 +75,12 @@
               <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="accept">
-                <button class="btn btn-primary" type="submit">Accept offer</button>
+                <button class="btn btn-primary" type="submit" data-i18n="deals_accept_offer">Accept offer</button>
               </form>
               <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reject">
-                <button class="btn btn-quiet" type="submit">Reject</button>
+                <button class="btn btn-quiet" type="submit" data-i18n="deals_reject_offer">Reject</button>
               </form>
             </div>
 
@@ -88,14 +88,14 @@
               {% csrf_token %}
               <input type="hidden" name="action" value="counter">
               <div class="field">
-                <label class="field-label" for="counter-amount">Counter with (AED)</label>
+                <label class="field-label" for="counter-amount" data-i18n="deals_counter_amount">Counter with (AED)</label>
                 <input class="input" id="counter-amount" type="number" name="amount" min="1" step="1" required>
               </div>
               <div class="field">
-                <label class="field-label" for="counter-note">Note (optional)</label>
+                <label class="field-label" for="counter-note" data-i18n="deals_note_optional">Note (optional)</label>
                 <input class="input" id="counter-note" type="text" name="note" maxlength="280">
               </div>
-              <button class="btn btn-quiet" type="submit">Send counteroffer</button>
+              <button class="btn btn-quiet" type="submit" data-i18n="deals_send_counteroffer">Send counteroffer</button>
             </form>
           </div>
         {% elif pending_offer and pending_offer.sender_id == user.pk %}
@@ -107,14 +107,14 @@
               {% csrf_token %}
               <input type="hidden" name="action" value="offer">
               <div class="field">
-                <label class="field-label" for="offer-amount">Amount (AED)</label>
+                <label class="field-label" for="offer-amount" data-i18n="deals_amount_aed">Amount (AED)</label>
                 <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" required>
               </div>
               <div class="field">
-                <label class="field-label" for="offer-note">Note (optional)</label>
+                <label class="field-label" for="offer-note" data-i18n="deals_note_optional">Note (optional)</label>
                 <input class="input" id="offer-note" type="text" name="note" maxlength="280">
               </div>
-              <button class="btn btn-primary" type="submit">Send offer</button>
+              <button class="btn btn-primary" type="submit" data-i18n="deals_send_offer">Send offer</button>
             </form>
           </div>
         {% endif %}
@@ -143,7 +143,7 @@
             {% empty %}
               <p class="muted small">No optional services are offered in this area.</p>
             {% endfor %}
-            <button class="btn btn-quiet btn-small" type="submit">Save service selections</button>
+            <button class="btn btn-quiet btn-small" type="submit" data-i18n="deals_save_services">Save service selections</button>
           </form>
         {% else %}
           {% if deal.service_selections.all %}
@@ -177,14 +177,14 @@
                 <input type="hidden" name="action" value="respond_cancellation">
                 <input type="hidden" name="cancellation_id" value="{{ open_cancellation.pk }}">
                 <input type="hidden" name="decision" value="accept">
-                <button class="btn btn-primary" type="submit">Accept cancellation</button>
+                <button class="btn btn-primary" type="submit" data-i18n="deals_accept_cancellation">Accept cancellation</button>
               </form>
               <form method="post" action="{% url 'deals:action' pk=deal.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="respond_cancellation">
                 <input type="hidden" name="cancellation_id" value="{{ open_cancellation.pk }}">
                 <input type="hidden" name="decision" value="reject">
-                <button class="btn btn-quiet" type="submit">Reject cancellation</button>
+                <button class="btn btn-quiet" type="submit" data-i18n="deals_reject_cancellation">Reject cancellation</button>
               </form>
             </div>
           {% endif %}

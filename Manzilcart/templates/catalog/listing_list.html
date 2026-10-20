@@ -700,6 +700,9 @@
       document.body.style.overflow = "hidden";
       openBtns.forEach(function (b) { b.setAttribute("aria-expanded", "true"); });
       updateSlider();
+      if (window.applyCurrentLanguage) {
+        window.applyCurrentLanguage();
+      }
       var firstInput = document.getElementById("filter-category");
       if (firstInput) {
         setTimeout(function () { firstInput.focus(); }, 120);

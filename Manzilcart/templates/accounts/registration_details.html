@@ -7,9 +7,9 @@
 {% block content %}
 <section class="container auth-layout">
   <div class="auth-card">
-    <p class="eyebrow">Step 3 of 3 · {{ emirate.name }}</p>
-    <h1>Where is home?</h1>
-    <p class="muted">
+    <p class="eyebrow"><span data-i18n="step_prefix">Step</span> 3 <span data-i18n="of_label">of</span> 3 · <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span></p>
+    <h1 data-i18n="reg_title">Where is home?</h1>
+    <p class="muted" data-i18n="reg_desc">
       Your area decides which listings you see first and which optional services are
       available with a deal. You can change it later in your profile.
     </p>
@@ -27,21 +27,20 @@
       {% include "partials/field.html" with field=form.service_area %}
       {% include "partials/field.html" with field=form.email %}
 
-      <button class="btn btn-primary btn-block" type="submit">Create my account</button>
+      <button class="btn btn-primary btn-block" type="submit" data-i18n="btn_create_account">Create my account</button>
     </form>
 
     <p class="field-help">
-      Verified number: <strong>{{ masked_phone }}</strong>
+      <span data-i18n="verified_number_label">Verified number:</span> <strong>{{ masked_phone }}</strong>
     </p>
   </div>
 
   <aside class="auth-aside">
-    <h2>Your marketplace</h2>
+    <h2 data-i18n="your_marketplace">Your marketplace</h2>
     <p>
-      <strong>{{ emirate.name }}</strong> is selected. If you chose the wrong emirate,
-      go back to the home page and pick the right one before creating your account.
+      <strong data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</strong> <span data-i18n="marketplace_selected_notice">is selected. If you chose the wrong emirate, go back and pick the right one before creating your account.</span>
     </p>
-    <a href="{% url 'locations:landing' %}">Change marketplace</a>
+    <a href="{% url 'locations:landing' %}" data-i18n="change_marketplace">Change marketplace</a>
   </aside>
 </section>
 {% endblock %}

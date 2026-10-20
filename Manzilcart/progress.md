@@ -8,7 +8,7 @@
 **Django project:** `Manzilcart` (settings package: `Manzilcart/`)
 **Django app:** originally `mainapp`, renamed to `core` (agreed with the owner)
 **Python venv:** `d:\Django_projects\multivendor-ecom-as\Manzilcart\venv`
-**Last updated:** 2026-10-19 23:55
+**Last updated:** 2026-10-20 12:10
 
 ---
 
@@ -334,6 +334,81 @@ real cron deployment is documented in `docs/deployment.md`.
   ```powershell
   ..\venv\Scripts\python.exe manage.py test
   # Ran 194 tests in 22.9s ... OK
+  ```
+
+### 2026-10-20 (Morning Session: 11:00 – 11:25) — Landing Page Clean Header & Browse Redirect on Brand Logo ✅
+
+1. **Landing Page Minimal Centered Branding Header with Arabic & Dark Mode Controls (`templates/locations/landing.html`, `static/css/styles.css`)**:
+   - Overrode `{% block site_header %}` in `templates/locations/landing.html` to eliminate all marketplace navigation elements from the landing page:
+     - Removed emirate selector dropdown chip.
+     - Removed Browse, Auctions, Sign in, and Sell+ buttons.
+     - Kept/included language (`العربية` / English) and dark/light theme controls positioned cleanly on the trailing edge (`.header-controls-landing`).
+   - Styled `.site-header-landing`, `.header-inner-landing`, and `.brand-landing` with `justify-content: center` and `margin-inline: auto` to display the ManzilCart logo dead-center on both LTR and RTL layouts while controls float neatly on the side.
+   - Marketplace options (Browse, Auctions, Sign in / user links, Sell+, emirate switcher) appear exclusively after the visitor chooses an emirate.
+
+2. **Base Brand Logo Browse Redirection (`templates/base.html`)**:
+   - Updated the header and footer brand logo links (`.brand` and `.footer-brand-link`) in `templates/base.html` from `locations:landing` to redirect to the active marketplace browse page (`{% url 'marketplace:home' emirate_slug=current_emirate.slug %}`) when an emirate is active, falling back to `locations:landing` only when no emirate is selected.
+   - Guarded the primary navigation bar in `templates/base.html` so marketplace options only render when `current_emirate` is set.
+
+3. **Automated Test Coverage (`locations/tests.py`)**:
+   - Added `test_landing_header_only_shows_centered_logo_without_marketplace_options` verifying that even when an emirate is stored in the user's session, the landing page header renders only the centered logo without `primary-nav`, `Sell+`, `Sign in`, `Browse`, `Auctions`, or the marketplace switcher chip.
+   - Added `test_logo_redirects_to_browse_page_when_emirate_chosen` verifying that the brand logo in the header points to `marketplace:home` for the chosen emirate.
+   - Test suite increased from 194 to 196 tests, all passing cleanly.
+
+### Test Status (Verified 2026-10-20 11:25)
+- All 196 automated tests pass with zero failures:
+  ```powershell
+  ..\venv\Scripts\python.exe manage.py test
+  # Ran 196 tests in 17.5s ... OK
+  ```
+
+### 2026-10-20 (Midday Session: 11:30 – 11:55) — Comprehensive Arabic Translation Audit & Optimization Across All Pages ✅
+
+1. **Root-Cause Analysis of Untranslated Elements**:
+   - The prior client-side translation engine was restricted strictly to pre-annotated `[data-i18n]` / `[data-emirate-name]` tags.
+   - Dynamic database-driven entities had no translation mapping: Categories (e.g., "Sofas & Seating", "Dining Tables", "Beds & Mattresses"), Service Areas across all 7 emirates (e.g., "Al Reem Island", "Downtown Dubai", "Al Majaz"), Conditions ("Brand new", "Like new", "Good", "Fair"), Statuses ("Draft", "Live", "Locked", "Reserved", "Sold", "Negotiating", "Awarded", "Unsold", "Cancelled").
+   - Common interactive UI elements lacked bilingual hooks: Buttons ("View", "Edit", "Archive", "Mark as sold", "Save changes", "Cancel"), Pagination ("Page X of Y", "Previous", "Next"), Prices ("AED 1,200" vs "1,200 د.إ"), and form labels / help text.
+
+2. **Full-Spectrum Bilingual Dictionaries & Automated DOM Translation Engine (`static/js/app.js`)**:
+   - Injected exhaustive translation lookup maps into `static/js/app.js`:
+     - `emirateNames`: All 7 UAE emirates.
+     - `categoryNames`: All categories and slugs.
+     - `conditionNames`: All furniture condition variants.
+     - `statusNames`: All listing, deal, offer, auction, and verification statuses.
+     - `areaNames`: Neighborhoods and service areas across Abu Dhabi, Dubai, Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah, and Fujairah.
+     - `uiPhrases`: Hundreds of complete UI labels, headings, prompts, field labels, button strings, tooltips, and safety notes.
+   - Built a non-destructive DOM scanner:
+     - Automatically scans badges, status pills, table headers, buttons, dropdown options, breadcrumbs, detail lists, and pagination.
+     - Preserves original English DOM content in `_origText` / `_origHtml` properties so switching back to English (`English`) restores 100% authentic typography and case formatting without data degradation.
+     - Dynamically formats currencies into Arabic standard `د.إ` with Western or Eastern Arabic numeral localization.
+
+3. **Template-Level Audit & Data-Hook Annotations**:
+   - `templates/partials/listing_card.html`: Added `data-condition`, `data-area-name`, `data-category-name`, and `data-price`.
+   - `templates/partials/field.html`: Added `data-i18n="field_optional"` and `.field-label-text`.
+   - `templates/locations/marketplace_home.html`: Added `data-area-name` across all neighbourhood pills.
+   - `templates/catalog/my_listings.html`: Annotated headings, statuses, empty state, action buttons ("Create auction", "Submit for review", "Mark as sold", "Archive").
+   - `templates/catalog/listing_detail.html`: Annotated breadcrumbs, badges, conditions, service areas, and detail specification lists.
+   - `templates/catalog/listing_form.html`: Annotated labels, category and area dropdowns, selling tips, and submit buttons.
+   - `templates/auctions/list.html` & `templates/auctions/my_auctions.html`: Annotated headings, active bid tags, no-bid labels, countdowns, and pagination.
+   - `templates/auctions/detail.html` & `templates/auctions/selection.html`: Annotated breadcrumbs, bids, sidebar specifications, confirmation rounds, lock actions, and decline options.
+   - `templates/deals/list.html` & `templates/deals/detail.html`: Annotated deal statuses, offer histories, action forms (Accept, Reject, Counter, Make offer, Cancel).
+   - `templates/conversations/list.html` & `templates/conversations/detail.html`: Annotated conversation listing, unread indicators, chat header, status, history loader, and message input placeholders.
+   - `templates/accounts/dashboard.html` & `templates/accounts/profile.html`: Annotated dashboard cards, navigation tiles, mobile verification status, phone numbers, and profile action forms.
+   - `templates/accounts/phone_entry.html`, `verify_code.html`, `registration_details.html`: Annotated headings, steps, phone number labels, OTP prompts, and expiry warnings.
+   - `templates/404.html` & `templates/500.html`: Annotated error headings, descriptions, and homepage return buttons.
+
+4. **Universal Recursive DOM TreeWalker Translation Engine (`static/js/app.js`)**:
+   - Replaced selective selector queries with a universal `TreeWalker` (`NodeFilter.SHOW_TEXT`) traversing all text nodes in `document.body`.
+   - Guaranteed that any word, phrase, dynamic label, compound sentence, count pattern (e.g. "X items available", "X neighbourhoods", "X listings"), filter preset, sort choice, or price pattern on any page is instantly translated to Arabic.
+   - Preserves original node content in `_origVal` so switching back to English restores authentic typography with zero loss.
+   - Synchronizes `document.title`, input/textarea `placeholder`s, dropdown `<option>`s, button `value`s, `aria-label`s, and `title` tooltips.
+   - Added cache-busting `?v=2.5` to `<script src="app.js">` in `templates/base.html`.
+
+### Test Status (Verified 2026-10-20 12:10)
+- All 196 automated tests pass with zero failures:
+  ```powershell
+  ..\venv\Scripts\python.exe manage.py test
+  # Ran 196 tests in 19.8s ... OK
   ```
 
 ---

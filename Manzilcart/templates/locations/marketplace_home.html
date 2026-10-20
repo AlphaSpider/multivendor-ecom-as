@@ -86,7 +86,7 @@
   </div>
   <ul class="area-list">
     {% for area in service_areas %}
-      <li>{{ area.name }}</li>
+      <li data-area-name="{{ area.name }}">{{ area.name }}</li>
     {% empty %}
       <li class="muted" data-i18n="no_active_neighbourhoods">No neighbourhoods are currently active.</li>
     {% endfor %}

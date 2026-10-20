@@ -4,6 +4,40 @@
 {% block title %}Choose your Emirate — ManzilCart{% endblock %}
 {% block meta_description %}Buy and sell new and refurbished furniture in the UAE. Select your emirate to discover local listings in your community.{% endblock %}
 
+{% block site_header %}
+  <header class="site-header site-header-landing">
+    <div class="container header-inner header-inner-landing">
+      <a class="brand brand-landing" href="{% url 'locations:landing' %}" aria-label="ManzilCart home">
+        <img src="{% static 'images/logo.png' %}" alt="ManzilCart" class="brand-logo brand-logo-light" width="138" height="49">
+        <img src="{% static 'images/logo-dark.png' %}" alt="ManzilCart" class="brand-logo brand-logo-dark" width="138" height="49">
+      </a>
+
+      <div class="header-controls header-controls-landing">
+        <button type="button" class="ctrl-btn lang-toggle-btn" data-lang-toggle aria-label="Switch language to Arabic" title="تغيير اللغة إلى العربية">
+          <span class="ctrl-text" data-lang-display>العربية</span>
+        </button>
+
+        <button type="button" class="ctrl-btn theme-toggle-btn" data-theme-toggle aria-label="Toggle dark and light mode" title="Toggle dark/light mode">
+          <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+{% endblock site_header %}
+
 {% block content %}
 {% if request.GET.invalid_emirate %}
   <div class="container" style="padding-top: 1.5rem;">
@@ -13,16 +47,6 @@
   </div>
 {% endif %}
 
-<section class="hero hero-landing">
-  <div class="container hero-inner">
-    <p class="eyebrow" data-i18n="hero_eyebrow">Furniture marketplace · UAE</p>
-    <h1 data-i18n="hero_title">Give good furniture<br>a second home.</h1>
-    <p class="hero-lede" data-i18n="hero_lede">
-      Buy and sell new and refurbished furniture with people in your own community.
-      Choose your emirate to see what is available near you.
-    </p>
-  </div>
-</section>
 
 <section class="container section emirate-picker" aria-labelledby="choose-emirate">
   <div class="section-heading">

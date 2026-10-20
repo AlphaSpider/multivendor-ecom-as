@@ -7,9 +7,9 @@
 {% block content %}
 <section class="container auth-layout">
   <div class="auth-card">
-    <p class="eyebrow">{% if emirate %}{{ emirate.name }} marketplace{% else %}ManzilCart{% endif %}</p>
-    <h1>Enter with your mobile number</h1>
-    <p class="muted">
+    <p class="eyebrow">{% if emirate %}<span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span> <span data-i18n="marketplace_label">marketplace</span>{% else %}ManzilCart{% endif %}</p>
+    <h1 data-i18n="phone_entry_title">Enter with your mobile number</h1>
+    <p class="muted" data-i18n="phone_entry_desc">
       We send a one-time code on WhatsApp. New here? Verifying your number creates your
       account — there is no password to remember.
     </p>
@@ -25,21 +25,21 @@
 
       {% include "partials/field.html" with field=form.phone %}
 
-      <button class="btn btn-primary btn-block" type="submit">Send my code</button>
+      <button class="btn btn-primary btn-block" type="submit" data-i18n="btn_send_code">Send my code</button>
     </form>
 
-    <p class="auth-footnote">
+    <p class="auth-footnote" data-i18n="phone_entry_footnote">
       By continuing you agree to use ManzilCart respectfully. Payments are arranged
       directly between buyer and seller.
     </p>
   </div>
 
   <aside class="auth-aside" aria-label="How it works">
-    <h2>How ManzilCart works</h2>
+    <h2 data-i18n="how_it_works">How ManzilCart works</h2>
     <ol class="step-list">
-      <li><strong>Verify your mobile.</strong> A one-time code on WhatsApp keeps the marketplace human.</li>
-      <li><strong>Choose your area.</strong> Your marketplace is your own emirate.</li>
-      <li><strong>Buy or sell.</strong> Message, negotiate and agree a deal directly.</li>
+      <li data-i18n="step_1"><strong>Verify your mobile.</strong> A one-time code on WhatsApp keeps the marketplace human.</li>
+      <li data-i18n="step_2"><strong>Choose your area.</strong> Your marketplace is your own emirate.</li>
+      <li data-i18n="step_3"><strong>Buy or sell.</strong> Message, negotiate and agree a deal directly.</li>
     </ol>
   </aside>
 </section>

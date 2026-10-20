@@ -10,18 +10,18 @@
 {% block content %}
 <section class="container section narrow">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <a href="{% url 'auctions:mine' %}">My auctions</a>
+    <a href="{% url 'auctions:mine' %}" data-i18n="nav_my_auctions">My auctions</a>
     <span aria-hidden="true">/</span>
     <span>{{ auction.reference }}</span>
   </nav>
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Auction confirmation · {{ auction.reference }}</p>
+      <p class="eyebrow"><span data-i18n="auction_confirmation_title">Auction confirmation</span> · {{ auction.reference }}</p>
       <h1>{{ listing.title }}</h1>
       <p class="muted">
-        {{ listing.service_area.name }}, {{ auction.emirate.name }} ·
-        Your locked bid
+        <span data-area-name>{{ listing.service_area.name }}</span>, <span data-emirate-name>{{ auction.emirate.name }}</span> ·
+        <span data-i18n="auction_your_locked_bid">Your locked bid</span>
         <strong>AED {{ bid.amount|floatformat:0|intcomma }}</strong>
       </p>
     </div>
@@ -50,15 +50,15 @@
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="confirm">
-          <button class="btn btn-primary" type="submit">Confirm and create the deal</button>
+          <button class="btn btn-primary" type="submit" data-i18n="auction_confirm_create_deal">Confirm and create the deal</button>
         </form>
 
         <form class="auction-decline-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="decline">
-          <label class="field-label" for="decline-reason">Reason (optional)</label>
+          <label class="field-label" for="decline-reason" data-i18n="auction_decline_reason_label">Reason (optional)</label>
           <textarea class="input" id="decline-reason" name="reason" rows="2" maxlength="255"></textarea>
-          <button class="btn btn-quiet" type="submit">Decline this offer</button>
+          <button class="btn btn-quiet" type="submit" data-i18n="auction_decline_offer">Decline this offer</button>
         </form>
       </div>
     </div>

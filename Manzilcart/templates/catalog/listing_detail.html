@@ -13,7 +13,7 @@
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</a>
     <span aria-hidden="true">/</span>
-    <a href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}">{{ listing.category.name }}</a>
+    <a href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}" data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</a>
     <span aria-hidden="true">/</span>
     <span>{{ listing.title }}</span>
   </nav>
@@ -102,7 +102,7 @@
 
     <aside class="detail-panel">
       <div class="detail-badges">
-        <span class="badge">{{ listing.get_condition_display }}</span>
+        <span class="badge" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
         {% if listing.status == "reserved" %}<span class="status-pill status-reserved" data-i18n="status_reserved">Reserved</span>{% endif %}
         {% if listing.status == "sold" %}<span class="status-pill status-sold" data-i18n="status_sold">Sold</span>{% endif %}
       </div>
@@ -111,8 +111,8 @@
       <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
 
       <dl class="detail-list">
-        <div><dt data-i18n="detail_category">Category</dt><dd>{{ listing.category.name }}</dd></div>
-        <div><dt data-i18n="detail_area">Area</dt><dd>{{ listing.service_area.name }}</dd></div>
+        <div><dt data-i18n="detail_category">Category</dt><dd data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</dd></div>
+        <div><dt data-i18n="detail_area">Area</dt><dd data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}</dd></div>
         <div><dt data-i18n="detail_emirate">Emirate</dt><dd data-emirate-name="{{ listing.emirate.name }}">{{ listing.emirate.name }}</dd></div>
         <div><dt data-i18n="detail_listed">Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
       </dl>
