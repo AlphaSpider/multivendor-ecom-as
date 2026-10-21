@@ -91,7 +91,7 @@
         </button>
 
         <nav class="main-nav" id="primary-nav" aria-label="Primary">
-          <a href="{% url 'marketplace:home' emirate_slug=current_emirate.slug %}" data-i18n="nav_browse">Browse</a>
+          <a href="{% url 'marketplace:home' emirate_slug=current_emirate.slug %}" data-i18n="nav_browse">Home</a>
           <a href="{% url 'auction_marketplace:list' emirate_slug=current_emirate.slug %}" data-i18n="nav_auctions">Auctions</a>
 
           {% if user.is_authenticated %}
@@ -106,7 +106,7 @@
             <a href="{% url 'accounts:login' %}" data-i18n="nav_sign_in">Sign in</a>
           {% endif %}
 
-          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell_plus">Sell+</a>
+          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell_plus"> Sell </a>
         </nav>
       {% endif %}
     </div>
@@ -141,7 +141,7 @@
       <div class="footer-links">
         <span class="footer-heading" data-i18n="footer_marketplaces">Marketplaces</span>
         {% for emirate in active_emirates %}
-          <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</a>
+          <a href="{% if emirate.slug != 'abu-dhabi' %}{% url 'locations:landing' %}?coming_soon={{ emirate.slug }}{% else %}{% url 'marketplace:home' emirate_slug=emirate.slug %}{% endif %}" data-emirate-name="{{ emirate.name }}"{% if emirate.slug != 'abu-dhabi' %} data-coming-soon="true" data-emirate-slug="{{ emirate.slug }}"{% endif %}>{{ emirate.name }}</a>
         {% empty %}
           <span class="muted" data-i18n="footer_no_marketplaces">No marketplaces are currently open.</span>
         {% endfor %}

@@ -117,6 +117,15 @@ class LandingTests(LocationTestBase):
         self.assertNotContains(response, 'data-i18n="nav_auctions"')
         self.assertNotContains(response, 'class="marketplace-chip"')
 
+    def test_landing_marks_non_abudhabi_emirates_as_coming_soon_with_popup_modal(self):
+        response = self.client.get(reverse("locations:landing"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="coming-soon-modal"')
+        self.assertContains(response, 'data-coming-soon="true"')
+        self.assertContains(response, 'emirate-card-coming-soon')
+        self.assertContains(response, "Coming soon")
+        self.assertContains(response, "Explore Abu Dhabi Marketplace")
+
 
 class MarketplaceHomeTests(LocationTestBase):
     def test_logo_redirects_to_browse_page_when_emirate_chosen(self):

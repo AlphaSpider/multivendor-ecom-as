@@ -8,7 +8,7 @@
 **Django project:** `Manzilcart` (settings package: `Manzilcart/`)
 **Django app:** originally `mainapp`, renamed to `core` (agreed with the owner)
 **Python venv:** `d:\Django_projects\multivendor-ecom-as\Manzilcart\venv`
-**Last updated:** 2026-10-20 21:40
+**Last updated:** 2026-10-21 23:35
 
 ---
 
@@ -501,8 +501,31 @@ never creates, inherits from, or references a listing at runtime.
 - `manage.py check --deploy` in `DJANGO_ENV=production` with a production-like
   configuration: no errors (only expected warnings for Redis/provider mode/DEBUG in
   this local environment).
-- `manage.py test`: **199 tests, OK** (auctions 36, deals 32, conversations including
-  auction threads, plus the existing suites).
+- `manage.py test`: **202 tests, OK** (auctions 36, deals 32, conversations including
+  auction threads, locations 40, plus the existing suites).
+
+### 2026-10-21 (Evening Session: 23:35) — Abu Dhabi Single-Emirate Focus & "Coming Soon" Modal Pop-up Page ✅
+
+1. **Focus on Abu Dhabi with Interactive "Coming Soon" Pop-up Page**:
+   - In accordance with the decision to focus exclusively on Abu Dhabi for launch, Ras Al Khaimah (and any non-Abu Dhabi emirates) on the landing page now displays an interactive **"Coming Soon"** pop-up page modal (`#coming-soon-modal`).
+   - Clicking Ras Al Khaimah on the landing page (card or footer) prevents default navigation and smoothly opens the animated pop-up modal.
+   - Built as an accessible modal overlay with dark blurred backdrop (`backdrop-filter: blur(8px)`), ESC key listener, outside click-to-dismiss, and top-right close button (never a browser `alert()` console pop-up).
+   - Contains:
+     - "Coming Soon" badge with clock icon
+     - Heading: "Ras Al Khaimah — Coming Soon" / "رأس الخيمة — قريباً"
+     - Informative explanation that operations are currently concentrated on Abu Dhabi to ensure high marketplace quality
+     - Feature highlight box for Abu Dhabi live marketplace vs upcoming Ras Al Khaimah expansion
+     - Direct primary action button: `"Explore Abu Dhabi Marketplace"` pointing to `/abu-dhabi/`
+     - Secondary dismissal button: `"Stay on this page"`
+   - Supports URL query parameter `?coming_soon=ras-al-khaimah` for auto-opening the modal when redirected from other pages or deep-links.
+
+2. **Bilingual Arabic & Dark Mode Integration**:
+   - Fully translated in `static/js/app.js` bilingual lookup tables (`uiPhrases`) with proper RTL alignment in Arabic.
+   - Full theme styling for light and dark modes (`[data-theme="dark"]`).
+
+3. **Automated Test Coverage**:
+   - Added `test_landing_marks_non_abudhabi_emirates_as_coming_soon_with_popup_modal` in `locations/tests.py`.
+   - Full suite now runs **202 tests, all passing cleanly**.
 
 ---
 

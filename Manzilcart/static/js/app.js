@@ -168,6 +168,15 @@ var areaNames = {
 };
 
 var uiPhrases = {
+  "Coming soon": "قريباً",
+  "Ras Al Khaimah — Coming soon": "رأس الخيمة — قريباً",
+  "We are currently operating exclusively in Abu Dhabi to ensure the best local experience. The Ras Al Khaimah marketplace is preparing for launch very soon!": "نعمل حالياً في إمارة أبوظبي فقط لضمان أفضل تجربة محلية. سوق رأس الخيمة يستعد للانطلاق قريباً جداً!",
+  "Abu Dhabi Marketplace is Live": "سوق أبوظبي متاح الآن",
+  "Discover approved furniture listings, verified sellers, and local chat.": "تصفح معروضات الأثاث المفحوصة، وتواصل مع بائعين موثوقين.",
+  "Ras Al Khaimah is Expanding Next": "رأس الخيمة هي محطتنا القادمة",
+  "Neighborhood-scoped listings and furniture handover coming to your community.": "إعلانات محلية وتسليم مباشر في منطقتكم قريباً.",
+  "Explore Abu Dhabi Marketplace": "استكشف سوق أبوظبي",
+  "Stay on this page": "البقاء في هذه الصفحة",
   "ManzilCart": "منزل كارت",
   "Choose your Emirate": "اختر إمارتك",
   "Choose your Emirate — ManzilCart": "اختر إمارتك — منزل كارت",

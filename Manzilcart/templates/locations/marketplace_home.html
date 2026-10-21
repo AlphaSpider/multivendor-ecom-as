@@ -81,7 +81,7 @@
       <p class="muted"><span data-i18n="operate_neighbourhoods_prefix">We operate in</span> {{ service_areas|length }} <span data-i18n="operate_neighbourhoods_suffix">neighbourhoods here.</span></p>
     </div>
     <a class="btn btn-primary" href="{% if user.is_authenticated %}{% url 'catalog:listing_create' emirate_slug=emirate.slug %}{% else %}{% url 'accounts:start' %}{% endif %}" data-i18n="list_an_item">
-      List an item
+      Sell an item
     </a>
   </div>
   <ul class="area-list">
