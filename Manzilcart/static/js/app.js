@@ -199,6 +199,7 @@ var uiPhrases = {
   "That marketplace is not currently available. Please select an active emirate below.": "هذا السوق غير متاح حالياً. يرجى اختيار إمارة نشطة أدناه.",
   "That marketplace isn’t available": "هذا السوق غير متاح حالياً",
   "Browse": "تصفح",
+  "Home": "الرئيسية",
   "Auctions": "المزادات",
   "Messages": "الرسائل",
   "Deals": "الصفقات",
@@ -218,6 +219,9 @@ var uiPhrases = {
   "Payments for furniture are arranged directly between buyer and seller. ManzilCart does not process or hold the purchase price.": "يتم ترتيب دفع ثمن الأثاث مباشرة بين المشتري والبائع. لا تقوم منزل كارت بمعالجة أو الاحتفاظ بسعر الشراء.",
   "United Arab Emirates.": "الإمارات العربية المتحدة.",
   "Skip to content": "الانتقال إلى المحتوى",
+  "Mobile navigation": "التنقل عبر الجوال",
+  "Show categories": "إظهار الفئات",
+  "Hide categories": "إخفاء الفئات",
   "Switch emirate": "تبديل الإمارة",
   "Switch language to Arabic": "تغيير اللغة إلى العربية",
   "Switch to English": "التبديل إلى الإنجليزية",
@@ -636,6 +640,9 @@ var uiPhrases = {
             if (tag === "script" || tag === "style" || tag === "textarea") {
               return NodeFilter.FILTER_REJECT;
             }
+            if (node.parentElement.hasAttribute("data-i18n-skip")) {
+              return NodeFilter.FILTER_REJECT;
+            }
             return NodeFilter.FILTER_ACCEPT;
           }
         }
@@ -721,6 +728,9 @@ var uiPhrases = {
     if (window._syncPriceSlider) {
       window._syncPriceSlider();
     }
+
+    // 8. Dynamic labels that the text walker deliberately skips.
+    updateCategoryToggleLabel();
   }
 
   // Initialize language from storage
@@ -764,6 +774,28 @@ var uiPhrases = {
       var open = nav.classList.toggle("is-open");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
+  }
+
+  // --- Collapsible category grid (home page, mobile) ----------------------
+  var categoryToggle = document.querySelector("[data-category-toggle]");
+  var categoryPanel = document.getElementById("category-panel");
+
+  function updateCategoryToggleLabel() {
+    if (!categoryToggle || !categoryPanel) return;
+    var label = categoryToggle.querySelector("[data-category-toggle-label]");
+    if (!label) return;
+    var isArabic = document.documentElement.getAttribute("lang") === "ar";
+    var text = categoryPanel.classList.contains("is-open") ? "Hide categories" : "Show categories";
+    label.textContent = isArabic ? translateString(text) : text;
+  }
+
+  if (categoryToggle && categoryPanel) {
+    categoryToggle.addEventListener("click", function () {
+      var open = categoryPanel.classList.toggle("is-open");
+      categoryToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      updateCategoryToggleLabel();
+    });
+    updateCategoryToggleLabel();
   }
 
   // --- Emirate switcher: submit on change ---------------------------------
