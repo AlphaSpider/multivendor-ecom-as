@@ -63,6 +63,25 @@ def _money(value) -> Decimal:
     return amount.quantize(Decimal("0.01"))
 
 
+def _minimum_amount(value) -> Decimal:
+    """The minimum amount is mandatory and doubles as the auction's starting price."""
+    if value in (None, ""):
+        raise ValidationError(
+            {"reserve_price": "Enter the minimum amount (the auction's starting price)."}
+        )
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValidationError(
+            {"reserve_price": "Enter a valid minimum amount."}
+        ) from exc
+    if amount < Decimal("1.00"):
+        raise ValidationError(
+            {"reserve_price": "The minimum amount must be at least AED 1.00."}
+        )
+    return amount.quantize(Decimal("0.01"))
+
+
 def _record_event(auction, event_type, *, actor=None, summary="", metadata=None):
     return AuctionEvent.objects.create(
         auction=auction,
@@ -156,17 +175,17 @@ def eligible_bids(auction: Auction) -> list[Bid]:
     """
     One row per bidder: their highest bid, earliest first on a tie.
 
-    Bids below the reserve are excluded. Ordering by ``-amount, created_at, id`` before
-    de-duplicating is what makes the tie-break rule explicit and deterministic.
+    Bids below the starting price are excluded. Ordering by ``-amount, created_at, id``
+    before de-duplicating is what makes the tie-break rule explicit and deterministic.
     """
-    reserve = auction.reserve_price
+    starting_price = auction.reserve_price
     seen: set[int] = set()
     rows: list[Bid] = []
     bids = auction.bids.select_related("bidder").order_by("-amount", "created_at", "id")
     for bid in bids:
         if bid.bidder_id in seen:
             continue
-        if reserve is not None and bid.amount < reserve:
+        if starting_price is not None and bid.amount < starting_price:
             continue
         seen.add(bid.bidder_id)
         rows.append(bid)
@@ -263,7 +282,7 @@ def create_auction(
         title=title, description=description, category=category, condition=condition
     )
     start_at, end_at = _validate_schedule(start_at, end_at)
-    reserve = _money(reserve_price) if reserve_price not in (None, "") else None
+    minimum_amount = _minimum_amount(reserve_price)
 
     now = timezone.now()
     auction = Auction(
@@ -276,7 +295,7 @@ def create_auction(
         service_area=service_area,
         start_at=start_at,
         end_at=end_at,
-        reserve_price=reserve,
+        reserve_price=minimum_amount,
         # Approval is required before the worker may open this auction.
         status=Auction.Status.SCHEDULED,
         moderation_status=(
@@ -298,7 +317,7 @@ def create_auction(
         metadata={
             "start_at": start_at.isoformat(),
             "end_at": end_at.isoformat(),
-            "reserve_price": str(reserve) if reserve else None,
+            "minimum_amount": str(minimum_amount),
         },
     )
     if submit_for_review:
@@ -367,7 +386,7 @@ def update_auction(
         title=title, description=description, category=category, condition=condition
     )
     start_at, end_at = _validate_schedule(start_at, end_at)
-    reserve = _money(reserve_price) if reserve_price not in (None, "") else None
+    minimum_amount = _minimum_amount(reserve_price)
 
     locked.title = title.strip()
     locked.description = description.strip()
@@ -376,7 +395,7 @@ def update_auction(
     locked.service_area = service_area
     locked.start_at = start_at
     locked.end_at = end_at
-    locked.reserve_price = reserve
+    locked.reserve_price = minimum_amount
     locked.seller_agreed_fallback = True
 
     was_approved = locked.moderation_status == Auction.ModerationStatus.APPROVED
@@ -706,10 +725,14 @@ def place_bid(
     amount = _money(amount)
     highest = lock.bids.order_by("-amount", "created_at", "id").first()
     increment = Decimal(settings.AUCTION_MIN_BID_INCREMENT)
-    if highest is not None and amount < highest.amount + increment:
-        raise ValidationError(
-            {"amount": f"Bid at least AED {highest.amount + increment}."}
-        )
+    starting_price = lock.starting_price
+    minimum_bid = (
+        max(highest.amount + increment, starting_price)
+        if highest is not None
+        else starting_price
+    )
+    if amount < minimum_bid:
+        raise ValidationError({"amount": f"Bid at least AED {minimum_bid}."})
 
     bid = Bid.objects.create(
         auction=lock,
@@ -759,7 +782,7 @@ def lock_bid(auction: Auction, *, seller, bid_id: int, request=None) -> AuctionS
     highest = highest_eligible_bid(locked)
     if highest is None:
         raise StateTransitionError(
-            "There are no eligible bids at or above the reserve price."
+            "There are no eligible bids at or above the starting price."
         )
     if int(bid_id) != highest.pk:
         raise StateTransitionError("You can only lock the current highest eligible bid.")
@@ -1193,4 +1216,20 @@ def close_expired_auction(auction_id: int, *, now=None) -> Auction | None:
         auction=auction,
         key=f"auction:{auction.pk}:unsold:seller",
     )
+    return auction
+
+
+def refresh_auction_state(auction: Auction, *, now=None) -> Auction:
+    """
+    Apply a due open/close transition while rendering a page.
+
+    The deadline worker remains the primary mechanism. This fallback keeps detail and
+    bid pages accurate when the worker has not run yet, for example during local
+    development, without replacing the worker's scheduled processing.
+    """
+    now = now or timezone.now()
+    if auction.status == Auction.Status.SCHEDULED and auction.start_at <= now:
+        return open_scheduled_auction(auction.pk, now=now) or auction
+    if auction.status == Auction.Status.LIVE and auction.end_at <= now:
+        return close_expired_auction(auction.pk, now=now) or auction
     return auction

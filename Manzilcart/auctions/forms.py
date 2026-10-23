@@ -78,8 +78,8 @@ class AuctionForm(forms.Form):
         ),
     )
     reserve_price = forms.DecimalField(
-        label="Reserve price (AED)",
-        required=False,
+        label="Minimum amount (AED)",
+        required=True,
         max_digits=10,
         decimal_places=2,
         min_value=Decimal("1.00"),
@@ -87,8 +87,8 @@ class AuctionForm(forms.Form):
             attrs={"class": "input", "min": "1", "step": "1", "inputmode": "decimal"}
         ),
         help_text=(
-            "Optional. Bids below this amount cannot be locked as the winner. "
-            "Leave blank for no reserve."
+            "Required. This is the auction's starting price; bids below this "
+            "amount are not accepted."
         ),
     )
     agree_fallback = forms.BooleanField(

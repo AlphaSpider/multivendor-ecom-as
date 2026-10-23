@@ -23,6 +23,8 @@
         AED {{ auction.awarded_deal.agreed_price|floatformat:0|intcomma }}
       {% elif auction.top_bid %}
         AED {{ auction.top_bid|floatformat:0|intcomma }}
+      {% elif auction.reserve_price %}
+        <span data-i18n="starting_price_label">Starting price</span> AED {{ auction.reserve_price|floatformat:0|intcomma }}
       {% elif auction.status == "scheduled" %}
         Bids open soon
       {% else %}

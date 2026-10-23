@@ -172,23 +172,22 @@
             <span class="muted small">current highest bid</span>
           </p>
         {% else %}
-          <p class="auction-price-large"><strong>No bids yet</strong></p>
-        {% endif %}
-
-        {% if auction.reserve_price %}
-          <p class="muted small">
-            {% if is_seller or is_staff_viewer %}
-              Reserve price: AED {{ auction.reserve_price|floatformat:0|intcomma }}.
-            {% else %}
-              A reserve price applies to this auction.
-            {% endif %}
-            {% if top_bid and not reserve_met %}The reserve has not been met yet.{% endif %}
+          <p class="auction-price-large">
+            <strong>AED {{ starting_price|floatformat:0|intcomma }}</strong>
+            <span class="muted small">starting price</span>
           </p>
         {% endif %}
 
         <p class="muted small">
-          The next valid bid must be at least
-          <strong>AED {{ minimum_bid|floatformat:0|intcomma }}</strong>.
+          {% if top_bid %}
+            Starting price:
+            <strong>AED {{ starting_price|floatformat:0|intcomma }}</strong>.
+            The next valid bid must be at least
+            <strong>AED {{ minimum_bid|floatformat:0|intcomma }}</strong>.
+            {% if not reserve_met %}No bid has met the starting price yet.{% endif %}
+          {% else %}
+            The first valid bid must be at least the starting price.
+          {% endif %}
           Ties are decided in favour of the earliest bid.
         </p>
 
@@ -245,7 +244,7 @@
             </form>
           </div>
         {% elif is_seller and auction.status == "live" %}
-          <p class="muted small">There is no eligible bid to lock yet. Bids below the reserve price cannot be selected.</p>
+          <p class="muted small">There is no eligible bid to lock yet. Bids below the starting price cannot be selected.</p>
         {% endif %}
 
         {% if can_cancel %}
@@ -355,9 +354,7 @@
         <div><dt data-i18n="detail_status">Status</dt><dd data-status>{{ auction.get_status_display }}</dd></div>
         <div><dt data-i18n="detail_starts">Starts</dt><dd>{{ auction.start_at|date:"j M Y, H:i" }}</dd></div>
         <div><dt data-i18n="detail_ends">Ends</dt><dd>{{ auction.end_at|date:"j M Y, H:i" }}</dd></div>
-        {% if auction.reserve_price and is_seller or auction.reserve_price and is_staff_viewer %}
-          <div><dt data-i18n="detail_reserve">Reserve</dt><dd>AED {{ auction.reserve_price|floatformat:0|intcomma }}</dd></div>
-        {% endif %}
+        <div><dt data-i18n="detail_starting_price">Starting price</dt><dd>AED {{ starting_price|floatformat:0|intcomma }}</dd></div>
         <div><dt data-i18n="detail_seller">Seller</dt><dd>{{ auction.seller.display_name|default:"ManzilCart member" }}</dd></div>
         <div><dt data-i18n="detail_area">Area</dt><dd data-area-name>{{ auction.service_area.name }}</dd></div>
       </dl>

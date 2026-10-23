@@ -14,6 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO, StringIO
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -100,7 +101,7 @@ class AuctionTestBase(TestCase):
         title="Leather sofa",
         start_delta=timedelta(minutes=-5),
         end_delta=timedelta(hours=3),
-        reserve=None,
+        reserve="100.00",
         submit_for_review=True,
         agree_fallback=True,
     ) -> Auction:
@@ -199,6 +200,21 @@ class StandaloneCreationTests(AuctionTestBase):
     def test_fallback_agreement_is_required(self):
         with self.assertRaises(ValidationError):
             self.create_auction(agree_fallback=False)
+
+    def test_minimum_amount_is_required(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self.create_auction(reserve=None)
+        self.assertIn("reserve_price", ctx.exception.message_dict)
+
+    def test_create_form_requires_a_minimum_starting_price(self):
+        self.client.force_login(self.seller)
+        response = self.client.get(self.create_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Minimum amount (AED)")
+        field = response.context["form"].fields["reserve_price"]
+        self.assertTrue(field.required)
+        self.assertEqual(field.label, "Minimum amount (AED)")
+        self.assertIn("starting price", field.help_text.lower())
 
     def test_schedule_duration_is_validated(self):
         now = timezone.now()
@@ -339,6 +355,7 @@ class SellerEditTests(AuctionTestBase):
             service_area=self.area,
             start_at=draft.start_at,
             end_at=draft.end_at,
+            reserve_price=draft.reserve_price,
             agree_fallback=True,
             submit_for_review=True,
         )
@@ -360,6 +377,7 @@ class SellerEditTests(AuctionTestBase):
             service_area=self.area,
             start_at=rejected.start_at,
             end_at=rejected.end_at,
+            reserve_price=rejected.reserve_price,
             agree_fallback=True,
             submit_for_review=True,
         )
@@ -380,6 +398,7 @@ class SellerEditTests(AuctionTestBase):
             service_area=self.area,
             start_at=auction.start_at,
             end_at=auction.end_at,
+            reserve_price=auction.reserve_price,
             agree_fallback=True,
             submit_for_review=True,
         )
@@ -445,6 +464,60 @@ class VisibilityTests(AuctionTestBase):
 
         self.client.force_login(self.seller)
         self.assertEqual(self.client.get(self.detail_url(pending)).status_code, 200)
+
+    def test_detail_opens_a_due_scheduled_auction(self):
+        auction = self.make_approved(title="Due auction")
+        self.assertEqual(auction.status, Auction.Status.SCHEDULED)
+
+        response = self.client.get(self.detail_url(auction))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bidding is open")
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.LIVE)
+
+    def test_detail_leaves_a_future_scheduled_auction_closed(self):
+        auction = self.make_approved(
+            title="Future auction",
+            start_delta=timedelta(hours=1),
+            end_delta=timedelta(hours=3),
+        )
+
+        response = self.client.get(self.detail_url(auction))
+
+        self.assertContains(response, "Bidding has not opened yet")
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.SCHEDULED)
+
+    def test_detail_closes_an_expired_live_auction(self):
+        auction = self.make_live(title="Expired auction")
+        Auction.objects.filter(pk=auction.pk).update(
+            start_at=timezone.now() - timedelta(hours=2),
+            end_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        response = self.client.get(self.detail_url(auction))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Auction closed unsold")
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.UNSOLD)
+
+    def test_detail_shows_the_starting_price_as_the_first_bid_floor(self):
+        auction = self.make_live(title="Starting price item", reserve="1500.00")
+        response = self.client.get(self.detail_url(auction))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Starting price")
+        self.assertContains(response, "1,500")
+        self.assertEqual(response.context["starting_price"], Decimal("1500.00"))
+        self.assertEqual(response.context["minimum_bid"], Decimal("1500.00"))
+
+        self.place(auction, self.bidder_one, "1500.00")
+        response = self.client.get(self.detail_url(auction))
+        self.assertEqual(
+            response.context["minimum_bid"],
+            Decimal("1500.00") + Decimal(settings.AUCTION_MIN_BID_INCREMENT),
+        )
 
     def test_logged_out_create_redirects_to_login_with_next(self):
         response = self.client.get(self.create_url())
@@ -548,17 +621,37 @@ class BiddingTests(AuctionTestBase):
         self.assertEqual(first.pk, second.pk)
         self.assertEqual(second.amount, Decimal("1000.00"))
 
-    def test_reserve_excludes_low_bids_from_winner_selection(self):
-        auction = self.make_live(title="Reserve item", reserve="1500.00")
-        self.place(auction, self.bidder_one, "1000.00")
-        self.place(auction, self.bidder_two, "1200.00")
-        with self.assertRaises(StateTransitionError):
-            services.lock_bid(
-                auction,
-                seller=self.seller,
-                bid_id=auction.bids.order_by("-amount").first().pk,
-            )
-        self.place(auction, self.bidder_two, "1500.00")
+    def test_bid_endpoint_opens_a_due_scheduled_auction(self):
+        auction = self.make_approved(title="Due auction")
+        self.client.force_login(self.bidder_one)
+
+        response = self.client.post(
+            reverse(
+                "auction_marketplace:bid",
+                kwargs={"emirate_slug": self.emirate.slug, "pk": auction.pk},
+            ),
+            {"amount": "150.00"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.LIVE)
+        self.assertTrue(
+            auction.bids.filter(
+                bidder=self.bidder_one, amount=Decimal("150.00")
+            ).exists()
+        )
+
+    def test_bids_below_the_starting_price_are_rejected(self):
+        auction = self.make_live(title="Starting price item", reserve="1500.00")
+        with self.assertRaises(ValidationError):
+            self.place(auction, self.bidder_one, "1000.00")
+        with self.assertRaises(ValidationError):
+            self.place(auction, self.bidder_two, "1499.00")
+        bid, created = self.place(auction, self.bidder_two, "1500.00")
+        self.assertTrue(created)
+        self.assertEqual(bid.amount, Decimal("1500.00"))
         highest = services.highest_eligible_bid(auction)
         self.assertEqual(highest.bidder, self.bidder_two)
 

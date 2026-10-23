@@ -90,7 +90,11 @@ class Auction(TimeStampedModel):
         null=True,
         blank=True,
         validators=[MinValueValidator(Decimal("1.00"))],
-        help_text="Optional. Bids below this amount are not eligible to win.",
+        verbose_name="minimum amount",
+        help_text=(
+            "The auction's starting price. Required for new auctions; bids below "
+            "this amount are not accepted."
+        ),
     )
     status = models.CharField(
         max_length=16,
@@ -197,6 +201,11 @@ class Auction(TimeStampedModel):
     @property
     def reference(self) -> str:
         return f"MC-A-{self.pk:06d}" if self.pk else "MC-A-new"
+
+    @property
+    def starting_price(self) -> Decimal:
+        """The minimum accepted first bid; legacy auctions default to AED 1."""
+        return self.reserve_price or Decimal("1.00")
 
     def get_absolute_url(self) -> str:
         return reverse(

@@ -119,6 +119,7 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
         auction = _get_auction(self.kwargs["pk"], self.emirate, user)
 
         now = timezone.now()
+        auction = services.refresh_auction_state(auction, now=now)
         is_authenticated = bool(getattr(user, "is_authenticated", False))
         is_seller = is_authenticated and user.pk == auction.seller_id
         is_staff = is_authenticated and user.is_staff
@@ -129,7 +130,12 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
         highest_eligible = services.highest_eligible_bid(auction)
         top_bid = bids[0] if bids else None
         increment = Decimal(settings.AUCTION_MIN_BID_INCREMENT)
-        minimum_bid = top_bid.amount + increment if top_bid else Decimal("1.00")
+        starting_price = auction.starting_price
+        minimum_bid = (
+            max(top_bid.amount + increment, starting_price)
+            if top_bid is not None
+            else starting_price
+        )
 
         viewer_bid_count = (
             auction.bids.filter(bidder=user).count() if is_authenticated else 0
@@ -213,6 +219,7 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
                 "bids": bids,
                 "top_bid": top_bid,
                 "highest_eligible": highest_eligible,
+                "starting_price": starting_price,
                 "minimum_bid": minimum_bid,
                 "is_seller": is_seller,
                 "is_staff_viewer": is_staff,
@@ -428,6 +435,7 @@ class AuctionBidView(LoginRequiredMixin, EmirateRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         auction = _get_auction(kwargs["pk"], self.emirate, request.user)
+        auction = services.refresh_auction_state(auction)
         form = BidForm(request.POST)
 
         if not form.is_valid():
