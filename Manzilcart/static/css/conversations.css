@@ -135,11 +135,105 @@
   gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .chat-header h2 {
   font-size: 1.05rem;
   margin: 0;
+}
+
+/* -- Bid Lock button in chat header -- */
+.chat-lock-form {
+  flex: 0 0 auto;
+}
+
+.btn-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  white-space: nowrap;
+}
+
+.btn-lock:hover {
+  background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+}
+
+.btn-lock:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.btn-lock .btn-icon {
+  flex: 0 0 auto;
+}
+
+.chat-no-lock-hint {
+  font-size: 0.78rem;
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+/* -- Auction status banners below chat header -- */
+.chat-auction-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-auction-banner svg {
+  flex: 0 0 auto;
+}
+
+.chat-auction-banner--locked {
+  background: linear-gradient(90deg, rgba(15, 52, 96, 0.08), rgba(22, 33, 62, 0.04));
+  color: #0f3460;
+  border-bottom-color: rgba(15, 52, 96, 0.2);
+}
+
+.chat-auction-banner--awarded {
+  background: linear-gradient(90deg, rgba(5, 150, 105, 0.08), rgba(5, 150, 105, 0.02));
+  color: #065f46;
+  border-bottom-color: rgba(5, 150, 105, 0.2);
+}
+
+/* -- Auction summary in the sidebar -- */
+.chat-auction-summary {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.chat-auction-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
 }
 
 .chat-status {
@@ -241,4 +335,108 @@
   .chat-panel { height: 70vh; min-height: 460px; }
   .my-listing, .conversation-row { flex-wrap: wrap; }
   .my-listing-thumb, .conversation-thumb { width: 72px; height: 72px; flex-basis: 72px; }
+  .chat-offer-row { flex-direction: column; }
+  .btn-offer { width: 100%; }
+}
+
+/* ==========================================================================
+   Make Offer panel (listing conversations — buyer sidebar)
+   ========================================================================== */
+
+.chat-offer-panel {
+  margin-top: 1.1rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(5,150,105,0.06) 0%, rgba(5,150,105,0.02) 100%);
+  border: 1px solid rgba(5, 150, 105, 0.22);
+  position: relative;
+}
+
+.chat-offer-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(5,150,105,0.1);
+  pointer-events: none;
+}
+
+.chat-offer-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #065f46;
+  margin: 0 0 0.5rem;
+}
+
+.chat-offer-title svg {
+  flex: 0 0 auto;
+  color: #059669;
+}
+
+.chat-offer-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+.chat-offer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 0.65rem;
+  font-size: 0.95rem;
+}
+
+/* Green "Make offer" / "Send offer" button */
+.btn-offer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 1rem;
+  height: 40px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+  box-shadow: 0 2px 8px rgba(5,150,105,0.30);
+}
+
+.btn-offer:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  box-shadow: 0 4px 14px rgba(5,150,105,0.40);
+  transform: translateY(-1px);
+}
+
+.btn-offer:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(5,150,105,0.2);
+}
+
+.chat-offer-existing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chat-offer-deal-link {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.chat-offer-label {
+  margin: 0.4rem 0 0;
+}
+
+.chat-make-offer-form {
+  margin: 0;
 }

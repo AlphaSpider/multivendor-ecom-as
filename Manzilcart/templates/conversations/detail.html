@@ -54,6 +54,137 @@
         <a class="btn btn-quiet btn-small" href="{{ conversation.item_url }}">View {{ conversation.item_kind }}</a>
       {% endif %}
 
+      {# -- Auction bid summary in sidebar -- #}
+      {% if conversation.auction_id and auction %}
+        <div class="chat-auction-summary">
+          <h3 class="chat-auction-summary-title">Auction Status</h3>
+          <dl class="detail-list">
+            <div>
+              <dt>Status</dt>
+              <dd><span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span></dd>
+            </div>
+            <div>
+              <dt>Ends</dt>
+              <dd>{{ auction.end_at|date:"j M Y, H:i" }}</dd>
+            </div>
+            {% if auction_top_bid %}
+            <div>
+              <dt>Top Bid</dt>
+              <dd><strong>AED {{ auction_top_bid.amount|floatformat:0|intcomma }}</strong></dd>
+            </div>
+            {% else %}
+            <div>
+              <dt>Top Bid</dt>
+              <dd class="muted">No bids yet</dd>
+            </div>
+            {% endif %}
+            {% if auction_highest_eligible and is_seller %}
+            <div>
+              <dt>Eligible Bid</dt>
+              <dd><strong>AED {{ auction_highest_eligible.amount|floatformat:0|intcomma }}</strong></dd>
+            </div>
+            {% endif %}
+          </dl>
+        </div>
+      {% endif %}
+
+      {# -- Make Offer panel: shown to the buyer in listing-based conversations -- #}
+      {% if conversation.listing_id and not is_seller %}
+        <div class="chat-offer-panel">
+
+          {% if existing_deal %}
+            {# Already has a deal — show its status and link -- #}
+            <div class="chat-offer-existing">
+              <h3 class="chat-offer-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M20 12V22H4V12"></path>
+                  <path d="M22 7H2v5h20V7z"></path>
+                  <path d="M12 22V7"></path>
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+                </svg>
+                Your Offer
+              </h3>
+              <p class="muted small">
+                Negotiation status:
+                <strong>{{ existing_deal.get_status_display }}</strong>
+              </p>
+              {% if pending_offer %}
+                <p class="muted small">
+                  Pending offer:
+                  <strong>AED {{ pending_offer.amount|floatformat:0|intcomma }}</strong>
+                </p>
+              {% endif %}
+              <a class="btn btn-primary btn-small chat-offer-deal-link"
+                 href="{% url 'deals:detail' pk=existing_deal.pk %}">
+                View deal
+              </a>
+              {% if can_offer_in_deal %}
+                <form class="chat-make-offer-form" method="post"
+                      action="{% url 'deals:action' pk=existing_deal.pk %}"
+                      id="chat-offer-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="offer">
+                  <p class="chat-offer-label muted small">Make a new offer (AED)</p>
+                  <div class="chat-offer-row">
+                    <input class="input chat-offer-input"
+                           id="chat-offer-amount"
+                           type="number" name="amount"
+                           min="1" step="1" inputmode="decimal"
+                           placeholder="{{ listing_asking_price|floatformat:0 }}"
+                           required>
+                    <button class="btn btn-offer" type="submit" id="chat-offer-btn">
+                      Send offer
+                    </button>
+                  </div>
+                </form>
+              {% endif %}
+            </div>
+
+          {% elif can_start_deal %}
+            {# No deal yet — show the Make Offer form (mirrors listing detail page) -- #}
+            <h3 class="chat-offer-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 12V22H4V12"></path>
+                <path d="M22 7H2v5h20V7z"></path>
+                <path d="M12 22V7"></path>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+              </svg>
+              Make an Offer
+            </h3>
+            <p class="muted small">
+              Asking price: <strong>AED {{ listing_asking_price|floatformat:0|intcomma }}</strong>
+            </p>
+            <form class="chat-make-offer-form" method="post"
+                  action="{% url 'deals:start' listing_id=conversation.listing.pk %}"
+                  id="chat-offer-form">
+              {% csrf_token %}
+              <label class="sr-only" for="chat-offer-amount">Your offer (AED)</label>
+              <div class="chat-offer-row">
+                <input class="input chat-offer-input"
+                       id="chat-offer-amount"
+                       type="number" name="amount"
+                       min="1" step="1" inputmode="decimal"
+                       placeholder="{{ listing_asking_price|floatformat:0 }}"
+                       required>
+                <button class="btn btn-offer" type="submit" id="chat-offer-btn">
+                  Make offer
+                </button>
+              </div>
+            </form>
+            <p class="muted small">No online payment. You arrange handover directly.</p>
+
+          {% elif conversation.listing.status == "reserved" or conversation.listing.status == "sold" %}
+            <p class="muted small">This listing is {{ conversation.listing.get_status_display|lower }} and is no longer available for offers.</p>
+          {% endif %}
+
+        </div>
+      {% endif %}
+
+
       <p class="safety-note">
         <strong>Stay safe.</strong> Never pay a deposit before seeing the furniture.
         ManzilCart does not hold or process the purchase price.
@@ -62,9 +193,56 @@
 
     <div class="panel chat-panel">
       <div class="chat-header">
-        <h2 data-i18n="chat_conversation_heading">Conversation</h2>
-        <span class="chat-status" id="chat-status" data-state="connecting" data-i18n="chat_connecting">Connecting…</span>
+        <div class="chat-header-left">
+          <h2 data-i18n="chat_conversation_heading">Conversation</h2>
+          <span class="chat-status" id="chat-status" data-state="connecting" data-i18n="chat_connecting">Connecting…</span>
+        </div>
+
+        {# -- Bid Lock button: shown to seller at the top of the chat when auction has eligible bids -- #}
+        {% if can_lock and auction_highest_eligible %}
+          <form class="chat-lock-form" method="post"
+                action="{% url 'auction_marketplace:lock' emirate_slug=auction_emirate_slug pk=auction.pk %}"
+                id="chat-lock-form">
+            {% csrf_token %}
+            <input type="hidden" name="bid_id" value="{{ auction_highest_eligible.pk }}">
+            <button class="btn btn-lock" type="submit" id="chat-lock-btn">
+              <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              Lock Bid · AED {{ auction_highest_eligible.amount|floatformat:0|intcomma }}
+            </button>
+          </form>
+        {% elif conversation.auction_id and auction and is_seller and auction.status == "live" %}
+          <span class="chat-no-lock-hint muted small">No eligible bid to lock yet</span>
+        {% endif %}
       </div>
+
+      {# -- Auction lock confirmation banner (if auction is already locked) -- #}
+      {% if conversation.auction_id and auction and auction.status == "locked" %}
+        <div class="chat-auction-banner chat-auction-banner--locked">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>
+            Bid locked at
+            <strong>AED {{ auction.selected_bid.amount|floatformat:0|intcomma }}</strong>.
+            Awaiting bidder confirmation until {{ auction.confirmation_deadline|date:"j M Y, H:i" }}.
+          </span>
+        </div>
+      {% elif conversation.auction_id and auction and auction.status == "awarded" %}
+        <div class="chat-auction-banner chat-auction-banner--awarded">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Auction awarded at <strong>AED {{ auction.awarded_deal.agreed_price|floatformat:0|intcomma }}</strong>.</span>
+        </div>
+      {% endif %}
 
       {% if page_obj.has_next %}
         <div class="chat-history-link">
@@ -93,7 +271,7 @@
             <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
           </li>
         {% empty %}
-          <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet. Say hello and ask about the furniture.</li>
+          <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet. Say hello and ask about the {% if conversation.auction_id %}auction{% else %}furniture{% endif %}.</li>
         {% endfor %}
       </ol>
 
