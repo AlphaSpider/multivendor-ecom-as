@@ -612,6 +612,37 @@ class ProfileAndAccessTests(AccountTestBase):
         self.assertRedirects(post_response, reverse("locations:landing"))
         self.assertNotIn("_auth_user_id", self.client.session)
 
+    def test_settings_page_requires_sign_in(self):
+        response = self.client.get(reverse("accounts:settings"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_settings_page_shows_preference_sections(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("accounts:settings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Preferences")
+        self.assertContains(response, "Language")
+        self.assertContains(response, "Appearance")
+        self.assertContains(response, "data-lang-choice")
+        self.assertContains(response, "data-theme-choice")
+        self.assertContains(response, str(self.member.phone))
+        self.assertContains(response, "Sign out")
+
+    def test_dashboard_shows_activity_counts_and_settings_link(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("accounts:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("accounts:settings"))
+        self.assertContains(response, "Create auction")
+        self.assertEqual(response.context["listings_count"], 0)
+        self.assertEqual(response.context["deals_count"], 0)
+
 
 class AdminHardeningTests(AccountTestBase):
     def test_otp_challenge_admin_is_read_only(self):

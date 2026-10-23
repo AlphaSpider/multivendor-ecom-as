@@ -415,6 +415,27 @@ a:hover { color: var(--brand-strong); }
 
 .inline-form { display: inline; }
 
+/* Unread-chat count badge (mobile tab bar + desktop nav Messages link). */
+.tab-badge,
+.nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  margin-inline-start: 0.28rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--brand, #dc2626);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0;
+  vertical-align: baseline;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
 .nav-toggle {
   display: none;
   width: 42px; height: 42px;
@@ -1870,6 +1891,107 @@ a:hover { color: var(--brand-strong); }
 .dashboard-tile strong { font-size: 1.05rem; }
 .tile-eyebrow { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--brand); font-weight: 700; }
 
+.account-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+
+.account-identity { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 1.45rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.account-avatar svg { width: 30px; height: 30px; }
+
+.account-identity h1 { margin: 0; font-size: 1.45rem; }
+
+.account-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem; }
+.account-meta-sep { color: var(--muted); }
+
+.account-actions { display: flex; align-items: center; gap: 0.6rem; }
+
+.account-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.6rem;
+}
+
+.account-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.05rem 1.25rem;
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.account-stat:hover { border-color: var(--brand); transform: translateY(-2px); color: var(--ink); }
+.account-stat strong { font-size: 1.5rem; font-weight: 750; }
+.account-stat span { font-size: 0.85rem; color: var(--muted); }
+
+/* Account settings */
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.05rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.settings-row-top { align-items: flex-start; }
+.settings-row-detail { min-width: 0; }
+.settings-row-detail p { margin: 0.3rem 0 0; }
+.settings-field { min-width: min(240px, 100%); }
+.settings-field select { width: 100%; }
+
+.settings-label { margin: 0; font-size: 0.95rem; font-weight: 650; }
+
+.choice-group { display: inline-flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.choice-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.choice-btn:hover { border-color: var(--brand); }
+
+.choice-btn[aria-pressed="true"] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-weight: 650;
+}
+
 /* --------------------------------------------------------------------------
    Forms & Auth
    -------------------------------------------------------------------------- */
@@ -2151,6 +2273,12 @@ select.input { appearance: auto; }
   .mobile-tab.is-active svg { stroke-width: 2.4; }
   .mobile-tab:hover { color: var(--brand); }
 
+  .mobile-tab .tab-badge {
+    font-size: 0.6rem;
+    color: #ffffff;
+    margin-inline-start: 0.2rem;
+  }
+
   .has-mobile-tabbar .mobile-fab {
     position: fixed;
     left: 50%;
@@ -2285,6 +2413,12 @@ select.input { appearance: auto; }
   .listing-card-price { font-size: 1rem; }
 
   .section-heading-row { align-items: flex-start; }
+
+  .account-header { align-items: flex-start; }
+  .account-avatar { width: 54px; height: 54px; font-size: 1.25rem; }
+  .account-identity h1 { font-size: 1.3rem; }
+  .account-actions { width: 100%; justify-content: flex-start; }
+  .account-stats { grid-template-columns: repeat(2, 1fr); }
 
   .footer-inner { grid-template-columns: 1fr; gap: 1.6rem; }
 }

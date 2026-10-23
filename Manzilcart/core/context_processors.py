@@ -23,10 +23,25 @@ def marketplace(request):
         active_emirates = list(active_emirates())
         request._active_emirates_cache = active_emirates
 
+    # Unread chat badge for the navigation. Memoised per request like the emirates
+    # so shared renders cost at most one extra indexed count.
+    user = getattr(request, "user", None)
+    unread_messages = getattr(request, "_unread_messages_cache", None)
+    if unread_messages is None:
+        if getattr(user, "is_authenticated", False):
+            from conversations.selectors import unread_total_for
+
+            unread_messages = unread_total_for(user)
+        else:
+            # Anonymous visitors get the login page when they tap Messages anyway.
+            unread_messages = 0
+        request._unread_messages_cache = unread_messages
+
     return {
         "current_emirate": emirate,
         "active_emirates": active_emirates,
         "show_emirate_switcher": len(active_emirates) > 1,
+        "unread_messages": unread_messages,
         "site_name": "ManzilCart",
         "marketplace_per_page": settings.LISTINGS_PER_PAGE,
     }

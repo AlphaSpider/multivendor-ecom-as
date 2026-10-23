@@ -163,6 +163,63 @@ class ConversationHTTPTests(TestCase):
         message.refresh_from_db()
         self.assertIsNotNone(message.read_at)
 
+    def test_chat_messages_do_not_leak_into_flash_alerts(self):
+        """
+        Regression: the detail view once shadowed the ``messages`` context key,
+        so base.html rendered every chat row's ``__str__`` as a flash alert.
+        """
+        conversation = Conversation.objects.create(
+            listing=self.listing,
+            buyer=self.buyer,
+            seller=self.seller,
+            emirate=self.emirate,
+        )
+        Message.objects.create(
+            conversation=conversation, sender=self.buyer, body="Is it still available?"
+        )
+
+        self.client.force_login(self.buyer)
+        response = self.client.get(
+            reverse("conversations:detail", args=[conversation.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "in conversation")
+        self.assertContains(response, "Is it still available?")
+        self.assertFalse(list(response.context["messages"]))
+
+    def test_unread_messages_badge_shows_on_shared_nav_and_clears(self):
+        conversation = Conversation.objects.create(
+            listing=self.listing,
+            buyer=self.buyer,
+            seller=self.seller,
+            emirate=self.emirate,
+        )
+        Message.objects.create(
+            conversation=conversation, sender=self.buyer, body="Is it still available?"
+        )
+
+        home_url = reverse(
+            "marketplace:home", kwargs={"emirate_slug": self.emirate.slug}
+        )
+
+        # Anonymous visitors see no badge (the Messages tab leads to sign-in).
+        response = self.client.get(home_url)
+        self.assertNotContains(response, "tab-badge")
+
+        # The sender has nothing unread from themselves; the recipient does.
+        self.client.force_login(self.buyer)
+        self.assertNotContains(self.client.get(home_url), "tab-badge")
+
+        self.client.force_login(self.seller)
+        response = self.client.get(home_url)
+        self.assertContains(response, "tab-badge")
+        self.assertContains(response, ">1<")
+
+        # Opening the thread marks the message read, so the badge disappears.
+        self.client.get(reverse("conversations:detail", args=[conversation.pk]))
+        self.assertNotContains(self.client.get(home_url), "tab-badge")
+
     def test_empty_message_is_not_persisted(self):
         conversation = Conversation.objects.create(
             listing=self.listing,
@@ -249,12 +306,12 @@ class ConversationHTTPTests(TestCase):
 
         self.client.force_login(self.buyer)
         first = self.client.get(reverse("conversations:detail", args=[conversation.pk]))
-        self.assertEqual(len(first.context["messages"]), settings.MESSAGES_PER_PAGE)
+        self.assertEqual(len(first.context["chat_messages"]), settings.MESSAGES_PER_PAGE)
 
         second = self.client.get(
             reverse("conversations:detail", args=[conversation.pk]) + "?page=2"
         )
-        self.assertEqual(len(second.context["messages"]), 5)
+        self.assertEqual(len(second.context["chat_messages"]), 5)
 
 
 class ConversationWebSocketTests(TransactionTestCase):

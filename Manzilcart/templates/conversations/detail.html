@@ -259,7 +259,7 @@
         data-user-id="{{ user.pk }}"
         data-message-length="{{ max_message_length }}"
       >
-        {% for message in messages %}
+        {% for message in chat_messages %}
           <li
             class="chat-bubble{% if message.sender_id == user.pk %} is-mine{% else %} is-theirs{% endif %}"
             id="message-{{ message.pk }}"

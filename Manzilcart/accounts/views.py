@@ -282,7 +282,7 @@ class LogoutView(View):
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
-    """Member home: their marketplace, activity summaries and quick links."""
+    """Member home: identity, activity counts and quick selling actions."""
 
     template_name = "accounts/dashboard.html"
     login_url = "accounts:login"
@@ -299,6 +299,43 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 "auction_marketplace:create",
                 kwargs={"emirate_slug": emirate.slug},
             )
+            context["listing_create_url"] = reverse(
+                "catalog:listing_create",
+                kwargs={"emirate_slug": emirate.slug},
+            )
+
+        display = (user.display_name or "").split()
+        if display:
+            context["initials"] = "".join(word[0] for word in display[:2]).upper()
+
+        # Activity counts. Two-way stats need the union of both roles, so they are
+        # summed; every query is a cheap indexed count scoped to one member.
+        context["listings_count"] = user.listings.count()
+        context["auctions_count"] = user.auctions.count() + user.bids.count()
+        context["conversations_count"] = (
+            user.buying_conversations.count() + user.selling_conversations.count()
+        )
+        context["deals_count"] = user.purchases.count() + user.sales.count()
+        return context
+
+
+class SettingsView(LoginRequiredMixin, TemplateView):
+    """
+    Account settings: interface language, appearance, browsing marketplace and
+    sign-out. Verified details (name, email, area) remain on the profile page;
+    this page only offers choices that need no verification.
+    """
+
+    template_name = "accounts/settings.html"
+    login_url = "accounts:login"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["member"] = self.request.user
+        context["emirate"] = self.request.user.emirate or getattr(
+            self.request, "emirate", None
+        )
+        context["service_area"] = self.request.user.service_area
         return context
 
 

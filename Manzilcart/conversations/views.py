@@ -81,7 +81,11 @@ class ConversationDetailView(LoginRequiredMixin, TemplateView):
                 "item": conversation,
                 "listing": conversation.listing,
                 "other": conversation.other_participant(user),
-                "messages": page_messages,
+                # Named "chat_messages" deliberately: the contrib-messages context
+                # processor also injects "messages" into every template, and
+                # shadowing that name makes base.html render each chat row's
+                # __str__ as a flash alert.
+                "chat_messages": page_messages,
                 "page_obj": page_obj,
                 "is_seller": is_seller,
                 "max_message_length": settings.CHAT_MESSAGE_MAX_LENGTH,

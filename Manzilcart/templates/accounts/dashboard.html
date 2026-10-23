@@ -1,69 +1,95 @@
 {% extends "base.html" %}
-{% load humanize %}
 
 {% block title %}My account — ManzilCart{% endblock %}
 
 {% block content %}
 <section class="container section">
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow" data-i18n="nav_my_account">My account</p>
-      <h1>{{ member.short_name }}</h1>
-      <p class="muted">
-        {% if service_area %}<span data-area-name="{{ service_area.name }}">{{ service_area.name }}</span>, <span data-emirate-name="{{ member.emirate.name }}">{{ member.emirate.name }}</span>{% else %}No marketplace set{% endif %}
-        · {{ member.phone }}
-      </p>
+  <div class="account-header">
+    <div class="account-identity">
+      {% if initials %}
+        <span class="account-avatar" aria-hidden="true">{{ initials }}</span>
+      {% else %}
+        <span class="account-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-5.5 8-5.5s8 2.2 8 5.5"/>
+          </svg>
+        </span>
+      {% endif %}
+      <div>
+        <h1>{{ member.short_name }}</h1>
+        <p class="muted account-meta">
+          {{ member.phone }}
+          {% if member.is_mobile_verified %}<span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}
+          <span class="account-meta-sep" aria-hidden="true">·</span>
+          {% if service_area %}<span data-area-name="{{ service_area.name }}">{{ service_area.name }}</span>, <span data-emirate-name="{{ member.emirate.name }}">{{ member.emirate.name }}</span>{% else %}<span data-i18n="no_marketplace_set">No marketplace set</span>{% endif %}
+        </p>
+        <p class="muted small" data-i18n="member_since">Member since</p>
+        <p class="muted small">{{ member.date_joined|date:"j F Y" }}</p>
+      </div>
     </div>
-    <a class="btn btn-quiet" href="{% url 'accounts:profile' %}" data-i18n="edit_profile">Edit profile</a>
+    <div class="account-actions">
+      <a class="btn btn-quiet" href="{% url 'accounts:settings' %}" data-i18n="account_settings">Settings</a>
+      <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-quiet" data-i18n="nav_sign_out">Sign out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="account-stats">
+    <a class="account-stat" href="{% url 'accounts:listings' %}">
+      <strong>{{ listings_count }}</strong>
+      <span data-i18n="my_listings">My listings</span>
+    </a>
+    <a class="account-stat" href="{% url 'auctions:mine' %}">
+      <strong>{{ auctions_count }}</strong>
+      <span data-i18n="my_auctions">My auctions</span>
+    </a>
+    <a class="account-stat" href="{% url 'conversations:list' %}">
+      <strong>{{ conversations_count }}</strong>
+      <span data-i18n="conversations_title">Conversations</span>
+    </a>
+    <a class="account-stat" href="{% url 'deals:list' %}">
+      <strong>{{ deals_count }}</strong>
+      <span data-i18n="deals_title">Offers and deals</span>
+    </a>
   </div>
 
   <div class="dashboard-grid">
+    {% if listing_create_url %}
+      <a class="dashboard-tile" href="{{ listing_create_url }}">
+        <span class="tile-eyebrow" data-i18n="selling_label">Selling</span>
+        <strong data-i18n="create_listing">Create listing</strong>
+        <span class="muted" data-i18n="create_listing_desc">List an item with photos and a price.</span>
+      </a>
+    {% endif %}
+
+    {% if auction_create_url %}
+      <a class="dashboard-tile" href="{{ auction_create_url }}">
+        <span class="tile-eyebrow" data-i18n="nav_auctions">Auctions</span>
+        <strong data-i18n="create_auction">Create auction</strong>
+        <span class="muted">List a standalone item with photos, a schedule and a starting price.</span>
+      </a>
+    {% endif %}
+
     <a class="dashboard-tile" href="{% if emirate %}{% url 'marketplace:home' emirate_slug=emirate.slug %}{% else %}{% url 'locations:landing' %}{% endif %}">
       <span class="tile-eyebrow" data-i18n="marketplace_label">Marketplace</span>
       <strong data-i18n="browse_listings">Browse listings</strong>
       <span class="muted" data-i18n="browse_listings_desc">See what is new in your emirate.</span>
     </a>
-
-    <a class="dashboard-tile" href="{% url 'accounts:listings' %}">
-      <span class="tile-eyebrow" data-i18n="selling_label">Selling</span>
-      <strong data-i18n="my_listings">My listings</strong>
-      <span class="muted" data-i18n="my_listings_desc">Drafts, reviews and items you have sold.</span>
-    </a>
-
-    {% if auction_create_url %}
-      <a class="dashboard-tile" href="{{ auction_create_url }}">
-        <span class="tile-eyebrow" data-i18n="nav_auctions">Auctions</span>
-        <strong>Create auction</strong>
-        <span class="muted">List a standalone item with photos, a schedule and a starting price.</span>
-      </a>
-    {% endif %}
-
-    <a class="dashboard-tile" href="{% url 'conversations:list' %}">
-      <span class="tile-eyebrow" data-i18n="nav_messages">Messages</span>
-      <strong data-i18n="conversations_title">Conversations</strong>
-      <span class="muted" data-i18n="conversations_desc">Chat with buyers and sellers.</span>
-    </a>
-
-    <a class="dashboard-tile" href="{% url 'deals:list' %}">
-      <span class="tile-eyebrow" data-i18n="nav_deals">Deals</span>
-      <strong data-i18n="deals_title">Offers and deals</strong>
-      <span class="muted" data-i18n="deals_desc">Track negotiations and accepted deals.</span>
-    </a>
-
-    <a class="dashboard-tile" href="{% url 'auctions:mine' %}">
-      <span class="tile-eyebrow" data-i18n="nav_auctions">Auctions</span>
-      <strong data-i18n="my_auctions">My auctions</strong>
-      <span class="muted" data-i18n="my_auctions_desc">Bids you placed and items you are auctioning.</span>
-    </a>
   </div>
 
   <div class="panel">
-    <h2 data-i18n="account_status">Account status</h2>
+    <h2 data-i18n="account_details">Account details</h2>
     <dl class="detail-list">
       <div><dt data-i18n="mobile_number">Mobile number</dt><dd>{{ member.phone }}{% if member.is_mobile_verified %} <span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}</dd></div>
       <div><dt data-i18n="email_label">Email</dt><dd>{% if member.email %}{{ member.email }}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
       <div><dt data-i18n="member_since">Member since</dt><dd>{{ member.date_joined|date:"j F Y" }}</dd></div>
     </dl>
+    <div class="form-actions">
+      <a class="btn btn-primary" href="{% url 'accounts:profile' %}" data-i18n="edit_profile">Edit profile</a>
+      <a class="btn btn-quiet" href="{% url 'accounts:settings' %}" data-i18n="account_settings">Settings</a>
+    </div>
   </div>
 </section>
 {% endblock %}

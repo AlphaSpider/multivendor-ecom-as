@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — ManzilCart{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow" data-i18n="nav_my_account">My account</p>
+      <h1 data-i18n="account_settings">Settings</h1>
+      <p class="muted" data-i18n="settings_desc">Choose how ManzilCart looks and which marketplace you browse.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 data-i18n="settings_preferences">Preferences</h2>
+
+    <div class="settings-row">
+      <div class="settings-row-detail">
+        <h3 class="settings-label" data-i18n="settings_language">Language</h3>
+        <p class="muted small" data-i18n="settings_language_desc">Switch the interface between English and Arabic.</p>
+      </div>
+      <div class="choice-group" role="group" aria-label="Language">
+        <button type="button" class="choice-btn" data-lang-choice="en" data-i18n-skip>English</button>
+        <button type="button" class="choice-btn" data-lang-choice="ar" data-i18n-skip>العربية</button>
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-row-detail">
+        <h3 class="settings-label" data-i18n="settings_appearance">Appearance</h3>
+        <p class="muted small" data-i18n="settings_appearance_desc">Choose light or dark mode for this device.</p>
+      </div>
+      <div class="choice-group" role="group" aria-label="Appearance">
+        <button type="button" class="choice-btn" data-theme-choice="light" data-i18n="settings_light">Light</button>
+        <button type="button" class="choice-btn" data-theme-choice="dark" data-i18n="settings_dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 data-i18n="settings_marketplace">Marketplace</h2>
+    <form method="post" action="{% url 'locations:switch_marketplace' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <div class="settings-row settings-row-top">
+        <div class="settings-row-detail">
+          <label class="settings-label" for="settings-emirate" data-i18n="settings_browsing_marketplace">Browsing marketplace</label>
+          <p class="muted small" data-i18n="settings_marketplace_desc">Change which marketplace you browse. Your profile area is set on the profile page.</p>
+        </div>
+        {% if active_emirates|length > 1 %}
+          <div class="settings-row-detail settings-field">
+            <select id="settings-emirate" name="emirate" class="input">
+              {% for option in active_emirates %}
+                <option value="{{ option.slug }}" data-emirate-name="{{ option.name }}" {% if current_emirate and current_emirate.slug == option.slug %}selected{% endif %}>{{ option.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% else %}
+          <input type="hidden" name="emirate" value="{% for option in active_emirates %}{{ option.slug }}{% endfor %}">
+          <p class="muted small">{% for option in active_emirates %}<span data-emirate-name="{{ option.name }}">{{ option.name }}</span>{% endfor %}</p>
+        {% endif %}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" data-i18n="settings_save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 data-i18n="settings_account">Account</h2>
+    <dl class="detail-list">
+      <div><dt data-i18n="display_name">Display name</dt><dd>{% if member.display_name %}{{ member.display_name }}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
+      <div><dt data-i18n="mobile_number">Mobile number</dt><dd>{{ member.phone }}{% if member.is_mobile_verified %} <span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}</dd></div>
+      <div><dt data-i18n="email_label">Email</dt><dd>{% if member.email %}{{ member.email }}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
+      <div><dt data-i18n="member_since">Member since</dt><dd>{{ member.date_joined|date:"j F Y" }}</dd></div>
+      <div><dt data-i18n="settings_area">Area</dt><dd>{% if service_area %}<span data-area-name="{{ service_area.name }}">{{ service_area.name }}</span>, <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span>{% else %}<span data-i18n="no_marketplace_set">No marketplace set</span>{% endif %}</dd></div>
+    </dl>
+    <div class="form-actions">
+      <a class="btn btn-primary" href="{% url 'accounts:profile' %}" data-i18n="edit_profile">Edit profile</a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 data-i18n="settings_session">Session</h2>
+    <p class="muted small" data-i18n="settings_session_desc">Sign out of this device. Your listings and messages stay safe.</p>
+    <form method="post" action="{% url 'accounts:logout' %}" novalidate>
+      {% csrf_token %}
+      <button class="btn btn-quiet" type="submit" data-i18n="nav_sign_out">Sign out</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

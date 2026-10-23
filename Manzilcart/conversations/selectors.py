@@ -32,6 +32,25 @@ def conversations_for(user):
     )
 
 
+def unread_total_for(user) -> int:
+    """
+    Total unread messages for ``user`` across every thread they participate in.
+
+    Same definition as the per-thread ``unread_count`` annotation: a message the
+    other side sent and that has no ``read_at`` yet.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return 0
+    return (
+        Message.objects.filter(
+            Q(conversation__buyer=user) | Q(conversation__seller=user),
+            read_at__isnull=True,
+        )
+        .exclude(sender=user)
+        .count()
+    )
+
+
 def conversation_for_participant(pk: int, user) -> Conversation | None:
     """
     Fetch a conversation only if ``user`` is one of its two participants.

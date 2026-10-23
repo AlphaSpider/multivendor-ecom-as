@@ -438,7 +438,35 @@ var uiPhrases = {
   "you": "أنت",
   "Member": "عضو",
   "just now": "الآن",
-  "yesterday": "أمس"
+  "yesterday": "أمس",
+  "Settings": "الإعدادات",
+  "Account settings": "الإعدادات",
+  "Account details": "تفاصيل الحساب",
+  "Choose how ManzilCart looks and which marketplace you browse.": "اختر مظهر المنصة والمتجر الذي تتصفحه.",
+  "Preferences": "التفضيلات",
+  "Language": "اللغة",
+  "Switch the interface between English and Arabic.": "تبديل واجهة المنصة بين الإنجليزية والعربية.",
+  "Appearance": "المظهر",
+  "Choose light or dark mode for this device.": "اختر الوضع الفاتح أو الغامق لهذا الجهاز.",
+  "Light": "فاتح",
+  "Dark": "غامق",
+  "Browsing marketplace": "المتجر الذي تتصفحه",
+  "Change which marketplace you browse. Your profile area is set on the profile page.": "غيّر المتجر الذي تتصفحه. منطقتك تُحدَّد في صفحة الملف الشخصي.",
+  "Sign out of this device. Your listings and messages stay safe.": "اخرج من هذا الجهاز. إعلاناتك ورسائلك تبقى محفوظة.",
+  "Save": "حفظ",
+  "Account": "الحساب",
+  "Area": "المنطقة",
+  "Area": "المنطقة",
+  "No marketplace set": "لم يتم تحديد منطقة بعد",
+  "Member since": "عضو منذ",
+  "Mobile number": "رقم الهاتف المتحرك",
+  "Email": "البريد الإلكتروني",
+  "Not provided": "غير مُدخل",
+  "My listings": "إعلاناتي",
+  "Offers and deals": "العروض والصفقات",
+  "Create listing": "إنشاء إعلان",
+  "List an item with photos and a price.": "اعرض قطعة بصور وسعر.",
+  "Conversations": "المحادثات"
 };
 
 
@@ -766,6 +794,38 @@ var uiPhrases = {
       applyLanguage(nextLang);
     });
   }
+
+  // --- Account settings: explicit language / appearance choices ------------
+  function syncSettingsChoices() {
+    var activeLang = document.documentElement.getAttribute("lang") || "en";
+    var activeTheme = document.documentElement.getAttribute("data-theme") || "light";
+    document.querySelectorAll("[data-lang-choice]").forEach(function (btn) {
+      var selected = btn.getAttribute("data-lang-choice") === activeLang;
+      btn.setAttribute("aria-pressed", selected ? "true" : "false");
+      btn.classList.toggle("is-selected", selected);
+    });
+    document.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
+      var selected = btn.getAttribute("data-theme-choice") === activeTheme;
+      btn.setAttribute("aria-pressed", selected ? "true" : "false");
+      btn.classList.toggle("is-selected", selected);
+    });
+  }
+
+  document.querySelectorAll("[data-lang-choice]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      applyLanguage(btn.getAttribute("data-lang-choice") === "ar" ? "ar" : "en");
+      syncSettingsChoices();
+    });
+  });
+
+  document.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      applyTheme(btn.getAttribute("data-theme-choice") === "dark" ? "dark" : "light");
+      syncSettingsChoices();
+    });
+  });
+
+  syncSettingsChoices();
 
 
 
