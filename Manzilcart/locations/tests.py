@@ -116,6 +116,8 @@ class LandingTests(LocationTestBase):
         self.assertNotContains(response, 'data-i18n="nav_browse"')
         self.assertNotContains(response, 'data-i18n="nav_auctions"')
         self.assertNotContains(response, 'class="marketplace-chip"')
+        self.assertNotContains(response, 'class="mobile-tabbar"')
+        self.assertNotContains(response, 'class="mobile-fab"')
 
     def test_landing_marks_non_abudhabi_emirates_as_coming_soon_with_popup_modal(self):
         response = self.client.get(reverse("locations:landing"))
@@ -165,6 +167,18 @@ class MarketplaceHomeTests(LocationTestBase):
         response = self.client.get("/sharjah/")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_marketplace_home_includes_mobile_navigation_and_category_toggle(self):
+        response = self.client.get(
+            reverse("marketplace:home", kwargs={"emirate_slug": "abu-dhabi"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="mobile-tabbar"')
+        self.assertContains(response, 'class="mobile-fab"')
+        self.assertContains(response, "data-category-toggle")
+        self.assertContains(response, "has-mobile-tabbar")
+        self.assertContains(response, "Show categories")
 
     def test_marketplace_home_only_offers_active_areas(self):
         self.set_active(self.area, False)

@@ -4,6 +4,10 @@
 {% block title %}{{ emirate.name }} furniture marketplace — ManzilCart{% endblock %}
 {% block meta_description %}Browse pre-owned furniture for sale in {{ emirate.name }}.{% endblock %}
 
+{% block extra_head %}
+<script>document.documentElement.classList.add("js");</script>
+{% endblock %}
+
 {% block content %}
 <section class="hero hero-market">
   <div class="container hero-inner">
@@ -32,13 +36,22 @@
   </div>
 
   {% if categories %}
-    <div class="category-grid">
-      {% for category in categories %}
-        <a class="category-card" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ category.slug }}">
-          <span class="category-name">{{ category.name }}</span>
-          <span class="category-count">{{ category.listing_count|default:0 }} listing{{ category.listing_count|default:0|pluralize }}</span>
-        </a>
-      {% endfor %}
+    <div class="category-panel" id="category-panel">
+      <button class="category-toggle" type="button" aria-expanded="false" aria-controls="category-grid" data-category-toggle>
+        <span data-category-toggle-label data-i18n-skip>Show categories</span>
+        <svg class="category-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      <div class="category-grid" id="category-grid">
+        {% for category in categories %}
+          <a class="category-card" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ category.slug }}">
+            <span class="category-name">{{ category.name }}</span>
+            <span class="category-count">{{ category.listing_count|default:0 }} listing{{ category.listing_count|default:0|pluralize }}</span>
+          </a>
+        {% endfor %}
+      </div>
     </div>
   {% else %}
     <div class="empty-state compact">

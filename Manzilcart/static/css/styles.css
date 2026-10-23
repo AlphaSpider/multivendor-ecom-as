@@ -188,6 +188,11 @@ a:hover { color: var(--brand-strong); }
   padding-block: 0.6rem;
 }
 
+/* Wrappers only group the header for the mobile layout; on desktop their
+   children participate directly in the header flex row. */
+.header-bar,
+.header-meta { display: contents; }
+
 .site-header-landing .header-inner-landing {
   position: relative;
   justify-content: center;
@@ -776,6 +781,31 @@ a:hover { color: var(--brand-strong); }
 
 .category-name { font-weight: 650; }
 .category-count { font-size: 0.8rem; color: var(--muted); }
+
+.category-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  text-align: start;
+  cursor: pointer;
+}
+
+.category-toggle-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.category-panel.is-open .category-toggle-chevron { transform: rotate(180deg); }
 
 /* --------------------------------------------------------------------------
    Listing Cards
@@ -2058,8 +2088,110 @@ select.input { appearance: auto; }
 }
 
 /* --------------------------------------------------------------------------
-   Responsive
+   Mobile Tab Bar & Compose FAB
    -------------------------------------------------------------------------- */
+
+.mobile-tabbar,
+.mobile-fab { display: none; }
+
+@media (max-width: 760px) {
+  body.has-mobile-tabbar {
+    padding-bottom: calc(60px + 0.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .has-mobile-tabbar .mobile-tabbar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.15rem;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding: 0.35rem 0.4rem env(safe-area-inset-bottom, 0px);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="dark"] .has-mobile-tabbar .mobile-tabbar {
+    background: #09090b;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.15rem 0.1rem;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-tab svg { width: 22px; height: 22px; flex: none; }
+
+  .mobile-tab span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-tab.is-active { color: var(--brand); }
+  .mobile-tab.is-active svg { stroke-width: 2.4; }
+  .mobile-tab:hover { color: var(--brand); }
+
+  .has-mobile-tabbar .mobile-fab {
+    position: fixed;
+    left: 50%;
+    bottom: calc(60px + 1rem + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 51;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #ffffff;
+    box-shadow: 0 10px 24px rgba(220, 38, 38, 0.45);
+    text-decoration: none;
+  }
+
+  .has-mobile-tabbar .mobile-fab:hover {
+    background: var(--brand-strong);
+    color: #ffffff;
+    transform: translateX(-50%) translateY(-2px);
+  }
+
+  .mobile-fab svg { width: 26px; height: 26px; }
+
+  /* Auth screens are focused flows: no persistent bar or compose button. */
+  body.auth-page.has-mobile-tabbar {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  body.auth-page .mobile-tabbar,
+  body.auth-page .mobile-fab { display: none; }
+
+  /* Categories start collapsed on the home page, but only when JS can expand them. */
+  html.js .category-toggle { display: flex; }
+  html.js .category-panel .category-grid { display: none; }
+  html.js .category-panel.is-open .category-grid {
+    display: grid;
+    margin-top: 0.75rem;
+  }
+}
 
 @media (max-width: 900px) {
   .auth-layout { grid-template-columns: 1fr; }
@@ -2069,9 +2201,43 @@ select.input { appearance: auto; }
 }
 
 @media (max-width: 760px) {
-  .nav-toggle { display: inline-block; order: -1; }
+  /* Mobile header: hamburger left, logo centered, then emirate + controls. */
+  .header-inner { row-gap: 0.55rem; }
 
-  .header-controls { order: 3; }
+  .header-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  /* Reserve the same space as the hamburger so the logo is truly centered. */
+  .header-bar:has(.nav-toggle)::after {
+    content: "";
+    flex: none;
+    width: 42px;
+  }
+
+  .brand {
+    flex: 1 1 auto;
+    justify-content: center;
+    margin-inline: 0;
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    width: 100%;
+  }
+
+  .header-meta .header-controls {
+    order: 0;
+    margin-inline-start: auto;
+  }
+
+  .nav-toggle { display: inline-block; order: -1; }
 
   .main-nav {
     display: none;
@@ -2090,7 +2256,20 @@ select.input { appearance: auto; }
 
   .main-nav.is-open { display: flex; }
 
-  .marketplace-chip { order: 2; }
+  .marketplace-chip {
+    order: 0;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .switcher-form {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .switcher-form select { max-width: 100%; }
+
   .chip-name { display: none; }
 
   .search-bar {
