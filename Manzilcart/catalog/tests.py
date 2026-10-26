@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 import uuid
 from decimal import Decimal
+from io import BytesIO
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image as PILImage
 
-from catalog.models import Category, Listing
+from catalog.models import Category, Listing, ListingImage
 from locations.models import Emirate, ServiceArea
 
 User = get_user_model()
+
+
+def make_image_file(name="photo.png"):
+    """A small valid upload, as Pillow-encoded bytes wrapped for the test client."""
+    buffer = BytesIO()
+    PILImage.new("RGB", (300, 300), (200, 120, 80)).save(buffer, format="PNG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
 
 class CatalogTestCase(TestCase):
@@ -112,6 +125,11 @@ class CatalogTestCase(TestCase):
             service_area=self.ad_area,
             status=Listing.Status.DRAFT,
         )
+        # Moderation requires the minimum photo set before a draft can go live.
+        for index in range(settings.MIN_IMAGES_PER_LISTING):
+            ListingImage.objects.create(
+                listing=draft, image=make_image_file(f"photo-{index}.png")
+            )
         self.client.force_login(self.seller)
 
         response = self.client.post(
@@ -126,9 +144,105 @@ class CatalogTestCase(TestCase):
         self.assertEqual(draft.status, Listing.Status.PENDING)
         self.assertIsNotNone(draft.submitted_at)
 
+    def test_submission_requires_the_minimum_photo_count(self):
+        draft = Listing.objects.create(
+            seller=self.seller,
+            title="Under-photographed shelf",
+            slug=f"under-photographed-{uuid.uuid4().hex[:6]}",
+            description="Needs a review.",
+            category=self.category,
+            condition=Listing.Condition.FAIR,
+            asking_price=Decimal("90.00"),
+            emirate=self.abu_dhabi,
+            service_area=self.ad_area,
+            status=Listing.Status.DRAFT,
+        )
+        for index in range(settings.MIN_IMAGES_PER_LISTING - 1):
+            ListingImage.objects.create(
+                listing=draft, image=make_image_file(f"photo-{index}.png")
+            )
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            reverse(
+                "catalog:listing_action",
+                kwargs={"emirate_slug": "abu-dhabi", "slug": draft.slug},
+            ),
+            {"action": "submit"},
+            follow=True,
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, Listing.Status.DRAFT)
+        self.assertContains(
+            response,
+            f"Add at least {settings.MIN_IMAGES_PER_LISTING} photos",
+        )
+
     def test_marketplace_home_renders_with_catalog_links(self):
         response = self.client.get(
             reverse("marketplace:home", kwargs={"emirate_slug": "abu-dhabi"})
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"/abu-dhabi/listings/")
+
+
+class ListingPhotoMinimumTests(CatalogTestCase):
+    """The create form requires ``MIN_IMAGES_PER_LISTING`` photos, like auctions."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def _create_url(self):
+        return reverse("catalog:listing_create", kwargs={"emirate_slug": "abu-dhabi"})
+
+    def _data(self, file_names):
+        return {
+            "title": "Photo count chair",
+            "description": "A solid, comfortable chair in daily use.",
+            "category": str(self.category.pk),
+            "condition": Listing.Condition.GOOD,
+            "asking_price": "100",
+            "service_area": str(self.ad_area.pk),
+            "images": [make_image_file(name) for name in file_names],
+        }
+
+    def test_create_rejects_fewer_than_the_minimum_photos(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            self._create_url(),
+            self._data(["front.png", "side.png"]),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response,
+            f"at least {settings.MIN_IMAGES_PER_LISTING} photos",
+            status_code=400,
+        )
+        self.assertFalse(Listing.objects.filter(title="Photo count chair").exists())
+
+    def test_create_accepts_exactly_the_minimum_photos(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            self._create_url(),
+            self._data(["front.png", "side.png", "leg.png"]),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        listing = Listing.objects.get(title="Photo count chair")
+        self.assertEqual(listing.images.count(), settings.MIN_IMAGES_PER_LISTING)
+        self.assertEqual(listing.status, Listing.Status.PENDING)

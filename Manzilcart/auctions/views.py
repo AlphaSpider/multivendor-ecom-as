@@ -275,8 +275,12 @@ class AuctionCreateView(
         if not form.is_valid():
             return render(request, self.template_name, self._context(form), status=400)
 
-        if not images:
-            form.add_error("images", "Please add at least one photo of the item.")
+        if len(images) < settings.MIN_IMAGES_PER_LISTING:
+            form.add_error(
+                "images",
+                f"Please add at least {settings.MIN_IMAGES_PER_LISTING} photos of the "
+                "item so bidders can judge its condition.",
+            )
         for error in _validate_uploads(images):
             form.add_error("images", error)
 
@@ -377,7 +381,15 @@ class AuctionUpdateView(LoginRequiredMixin, EmirateRequiredMixin, View):
                 request, self.template_name, self._context(form, auction), status=400
             )
 
-        if not auction.images.exists() and not images:
+        total_photos = auction.images.count() + len(images)
+        if submit_for_review:
+            if total_photos < settings.MIN_IMAGES_PER_LISTING:
+                form.add_error(
+                    "images",
+                    f"Please add at least {settings.MIN_IMAGES_PER_LISTING} photos "
+                    "before submitting for review.",
+                )
+        elif not auction.images.exists() and not images:
             form.add_error("images", "Please add at least one photo of the item.")
         for error in _validate_uploads(images):
             form.add_error("images", error)

@@ -252,6 +252,13 @@ def transition_listing(
 
 
 def submit_for_review(listing: Listing, *, actor, request=None) -> Listing:
+    # Photos are how buyers judge condition: never let an under-photographed item
+    # reach moderation through a path that skipped the form-level check.
+    if listing.images.count() < settings.MIN_IMAGES_PER_LISTING:
+        raise StateTransitionError(
+            f"Add at least {settings.MIN_IMAGES_PER_LISTING} photos before submitting "
+            "for review."
+        )
     return transition_listing(
         listing, S.PENDING, actor=actor, request=request
     )

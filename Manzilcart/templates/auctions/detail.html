@@ -25,7 +25,7 @@
         <span data-category-name>{{ auction.category.name }}</span> ·
         <span data-area-name>{{ auction.service_area.name }}</span>,
         <span data-emirate-name>{{ auction.emirate.name }}</span>
-        · <span data-condition>{{ auction.get_condition_display }}</span>
+        · <span class="badge" data-condition="{{ auction.condition }}">{{ auction.get_condition_display }}</span>
         {% if is_seller %} · <span data-i18n="auction_you_are_seller">You are the seller</span>{% endif %}
       </p>
     </div>
@@ -347,7 +347,7 @@
 
     <aside class="panel auction-sidebar">
       <h2>{{ auction.title }}</h2>
-      <p class="muted small" data-condition>{{ auction.get_condition_display }}</p>
+      <p><span class="badge" data-condition="{{ auction.condition }}">{{ auction.get_condition_display }}</span></p>
 
       <h2 data-i18n="auction_heading">Auction</h2>
       <dl class="detail-list">

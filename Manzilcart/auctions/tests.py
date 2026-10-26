@@ -793,6 +793,97 @@ class AuctionImageTests(AuctionTestBase):
         )
 
 
+class AuctionPhotoMinimumTests(AuctionTestBase):
+    """Create/edit views must enforce the minimum photo count like fixed-price listings."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def _upload(self, name):
+        buffer = BytesIO()
+        PILImage.new("RGB", (300, 300), (180, 160, 140)).save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+    def _data(self, names):
+        now = timezone.localtime(timezone.now())
+        return {
+            "title": "Photo count sofa",
+            "description": "A neat sofa, photographed from every important angle.",
+            "category": str(self.category.pk),
+            "condition": Auction.Condition.GOOD,
+            "service_area": str(self.area.pk),
+            "start_at": (now + timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M"),
+            "end_at": (now + timedelta(days=3)).strftime("%Y-%m-%d %H:%M"),
+            "reserve_price": "100",
+            "agree_fallback": "on",
+            "action": "submit",
+            "images": [self._upload(name) for name in names],
+        }
+
+    def test_create_rejects_fewer_than_the_minimum_photos(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            self.create_url(),
+            self._data(["front.png", "side.png"]),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response, f"at least {settings.MIN_IMAGES_PER_LISTING} photos", status_code=400
+        )
+        self.assertFalse(Auction.objects.filter(title="Photo count sofa").exists())
+
+    def test_create_accepts_exactly_the_minimum_photos(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            self.create_url(),
+            self._data(["front.png", "side.png", "base.png"]),
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        auction = Auction.objects.exclude(title="Leather sofa").get()
+        self.assertEqual(
+            auction.images.count(), settings.MIN_IMAGES_PER_LISTING
+        )
+
+    def test_submitting_an_edit_with_too_few_photos_is_blocked(self):
+        # A draft with an old, swallowed-to-one-photo history from before the rule.
+        auction = self.create_auction(
+            start_delta=timedelta(hours=2), submit_for_review=False
+        )
+        AuctionImage.objects.create(auction=auction, image=self._upload("front.png"))
+        self.client.force_login(self.seller)
+
+        edit_url = reverse(
+            "auction_marketplace:edit",
+            kwargs={"emirate_slug": self.emirate.slug, "pk": auction.pk},
+        )
+        response = self.client.post(
+            edit_url, self._data(["side.png"]), format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(
+            response, "before submitting for review", status_code=400
+        )
+        auction.refresh_from_db()
+        self.assertEqual(auction.images.count(), 1)
+
+
 class AuditCommandTests(AuctionTestBase):
     def test_dry_run_is_read_only_and_reports_schema(self):
         self.make_approved()

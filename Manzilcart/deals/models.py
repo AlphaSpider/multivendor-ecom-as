@@ -204,6 +204,12 @@ class Deal(TimeStampedModel):
         return self.auction.get_condition_display() if self.auction_id else ""
 
     @property
+    def item_condition(self) -> str:
+        if self.listing_id:
+            return self.listing.condition
+        return self.auction.condition if self.auction_id else ""
+
+    @property
     def cover_image(self):
         if self.listing_id:
             return self.listing.cover_image

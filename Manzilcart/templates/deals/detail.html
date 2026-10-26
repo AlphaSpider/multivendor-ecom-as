@@ -276,7 +276,7 @@
           <img class="deal-sidebar-image" src="{{ cover.image.url }}" alt="" loading="lazy">
         {% endif %}
       {% endwith %}
-      <p class="muted small">{{ deal.item_category.name }} · {{ deal.condition_display }}</p>
+      <p class="muted small">{{ deal.item_category.name }} · <span class="badge" data-condition="{{ deal.item_condition }}">{{ deal.condition_display }}</span></p>
       {% if deal.item_url %}
         <a class="btn btn-quiet btn-small" href="{{ deal.item_url }}">View {{ deal.item_kind }}</a>
       {% endif %}

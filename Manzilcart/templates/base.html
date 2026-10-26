@@ -27,7 +27,7 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
-  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.10">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.13">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}{% if current_emirate and request.resolver_match.namespace != 'locations' %} has-mobile-tabbar{% endif %}">

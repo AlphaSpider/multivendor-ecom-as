@@ -193,8 +193,12 @@ class ListingCreateView(LoginRequiredMixin, SellerEligibleMixin, EmirateRequired
 
         # Validate uploads *before* creating the listing so a bad photo cannot leave an
         # orphan listing (and a consumed slug) behind.
-        if not images:
-            form.add_error("images", "Please add at least one photo of the item.")
+        if len(images) < settings.MIN_IMAGES_PER_LISTING:
+            form.add_error(
+                "images",
+                f"Please add at least {settings.MIN_IMAGES_PER_LISTING} photos of the "
+                "item so buyers can judge its condition.",
+            )
         else:
             for index, uploaded in enumerate(images, start=1):
                 try:
@@ -272,6 +276,25 @@ class ListingUpdateView(LoginRequiredMixin, EmirateRequiredMixin, View):
         form = ListingForm(request.POST, request.FILES, instance=listing, emirate=self.emirate)
 
         if not form.is_valid():
+            return render(
+                request,
+                self.template_name,
+                {"emirate": self.emirate, "form": form, "listing": listing, "mode": "edit"},
+                status=400,
+            )
+
+        # An edited draft can keep fewer photos until it is submitted; anything that
+        # goes (back) to moderation needs the full set.
+        total_photos = listing.images.count() + len(request.FILES.getlist("images"))
+        if (
+            listing.status != Listing.Status.DRAFT
+            and total_photos < settings.MIN_IMAGES_PER_LISTING
+        ):
+            form.add_error(
+                "images",
+                f"Please keep at least {settings.MIN_IMAGES_PER_LISTING} photos so "
+                "buyers can judge the item's condition.",
+            )
             return render(
                 request,
                 self.template_name,

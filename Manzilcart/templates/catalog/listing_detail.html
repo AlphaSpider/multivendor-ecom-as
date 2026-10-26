@@ -88,9 +88,14 @@
           </div>
         </div>
       {% endif %}
-    </div>
 
-    <aside class="detail-panel">
+    <div class="panel detail-description">
+      <h2 data-i18n="about_piece">About this piece</h2>
+      {{ listing.description|linebreaks }}
+    </div>
+  </div>
+
+  <aside class="detail-panel">
       <div class="detail-badges">
         <span class="badge" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
         {% if listing.status == "reserved" %}<span class="status-pill status-reserved" data-i18n="status_reserved">Reserved</span>{% endif %}
@@ -110,7 +115,7 @@
       <div class="seller-card">
         <span class="seller-avatar" aria-hidden="true">{{ listing.seller.short_name|slice:":1"|upper }}</span>
         <div>
-          <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong>
+          <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong><br>
           <span class="muted small"><span data-i18n="member_since">Member since</span> {{ listing.seller.date_joined|date:"M Y" }}</span>
         </div>
       </div>
@@ -151,11 +156,6 @@
         <strong data-i18n="stay_safe">Stay safe.</strong> <span data-i18n="safety_text">View the furniture before paying. ManzilCart does not process, hold or guarantee the purchase price — payment is agreed directly between buyer and seller.</span>
       </p>
     </aside>
-  </div>
-
-  <div class="panel detail-description">
-    <h2 data-i18n="about_piece">About this piece</h2>
-    {{ listing.description|linebreaks }}
   </div>
 </section>
 {% endblock %}

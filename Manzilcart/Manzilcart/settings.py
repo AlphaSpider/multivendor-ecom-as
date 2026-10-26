@@ -418,6 +418,9 @@ MAX_IMAGE_UPLOAD_SIZE = env_int("MAX_IMAGE_UPLOAD_SIZE", 5 * 1024 * 1024)
 ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
 ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
 MAX_IMAGES_PER_LISTING = env_int("MAX_IMAGES_PER_LISTING", 10)
+# Photos are how buyers judge condition, so a public item needs a few from every
+# angle. Enforced at creation and when submitting for moderation.
+MIN_IMAGES_PER_LISTING = env_int("MIN_IMAGES_PER_LISTING", 3)
 
 # --- Mobile verification (WhatsApp OTP) ------------------------------------
 OTP_LENGTH = env_int("OTP_LENGTH", 6)

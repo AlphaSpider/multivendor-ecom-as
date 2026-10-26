@@ -444,6 +444,13 @@ def submit_auction(auction: Auction, *, actor, request=None) -> Auction:
     locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
     if locked.moderation_status not in EDITABLE_MODERATION_STATUSES:
         raise StateTransitionError("This auction is not waiting for a resubmission.")
+    # Photos are how bidders judge condition: never let an under-photographed
+    # auction reach moderation through a path that skipped the form-level check.
+    if locked.images.count() < settings.MIN_IMAGES_PER_LISTING:
+        raise StateTransitionError(
+            f"Add at least {settings.MIN_IMAGES_PER_LISTING} photos before submitting "
+            "for review."
+        )
     locked.moderation_status = Auction.ModerationStatus.PENDING
     locked.moderation_note = ""
     locked.submitted_at = timezone.now()

@@ -54,7 +54,8 @@ class ListingForm(forms.ModelForm):
     images = MultipleImageField(
         required=False,
         help_text=(
-            f"Up to {settings.MAX_IMAGES_PER_LISTING} photos, "
+            f"At least {settings.MIN_IMAGES_PER_LISTING} and up to "
+            f"{settings.MAX_IMAGES_PER_LISTING} photos, "
             f"{settings.MAX_IMAGE_UPLOAD_SIZE // (1024 * 1024)} MB each. "
             "JPEG, PNG or WebP."
         ),
