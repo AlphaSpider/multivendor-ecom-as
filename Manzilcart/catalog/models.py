@@ -28,6 +28,7 @@ from django.db.models import Q
 from django.urls import reverse
 
 from core.models import TimeStampedModel
+from governance.models import ModerationGovernanceMixin
 
 
 class Category(TimeStampedModel):
@@ -102,7 +103,7 @@ class ListingQuerySet(models.QuerySet):
         return self.filter(seller=user)
 
 
-class Listing(TimeStampedModel):
+class Listing(ModerationGovernanceMixin, TimeStampedModel):
     class Condition(models.TextChoices):
         LIKE_NEW = "like_new", "Like new"
         GOOD = "good", "Good"
@@ -113,6 +114,9 @@ class Listing(TimeStampedModel):
         PENDING = "pending", "Pending review"
         APPROVED = "approved", "Approved / published"
         REJECTED = "rejected", "Rejected"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+        # Delisted by the marketplace (policy/KYC); not visible to buyers.
+        SUSPENDED = "suspended", "Suspended"
         ARCHIVED = "archived", "Archived"
         # Reserved while an accepted deal exists; reopened if that deal is cancelled.
         RESERVED = "reserved", "Reserved"
@@ -149,7 +153,7 @@ class Listing(TimeStampedModel):
     )
 
     status = models.CharField(
-        max_length=16,
+        max_length=20,
         choices=Status.choices,
         default=Status.DRAFT,
         db_index=True,

@@ -7,6 +7,7 @@ login-only and every conversation lookup is participant-scoped.
 
 from __future__ import annotations
 
+import datetime
 from decimal import Decimal
 
 from django.conf import settings
@@ -39,9 +40,66 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
     template_name = "conversations/list.html"
     login_url = "accounts:login"
 
+    def _inbox_for(self, user) -> list[dict]:
+        """Rows for the Messages tab: buyer↔seller chats plus the seller's
+        marketplace-team (moderation/support) threads, newest activity first.
+        Everything is pre-normalised so one template loop renders both kinds.
+        """
+        entries: list[dict] = []
+
+        for conversation in conversations_for(user):
+            other = (
+                conversation.seller
+                if conversation.buyer_id == user.pk
+                else conversation.buyer
+            )
+            cover = conversation.cover_image
+            entries.append(
+                {
+                    "kind": "conversation",
+                    "url": reverse("conversations:detail", args=[conversation.pk]),
+                    "title": conversation.item_title,
+                    "thumb_url": cover.image.url if cover else "",
+                    "with_label": getattr(
+                        other, "display_name", ""
+                    ) or ("the seller" if conversation.buyer_id != user.pk else "a buyer"),
+                    "area_name": conversation.service_area.name if conversation.service_area else "",
+                    "emirate_name": conversation.emirate.name if conversation.emirate else "",
+                    "unread": conversation.unread_count,
+                    "last_message_at": conversation.last_message_at,
+                    "sort_at": conversation.last_message_at,
+                    "sort_id": conversation.pk,
+                }
+            )
+
+        # Marketplace-team threads join the same inbox so sellers see all of
+        # it in one tab. Lazy import: governance is a moderation app.
+        from governance.selectors import support_rows_for
+
+        for row in support_rows_for(user):
+            entries.append(
+                {
+                    "kind": "support",
+                    "url": row["url"],
+                    "title": row["title"],
+                    "thumb_url": row["cover_url"],
+                    "status_label": row["status_label"],
+                    "unread": row["unread"],
+                    "last_message_at": row["last_message_at"],
+                    "sort_at": row["last_message_at"],
+                    "sort_id": row["pk"],
+                }
+            )
+
+        # Aware "beginning of time" so brand-new threads (no messages yet)
+        # still sort after conversations that have activity.
+        epoch = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+        entries.sort(key=lambda e: (e["sort_at"] or epoch, e["sort_id"]), reverse=True)
+        return entries
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["conversations"] = conversations_for(self.request.user)
+        context["inbox"] = self._inbox_for(self.request.user)
         return context
 
 

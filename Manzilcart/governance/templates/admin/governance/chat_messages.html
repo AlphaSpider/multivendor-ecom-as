@@ -1,0 +1,5 @@
+{% for message in messages %}
+  {% include "admin/governance/chat_message.html" %}
+{% empty %}
+  <p class="governance-chat-empty">No messages yet — say hello to the seller.</p>
+{% endfor %}

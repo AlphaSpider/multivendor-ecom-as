@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block branding %}
+  <h1 id="site-name"><a href="/">{{ site_header|default:_('ManzilCart governance') }}</a></h1>
+{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block bodyclass %}login{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    /* The login page has no modules to filter; hide the sidebar frame. */
+    body.login #toggle-nav-sidebar,
+    body.login #content.main.shifted { margin-inline-start: 0; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="governance-login">
+  <div class="governance-panel">
+    {% if step == "code" %}
+      <h1>Enter the code we sent you</h1>
+      <p class="gov-hint">
+        We texted a 6-digit code to <strong>{{ stored_phone }}</strong>.
+        {% blocktranslate with minutes=5 %}The code works for {{ minutes }} minutes.{% endblocktranslate %}
+      </p>
+      <form method="post" action="{% url 'admin:login' %}">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="code">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label for="id_admin_code">One-time code</label>
+        <input id="id_admin_code" class="governance-otp-code" type="text" name="code"
+               inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+               required autofocus placeholder="••••••">
+        <div class="governance-save-row">
+          <input type="submit" class="default" value="{% translate 'Verify and log in' %}">
+          <button type="submit" name="action" value="resend" class="button">{% translate 'Send a new code' %}</button>
+        </div>
+      </form>
+      <p style="margin-top:14px">
+        <a class="gov-switch-step" href="{% url 'admin:login' %}">{% translate 'Use a different number' %}</a>
+      </p>
+    {% else %}
+      <h1>Log in with your mobile number</h1>
+      <p class="gov-hint">
+        {% blocktranslate %}We send a one-time code on WhatsApp — no password to remember.
+        Only ManzilCart staff accounts can open this back office.{% endblocktranslate %}
+      </p>
+      <form method="post" action="{% url 'admin:login' %}">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="phone">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label for="id_admin_phone">Mobile number</label>
+        <input id="id_admin_phone" type="text" name="phone" required autofocus
+               placeholder="+971 5X XXX XXXX" value="{{ stored_phone }}">
+        <div class="governance-save-row">
+          <input type="submit" class="default" value="{% translate 'Send code' %}">
+        </div>
+      </form>
+    {% endif %}
+
+    <details class="governance-password-fallback" {% if show_password %}open{% endif %}>
+      <summary style="margin-top:14px;cursor:pointer">{% translate 'Use a password instead (command-line superuser)' %}</summary>
+      <form method="post" action="{% url 'admin:login' %}" style="margin-top:10px">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="password">
+        <input type="hidden" name="next" value="{{ next }}">
+        {{ password_form.username.label_tag }}
+        {{ password_form.username }}
+        {{ password_form.password.label_tag }}
+        {{ password_form.password }}
+        {% if password_form.errors %}
+          <p class="governance-error">{% translate 'Wrong number or password, or the account is inactive.' %}</p>
+        {% endif %}
+        <div class="governance-save-row">
+          <input type="submit" class="button" value="{% translate 'Log in with password' %}">
+        </div>
+      </form>
+    </details>
+  </div>
+</div>
+{% endblock %}

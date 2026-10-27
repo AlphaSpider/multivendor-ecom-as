@@ -830,6 +830,78 @@ def respond_to_cancellation(
 
 
 @transaction.atomic
+def staff_reject_cancellation(
+    cancellation: DealCancellation, *, actor, note="", request=None
+) -> Deal:
+    """
+    Operations declines a cancellation dispute: the deal stands.
+
+    The participant flow (``respond_to_cancellation``) is seller/buyer-only;
+    staff need the same outcome from the governance financials page, including
+    for ESCALATED rows that a participant cannot answer.
+    """
+    ensure_staff(actor)
+    locked_cancellation = (
+        DealCancellation.objects.select_for_update()
+        .select_related("deal")
+        .get(pk=cancellation.pk)
+    )
+    deal = Deal.objects.select_for_update().get(pk=locked_cancellation.deal_id)
+    if locked_cancellation.status not in {
+        DealCancellation.Status.PENDING,
+        DealCancellation.Status.ESCALATED,
+    }:
+        raise StateTransitionError("This cancellation request has already been answered.")
+
+    locked_cancellation.status = DealCancellation.Status.REJECTED
+    locked_cancellation.responded_by = actor
+    locked_cancellation.response_note = (note or "")[:1000]
+    locked_cancellation.responded_at = timezone.now()
+    locked_cancellation.resolved_at = timezone.now()
+    locked_cancellation.save(
+        update_fields=[
+            "status",
+            "responded_by",
+            "response_note",
+            "responded_at",
+            "resolved_at",
+            "updated_at",
+        ]
+    )
+    deal.status = Deal.Status.ACCEPTED
+    deal.save(update_fields=["status", "updated_at"])
+
+    _record_event(
+        deal,
+        DealEvent.Type.CANCELLATION_REJECTED,
+        actor=actor,
+        summary="Cancellation request rejected by operations",
+        metadata={"cancellation_id": locked_cancellation.pk},
+    )
+    record_audit(
+        action=AuditEvent.Action.DEAL_CANCELLATION_REJECTED,
+        actor=actor,
+        entity=deal,
+        emirate=deal.emirate,
+        summary=f"Cancellation rejected by operations for {deal.reference}",
+        metadata={"cancellation_id": locked_cancellation.pk},
+        request=request,
+    )
+    _notify_user(
+        user=locked_cancellation.requested_by,
+        kind=Notification.Kind.DEAL_CANCELLATION,
+        subject=f"Cancellation declined — {deal.reference}",
+        body=(
+            "ManzilCart operations reviewed the dispute and the deal stands. "
+            "Please coordinate with the other party to complete it."
+        ),
+        deal=deal,
+        key=f"deal:{deal.pk}:cancel:{locked_cancellation.pk}:ops-rejected",
+    )
+    return deal
+
+
+@transaction.atomic
 def escalate_cancellation(
     cancellation: DealCancellation, *, actor, note="", request=None
 ) -> DealCancellation:

@@ -1,0 +1,130 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="governance-kpi-grid">
+  <a class="governance-kpi" href="{% url 'admin:catalog_listing_changelist' %}">
+    <div class="governance-kpi-value">{{ kpis.total_listings }}</div>
+    <div class="governance-kpi-label">Total fixed-price products</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:auctions_auction_changelist' %}">
+    <div class="governance-kpi-value">{{ kpis.total_auctions }}</div>
+    <div class="governance-kpi-label">Total auction products</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:catalog_listing_changelist' %}?status__exact=pending">
+    <div class="governance-kpi-value">{{ kpis.pending_listings }}</div>
+    <div class="governance-kpi-label">Fixed-price posts to review</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:auctions_auction_changelist' %}?moderation_status__exact=pending">
+    <div class="governance-kpi-value">{{ kpis.pending_auctions }}</div>
+    <div class="governance-kpi-label">Auctions to review</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_moderation_inbox' %}?view=attention">
+    <div class="governance-kpi-value">{{ kpis.unread_threads }}</div>
+    <div class="governance-kpi-label">Messages needing attention</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_bid_monitor' %}">
+    <div class="governance-kpi-value">{{ kpis.ending_soon }}</div>
+    <div class="governance-kpi-label">Auctions ending in 24h</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_financials' %}">
+    <div class="governance-kpi-value">AED {{ kpis.gmv|intcomma }}</div>
+    <div class="governance-kpi-label">Agreed deal value</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_financials' %}#disputes">
+    <div class="governance-kpi-value">{{ kpis.open_disputes }}</div>
+    <div class="governance-kpi-label">Open disputes</div>
+  </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_vendors' %}?status=suspended">
+    <div class="governance-kpi-value">{{ kpis.suspended_items }}</div>
+    <div class="governance-kpi-label">Suspended items</div>
+  </a>
+</div>
+
+<div class="governance-queues">
+  <div class="governance-panel">
+    <h2>Fixed-price posts waiting for review</h2>
+    <table class="governance-table">
+      <thead><tr><th></th><th>Item</th><th>Seller</th><th>Waiting since</th><th></th></tr></thead>
+      <tbody>
+        {% for listing in pending_listings %}
+          {% with imgs=listing.images.all %}
+          <tr>
+            <td>{% if imgs %}<a href="{% url 'admin:moderation_review' listing.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ listing.title }}"></a>{% else %}—{% endif %}</td>
+            <td><strong>{{ listing.title }}</strong><br><span class="governance-kpi-label">{{ listing.category.name }} · AED {{ listing.asking_price }}</span></td>
+            <td>{{ listing.seller }}</td>
+            <td>{{ listing.submitted_at|naturaltime|default:"—" }}</td>
+            <td><a class="button" href="{% url 'admin:moderation_review' listing.pk %}">Review</a></td>
+          </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="5">Queue clear — every post has been reviewed.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Auctions waiting for review</h2>
+    <table class="governance-table">
+      <thead><tr><th></th><th>Auction</th><th>Seller</th><th></th></tr></thead>
+      <tbody>
+        {% for auction in pending_auctions %}
+          {% with imgs=auction.images.all %}
+          <tr>
+            <td>{% if imgs %}<a href="{% url 'admin:moderation_auction_review' auction.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ auction.title }}"></a>{% else %}—{% endif %}</td>
+            <td><strong>{{ auction.title }}</strong><br><span class="governance-kpi-label">{{ auction.reference }}</span></td>
+            <td>{{ auction.seller }}</td>
+            <td><a class="button" href="{% url 'admin:moderation_auction_review' auction.pk %}">Review</a></td>
+          </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="4">Queue clear — every auction has been reviewed.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Messages waiting on staff</h2>
+    <table class="governance-table">
+      <thead><tr><th></th><th>Item</th><th>Customer</th><th>Last message</th><th></th></tr></thead>
+      <tbody>
+        {% for thread in recent_chats %}
+          <tr>
+            <td>{% if thread.item_cover_url %}<a href="{{ thread.item_admin_url }}"><img class="gov-thumb" src="{{ thread.item_cover_url }}" alt="{{ thread.item_title }}"></a>{% else %}—{% endif %}</td>
+            <td>
+              <strong>{{ thread.item_title|truncatechars:40 }}</strong>
+              <span class="governance-pill gov-pill-{{ thread.content_type.model }}">{{ thread.content_type.model }}</span>
+            </td>
+            <td>{{ thread.customer }}</td>
+            <td class="governance-flag">{{ thread.last_message|truncatechars:80|default:"—" }}</td>
+            <td><a class="button" href="{{ thread.item_admin_url }}">Reply</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">No customer is waiting for a reply.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Open deal disputes</h2>
+    <table class="governance-table">
+      <thead><tr><th>Deal</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for cancellation in escalated %}
+          <tr>
+            <td>{{ cancellation.deal.reference }}</td>
+            <td>{{ cancellation.reason|truncatechars:70 }}</td>
+            <td><span class="governance-pill gov-pill-{{ cancellation.status }}">{{ cancellation.get_status_display }}</span></td>
+            <td><a class="button" href="{% url 'admin:governance_financials' %}#disputes">Resolve</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4">No open disputes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

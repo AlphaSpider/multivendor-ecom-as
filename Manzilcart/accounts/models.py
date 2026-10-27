@@ -98,6 +98,24 @@ class User(AbstractUser, TimeStampedModel):
         help_text="Optional. Used for auction and deal notifications when provided.",
     )
     phone_verified_at = models.DateTimeField(null=True, blank=True)
+
+    class SellerStatus(models.TextChoices):
+        # Mobile verification is today's KYC gate, so existing members default
+        # to verified; staff can downgrade or suspend from the vendor page.
+        PENDING = "pending", "Pending"
+        VERIFIED = "verified", "Verified"
+        SUSPENDED = "suspended", "Suspended"
+
+    seller_status = models.CharField(
+        max_length=16,
+        choices=SellerStatus.choices,
+        default=SellerStatus.VERIFIED,
+        db_index=True,
+        help_text=(
+            "Vendor governance state. A suspended seller's public items are "
+            "delisted automatically."
+        ),
+    )
     display_name = models.CharField(
         max_length=64,
         blank=True,

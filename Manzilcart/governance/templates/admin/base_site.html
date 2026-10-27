@@ -1,0 +1,35 @@
+{# ManzilCart admin chrome: governance navigation on every admin page. #}
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static "governance/admin.css" %}?v=9">
+{% endblock %}
+
+{% block branding %}
+  <h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></h1>
+  <nav class="governance-nav" aria-label="Governance pages">
+    {% for link in governance_nav %}
+      <a href="{{ link.url }}"{% if link.name == 'Moderation inbox' and governance_unread_threads %} class="governance-nav-unread"{% endif %}>
+        {{ link.name }}{% if link.name == 'Moderation inbox' and governance_unread_threads %} <span class="governance-badge-unread">{{ governance_unread_threads }}</span>{% endif %}
+      </a>
+    {% endfor %}
+  </nav>
+{% endblock %}
+
+{% comment %}
+  Keep the shipped POST logout form and theme toggle (they live inside
+  userlinks); drop only the app-list / documentation noise. Note: the stock
+  "Change password" link hides itself for OTP-only accounts automatically.
+{% endcomment %}
+{% block userlinks %}
+  {% if site_url %}<a href="{{ site_url }}">{% translate 'View site' %}</a> /{% endif %}
+  <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+    {% csrf_token %}
+    <button type="submit">{% translate 'Log out' %}</button>
+  </form>
+  {% include "admin/color_theme_toggle.html" %}
+{% endblock %}

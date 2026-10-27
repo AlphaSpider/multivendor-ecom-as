@@ -1,0 +1,736 @@
+/*
+ * ManzilCart governance admin chrome.
+ *
+ * One stylesheet for every custom admin page. It reads the Django admin theme
+ * variables (--body-bg, --body-fg, --hairline-color, --darkened-bg, …) so the
+ * panels follow the light and dark admin themes automatically instead of
+ * shipping hardcoded colours for one theme only.
+ */
+
+:root {
+  --gov-radius: 10px;
+  --gov-accent: #0ea5e9;
+  --gov-danger: #dc2626;
+  --gov-warn: #d97706;
+  --gov-ok: #16a34a;
+}
+
+/* ---------------------------------------------------------------------------
+ * Header: brand + governance navigation on one row, safe on narrow screens.
+ * ------------------------------------------------------------------------- */
+
+#header,
+#header #branding {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding-inline: 12px;
+}
+
+#header #site-name {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+
+#header #branding {
+  flex: 1 1 auto;
+  padding-inline: 0;
+}
+
+#header #site-name a,
+#header #site-name a:link {
+  color: #ffc;
+}
+
+#header .governance-nav {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+}
+
+#header .governance-nav a {
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 2px 0;
+  border-bottom: 2px solid transparent;
+}
+
+#header .governance-nav a:hover,
+#header .governance-nav a.is-active {
+  color: #fff;
+  border-bottom-color: #fbbf24;
+}
+
+#header #user-tools {
+  margin-inline-start: auto;
+}
+
+.governance-badge-unread {
+  display: inline-block;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Cards and panels.
+ * ------------------------------------------------------------------------- */
+
+.governance-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.governance-kpi {
+  background: var(--darkened-bg, #f8fafc);
+  border: 1px solid var(--hairline-color, #e2e8f0);
+  border-radius: var(--gov-radius);
+  padding: 14px 16px;
+}
+
+.governance-kpi .governance-kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--body-fg, #0f172a);
+}
+
+.governance-kpi .governance-kpi-value a {
+  color: inherit;
+}
+
+.governance-kpi .governance-kpi-label {
+  color: var(--body-quiet-color, #64748b);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+}
+
+.governance-queues {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.governance-panel {
+  background: var(--body-bg, #fff);
+  border: 1px solid var(--hairline-color, #e2e8f0);
+  border-radius: var(--gov-radius);
+  padding: 14px 16px 16px;
+  margin-bottom: 16px;
+}
+
+.governance-panel h2 {
+  font-size: 12.5px;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  color: var(--body-quiet-color, #475569);
+  letter-spacing: 0.05em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Tables inside panels.
+ * ------------------------------------------------------------------------- */
+
+.governance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.governance-table th {
+  text-align: left;
+  color: var(--body-quiet-color, #475569);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline-color, #e2e8f0);
+  white-space: nowrap;
+}
+
+.governance-table td {
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--hairline-color, #f1f5f9);
+  vertical-align: top;
+}
+
+.governance-table tr:last-child td {
+  border-bottom: none;
+}
+
+.governance-table .gov-thumb,
+img.gov-thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.governance-empty {
+  color: var(--body-quiet-color, #64748b);
+  padding: 14px 4px;
+}
+
+.governance-flag {
+  color: var(--gov-danger, #b91c1c);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Status pills.
+ * ------------------------------------------------------------------------- */
+
+.governance-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gov-pill-approved,
+.gov-pill-verified,
+.gov-pill-accepted,
+.gov-pill-finalized {
+  background: color-mix(in srgb, var(--gov-ok, #16a34a) 18%, transparent);
+  color: #15803d;
+}
+
+.gov-pill-pending,
+.gov-pill-needs_seller_reply,
+.gov-pill-open,
+.gov-pill-esc,
+.gov-pill-escalated {
+  background: color-mix(in srgb, var(--gov-warn, #d97706) 20%, transparent);
+  color: #b45309;
+}
+
+.gov-pill-changes_requested,
+.gov-pill-paused {
+  background: color-mix(in srgb, #f97316 20%, transparent);
+  color: #c2410c;
+}
+
+.gov-pill-rejected,
+.gov-pill-suspended,
+.gov-pill-outbid {
+  background: color-mix(in srgb, var(--gov-danger, #dc2626) 16%, transparent);
+  color: var(--gov-danger, #b91c1c);
+}
+
+.gov-pill-resolved {
+  background: color-mix(in srgb, #6366f1 18%, transparent);
+  color: #4338ca;
+}
+
+.gov-pill-live {
+  background: color-mix(in srgb, var(--gov-accent, #0ea5e9) 18%, transparent);
+  color: #0369a1;
+}
+
+.gov-pill-scheduled,
+.gov-pill-locked,
+.gov-pill-draft {
+  background: var(--darkened-bg, #e2e8f0);
+  color: var(--body-fg, #334155);
+}
+
+.gov-pill-awarded,
+.gov-pill-sold,
+.gov-pill-cancellation_requested {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #1d4ed8;
+}
+
+.gov-pill-unsold,
+.gov-pill-cancelled,
+.gov-pill-archived,
+.gov-pill-selected {
+  background: var(--darkened-bg, #f1f5f9);
+  color: var(--body-quiet-color, #64748b);
+}
+
+/* ---------------------------------------------------------------------------
+ * Changelist niceties.
+ * ------------------------------------------------------------------------- */
+
+#changelist .gov-thumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Changelist tables pack many columns; scroll instead of crushing them. */
+#changelist .results {
+  overflow-x: auto;
+}
+
+#result_list {
+  min-width: 980px;
+}
+
+#result_list td:first-child + th,
+#result_list .field-title {
+  min-width: 200px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Review screen.
+ * ------------------------------------------------------------------------- */
+
+.governance-review {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .governance-review {
+    grid-template-columns: 1fr;
+  }
+}
+
+.governance-hero {
+  display: block;
+  border-radius: var(--gov-radius);
+  overflow: hidden;
+  border: 1px solid var(--hairline-color, #e2e8f0);
+  background: var(--darkened-bg, #f1f5f9);
+}
+
+.governance-hero img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.governance-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.governance-thumbs a {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--hairline-color, #cbd5e1);
+}
+
+.governance-thumbs img {
+  display: block;
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+}
+
+.governance-facts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  margin-top: 2px;
+}
+
+.governance-facts th {
+  text-align: left;
+  vertical-align: top;
+  width: 148px;
+  color: var(--body-quiet-color, #64748b);
+  font-weight: 600;
+  padding: 7px 10px 7px 0;
+  white-space: nowrap;
+}
+
+.governance-facts td {
+  padding: 7px 0;
+  color: var(--body-fg, #0f172a);
+}
+
+.governance-description {
+  white-space: pre-line;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.governance-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.governance-timeline li {
+  padding: 9px 0 9px 14px;
+  border-inline-start: 2px solid var(--hairline-color, #e2e8f0);
+  margin-inline-start: 4px;
+}
+
+.governance-timeline li strong {
+  display: block;
+}
+
+.governance-timeline li small {
+  color: var(--body-quiet-color, #64748b);
+}
+
+/* Decision form ---------------------------------------------------------- */
+
+.governance-decision-options {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.governance-decision-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline-color, #cbd5e1);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--body-bg, #fff);
+}
+
+.governance-decision-option:hover {
+  border-color: var(--gov-accent, #0ea5e9);
+}
+
+.governance-decision-option.is-checked {
+  border-color: var(--gov-accent, #0ea5e9);
+  box-shadow: 0 0 0 1px var(--gov-accent, #0ea5e9) inset;
+}
+
+.governance-decision-option input {
+  margin-top: 3px;
+}
+
+.governance-decision-option .gov-option-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.governance-decision-option .gov-option-help {
+  color: var(--body-quiet-color, #64748b);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.governance-reason {
+  width: 100%;
+  min-height: 88px;
+  border-radius: 8px;
+  font: inherit;
+  padding: 8px 10px;
+  background: var(--darkened-bg, #fff);
+  border: 1px solid var(--hairline-color, #cbd5e1);
+  color: var(--body-fg, #0f172a);
+}
+
+.governance-reason:focus {
+  outline: 2px solid var(--gov-accent, #0ea5e9);
+  border-color: transparent;
+}
+
+.governance-save-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.submit-row.governance-save-row input[type="submit"] {
+  margin: 0;
+}
+
+.governance-error {
+  color: var(--gov-danger, #dc2626);
+  font-size: 12.5px;
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Buttons shared by governance pages.
+ * ------------------------------------------------------------------------- */
+
+.governance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.governance-actions .button,
+.governance-actions input[type="submit"] {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Chat threads / inbox rows.
+ * ------------------------------------------------------------------------- */
+
+.gov-thread-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.gov-thread-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gov-thread-actions {
+  flex: 0 0 auto;
+}
+
+.gov-thread-item .gov-thread-title {
+  font-weight: 700;
+}
+
+.gov-thread-item .gov-thread-meta {
+  color: var(--body-quiet-color, #64748b);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.gov-thread-preview {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Slot for the chat drawer on the item change form: Django admin floats
+ * the form container, so the slot must clear it or it wraps up beside
+ * the form and the sticky panel overlaps the fields. */
+.governance-chat-slot {
+  clear: both;
+  max-width: 560px;
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Login / OTP.
+ * ------------------------------------------------------------------------- */
+
+.governance-login {
+  max-width: 420px;
+  margin: 30px auto;
+}
+
+.governance-login .governance-panel {
+  margin-bottom: 12px;
+}
+
+.governance-login h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.governance-login p.gov-hint {
+  color: var(--body-quiet-color, #64748b);
+  font-size: 12.5px;
+  margin: 0 0 12px;
+}
+
+.governance-login label {
+  display: block;
+  font-weight: 600;
+  font-size: 12.5px;
+  margin: 10px 0 4px;
+}
+
+.governance-login input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 15px;
+  background: var(--darkened-bg, #fff);
+  border: 1px solid var(--hairline-color, #cbd5e1);
+  color: var(--body-fg, #0f172a);
+}
+
+.governance-login .governance-save-row {
+  margin-top: 14px;
+}
+
+.governance-login .gov-switch-step {
+  font-size: 12.5px;
+  color: var(--link-fg, #0b69c6);
+}
+
+.governance-otp-code {
+  letter-spacing: 0.4em;
+  font-size: 18px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mobile & small tablets.
+ *
+ * Django's own admin CSS already collapses its navigation into a toggle
+ * below ~1024px; this section only needs to make the governance chrome
+ * (header strip, KPI cards, inbox cards, review layout, decision form)
+ * work on a phone-sized viewport.
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 780px) {
+  /* Review grid: product on top, decision panel underneath. */
+  .governance-review {
+    grid-template-columns: 1fr;
+  }
+
+  /* Inbox cards let the action button drop to its own row. */
+  .gov-thread-item {
+    flex-wrap: wrap;
+  }
+
+  .gov-thread-preview {
+    max-width: none;
+    white-space: normal;
+  }
+
+  /* Inbox cards: thumb+text share the first row, the button gets a full row. */
+  .gov-thread-body {
+    flex: 1 1 0%;
+  }
+  .gov-thread-actions {
+    flex: 1 1 100%;
+  }
+
+  .gov-thread-actions .button {
+    display: block;
+    text-align: center;
+  }
+
+  /* Decision + login action rows wrap instead of squashing. */
+  .governance-save-row {
+    flex-wrap: wrap;
+  }
+
+  .governance-save-row input[type="submit"],
+  .governance-save-row .button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Header: brand row on top, nav as a swipeable strip below. */
+  #header {
+    padding: 8px 10px;
+    gap: 6px 10px;
+  }
+
+  #header #site-name {
+    font-size: 15.5px;
+    max-width: 70vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #header .governance-nav {
+    flex: 1 1 100%;
+    order: 3;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #header .governance-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  #header .governance-nav a {
+    font-size: 13px;
+    padding: 6px 2px; /* bigger touch target */
+  }
+
+  #header #user-tools {
+    font-size: 12px;
+  }
+
+  #header #user-tools form#logout-form button,
+  #header #user-tools a {
+    font-size: 12px;
+  }
+
+  /* KPI cards: two per row. */
+  .governance-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .governance-kpi .governance-kpi-value {
+    font-size: 21px;
+  }
+
+  /* Panels and their tables scroll sideways instead of clipping. */
+  .governance-panel {
+    padding: 10px 12px 12px;
+  }
+
+  .governance-panel .governance-table-wrap,
+  .governance-panel {
+    overflow-x: auto;
+  }
+
+  .governance-facts th {
+    width: 118px;
+  }
+
+  /* Full-width controls: thumbs up-sized for touch. */
+  .governance-thumbs img {
+    width: 84px;
+    height: 64px;
+  }
+
+  .governance-hero img {
+    max-height: 300px;
+  }
+
+  /* Login page: nothing wider than the screen. */
+  .governance-login {
+    margin: 12px auto;
+  }
+
+  .governance-login input[type="text"],
+  .governance-otp-code {
+    font-size: 16px; /* stop iOS Safari zooming on focus */
+  }
+
+  .governance-login .governance-save-row input[type="submit"],
+  .governance-login .governance-save-row .button {
+    flex: 1 1 100%;
+  }
+
+  /* Chat panel drawer: full width. */
+  .governance-chat-panel {
+    width: 100%;
+    max-width: none;
+  }
+}

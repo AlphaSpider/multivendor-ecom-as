@@ -36,12 +36,16 @@ from django.db.models import Q
 from django.urls import reverse
 
 from core.models import TimeStampedModel
+from governance.models import ModerationGovernanceMixin
 
 
-class Auction(TimeStampedModel):
+class Auction(ModerationGovernanceMixin, TimeStampedModel):
     class Status(models.TextChoices):
         SCHEDULED = "scheduled", "Scheduled"
         LIVE = "live", "Live"
+        # Emergency pause from the admin bid monitor: bidders can see the page
+        # but bids are refused until staff resume the auction.
+        PAUSED = "paused", "Paused by admin"
         LOCKED = "locked", "Bid locked — awaiting confirmation"
         AWARDED = "awarded", "Awarded"
         UNSOLD = "unsold", "Unsold"
@@ -52,6 +56,9 @@ class Auction(TimeStampedModel):
         PENDING = "pending", "Pending review"
         APPROVED = "approved", "Approved / public"
         REJECTED = "rejected", "Rejected"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+        # Delisted by the marketplace (policy/KYC); not visible to bidders.
+        SUSPENDED = "suspended", "Suspended"
 
     class Condition(models.TextChoices):
         LIKE_NEW = "like_new", "Like new"
@@ -97,13 +104,13 @@ class Auction(TimeStampedModel):
         ),
     )
     status = models.CharField(
-        max_length=16,
+        max_length=20,
         choices=Status.choices,
         default=Status.SCHEDULED,
         db_index=True,
     )
     moderation_status = models.CharField(
-        max_length=16,
+        max_length=20,
         choices=ModerationStatus.choices,
         default=ModerationStatus.DRAFT,
         db_index=True,
@@ -319,7 +326,23 @@ class Bid(models.Model):
         editable=False,
         help_text="Idempotency key supplied by the client so retries cannot double-bid.",
     )
+    voided_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when the bid was voided from the admin bid monitor.",
+    )
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="voided_bids",
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    @property
+    def is_voided(self) -> bool:
+        return self.voided_at is not None
 
     class Meta:
         ordering = ["-amount", "created_at", "id"]
@@ -415,6 +438,9 @@ class AuctionEvent(models.Model):
         SELECTION_CONFIRMED = "selection_confirmed", "Bidder confirmed"
         SELECTION_DECLINED = "selection_declined", "Bidder declined"
         SELECTION_TIMED_OUT = "selection_timed_out", "Bidder timed out"
+        PAUSED = "paused", "Auction paused by admin"
+        EXTENDED = "extended", "End time extended by admin"
+        BID_VOIDED = "bid_voided", "Bid voided by admin"
         AWARDED = "awarded", "Auction awarded"
         UNSOLD = "unsold", "Auction unsold"
         CANCELLED = "cancelled", "Auction cancelled"

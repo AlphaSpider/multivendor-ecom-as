@@ -125,7 +125,9 @@ class AuctionDetailView(EmirateRequiredMixin, TemplateView):
         is_staff = is_authenticated and user.is_staff
 
         bids = list(
-            auction.bids.select_related("bidder").order_by("-amount", "created_at", "id")
+            auction.bids.select_related("bidder")
+            .filter(voided_at__isnull=True)
+            .order_by("-amount", "created_at", "id")
         )
         highest_eligible = services.highest_eligible_bid(auction)
         top_bid = bids[0] if bids else None

@@ -40,9 +40,22 @@ S = Listing.Status
 #: The only permitted status transitions. Anything else raises StateTransitionError.
 LISTING_TRANSITIONS: dict[str, set[str]] = {
     S.DRAFT: {S.PENDING, S.ARCHIVED},
-    S.PENDING: {S.APPROVED, S.REJECTED, S.DRAFT},
-    S.APPROVED: {S.PENDING, S.RESERVED, S.SOLD, S.ARCHIVED},
+    S.PENDING: {S.APPROVED, S.REJECTED, S.DRAFT, S.CHANGES_REQUESTED},
+    S.APPROVED: {
+        S.PENDING,
+        S.RESERVED,
+        S.SOLD,
+        S.ARCHIVED,
+        S.CHANGES_REQUESTED,
+        S.SUSPENDED,
+    },
     S.REJECTED: {S.DRAFT, S.PENDING, S.ARCHIVED},
+    # Staff wrote feedback; the seller can resubmit, archive, or a moderator can
+    # still approve (after a phone conversation) or reject outright.
+    S.CHANGES_REQUESTED: {S.PENDING, S.APPROVED, S.REJECTED, S.ARCHIVED},
+    # Delisted by staff (policy or vendor suspension); the seller may appeal via
+    # a resubmission, or staff can restore it.
+    S.SUSPENDED: {S.PENDING, S.APPROVED, S.REJECTED, S.ARCHIVED},
     S.RESERVED: {S.APPROVED, S.SOLD, S.ARCHIVED},
     S.SOLD: {S.ARCHIVED},
     S.ARCHIVED: {S.DRAFT},

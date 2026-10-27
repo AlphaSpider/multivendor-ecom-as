@@ -1,84 +1,154 @@
 {% extends "admin/base_site.html" %}
-{% load humanize %}
+{% comment %}
+  Moderation review screen for listings AND auctions.
+
+  One focused page: the product first (photos, facts, description), the
+  decision form and the seller in a side column, the audit trail below.
+  Rendered by ListingAdmin.review_view (object_kind="listing") and
+  AuctionAdmin.review_view (object_kind="auction"); item-specific details
+  arrive pre-built in the ``facts`` context list.
+{% endcomment %}
+{% load i18n %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Home</a>
   &rsaquo; <a href="{{ changelist_url }}">{{ object_kind|capfirst }}s</a>
-  &rsaquo; Review
+  &rsaquo; Review {{ object_label }}
 </div>
 {% endblock %}
 
 {% block content %}
-<h1>{{ title }}</h1>
+<div class="governance-review">
 
-<div class="module" style="padding:1rem;margin-bottom:1rem">
-  <p>
-    <strong>Seller:</strong> {{ seller.display_name|default:"(no name)" }}
-    · {{ seller.phone }}
-    {% if seller.email %}({{ seller.email }}){% endif %}
-    <br>
-    <strong>Location:</strong> {{ location }}
-    <br>
-    <strong>Details:</strong> {{ meta }}
-    <br>
-    {% if object.reference %}<strong>Reference:</strong> {{ object.reference }}<br>{% endif %}
-    <strong>Current status:</strong> {{ object.get_status_display }}
-    {% if object_kind == "auction" %}
-      · Moderation: {{ object.get_moderation_status_display }}
-    {% endif %}
-  </p>
-  <p><strong>Description:</strong><br>{{ description|linebreaksbr }}</p>
-
-  {% if images %}
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem">
-      {% for image in images %}
-        <a href="{{ image.image.url }}" target="_blank">
-          <img src="{{ image.image.url }}" alt="" style="height:110px;border-radius:6px">
+  {# ------------------------------------------------------------------ item #}
+  <div>
+    <div class="governance-panel">
+      <h2>{% translate "Photos" %}</h2>
+      {% if photos %}
+        <a class="governance-hero" href="{{ photos.0.image.url }}" target="_blank" rel="noopener">
+          <img src="{{ photos.0.image.url }}" alt="{{ object_label }}">
         </a>
-      {% endfor %}
+        {% if photos|length > 1 %}
+          <div class="governance-thumbs">
+            {% for image in photos %}
+              <a href="{{ image.image.url }}" target="_blank" rel="noopener">
+                <img src="{{ image.image.url }}" alt="{{ object_label }} photo {{ forloop.counter }}"
+                     {% if forloop.first %}style="outline:2px solid var(--gov-accent,#0ea5e9)"{% endif %}>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% else %}
+        <p class="governance-empty">{% translate "No photos uploaded for this item." %}</p>
+      {% endif %}
     </div>
-  {% else %}
-    <p class="help">No photos uploaded.</p>
-  {% endif %}
+
+    <div class="governance-panel">
+      <h2>{% translate "Item details" %}</h2>
+      <table class="governance-facts">
+        {% for fact in facts %}
+          <tr>
+            <th>{{ fact.label }}</th>
+            <td>{% if fact.pill %}<span class="governance-pill gov-pill-{{ fact.pill }}">{{ fact.value }}</span>{% else %}{{ fact.value|default:"—" }}{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </table>
+      {% if description %}
+        <p class="governance-description" style="margin-top:10px">{{ description }}</p>
+      {% else %}
+        <p class="governance-empty" style="margin-top:10px">{% translate "The seller did not write a description." %}</p>
+      {% endif %}
+    </div>
+
+    {% if reviews %}
+      <div class="governance-panel">
+        <h2>{% translate "Decision history" %}</h2>
+        <ul class="governance-timeline">
+          {% for review in reviews reversed %}
+            <li>
+              <strong><span class="governance-pill gov-pill-{{ review.decision }}">{{ review.get_decision_display }}</span></strong>
+              <div>{% if review.reason %}{{ review.reason }}{% else %}<em>{% translate "No note left" %}</em>{% endif %}</div>
+              <small>{{ review.created_at|date:"j M Y H:i" }} · {{ review.reviewer|default:"—" }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+
+  {# -------------------------------------------------------- decision + chat #}
+  <div>
+    <div class="governance-panel">
+      <h2>{% translate "Decision" %}</h2>
+      <form method="post" action="" id="moderation-decision-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<p class="governance-error">{{ form.non_field_errors }}</p>{% endif %}
+
+        <div class="governance-decision-options" id="decision-options">
+          {% for choice in form.decision %}
+            {% with value=choice.data.value %}
+            <label class="governance-decision-option" data-value="{{ value }}">
+              {{ choice.tag }}
+              <span>
+                <span class="gov-option-title">{{ choice.choice_label }}</span>
+                <span class="gov-option-help">{% if value == "approve" %}{% translate "Publish it immediately on the marketplace." %}{% elif value == "request_changes" %}{% translate "Send it back; your reason below goes to the seller." %}{% elif value == "reject" %}{% translate "Keep it unpublished and tell the seller why." %}{% else %}{% translate "Delist now; the seller can appeal." %}{% endif %}</span>
+              </span>
+            </label>
+            {% endwith %}
+          {% endfor %}
+        </div>
+
+        {{ form.reason.errors }}
+        {{ form.reason }}
+
+        <p class="gov-hint" style="margin-top:6px">{% translate "The reason is shown to the seller." %}</p>
+
+        <div class="governance-save-row">
+          <input type="submit" class="default" value="{% translate 'Save decision' %}">
+          <a class="button" href="{{ changelist_url }}">{% translate 'Back to the list' %}</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="governance-panel">
+      <h2>{% translate "Seller" %}</h2>
+      <table class="governance-facts">
+        <tr>
+          <th>{% translate "Name" %}</th>
+          <td>{% if seller.seller_status == "suspended" %}<span class="governance-pill gov-pill-suspended">{% translate "Vendor suspended" %}</span> {% endif %}{{ seller.display_name|default:"(no name yet)" }}</td>
+        </tr>
+        <tr><th>{% translate "Phone" %}</th><td>{{ seller.phone }}</td></tr>
+        {% if seller.email %}<tr><th>{% translate "Email" %}</th><td>{{ seller.email }}</td></tr>{% endif %}
+        {% if seller.date_joined %}<tr><th>{% translate "Member since" %}</th><td>{{ seller.date_joined|date:"M Y" }}</td></tr>{% endif %}
+        <tr><th>{% translate "Open this member" %}</th><td><a class="button" href="{{ seller_admin_url }}">{% translate "Vendor page" %}</a></td></tr>
+      </table>
+    </div>
+
+    {% if governance_chat %}
+      {% include "admin/governance/chat_panel.html" %}
+    {% endif %}
+  </div>
 </div>
 
-<form method="post">
-  {% csrf_token %}
-  <fieldset class="module aligned">
-    {% for field in form %}
-      <div class="form-row">
-        {{ field.errors }}
-        <div>
-          {{ field.label_tag }}
-          {{ field }}
-          {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </fieldset>
-  <div class="submit-row">
-    <input type="submit" value="Save decision" class="default">
-    <a href="{{ changelist_url }}" class="button cancel-link">Back to queue</a>
-  </div>
-</form>
-
-{% if reviews %}
-  <h2 style="margin-top:2rem">Previous decisions</h2>
-  <table class="adminlist" style="width:100%">
-    <thead>
-      <tr><th>When</th><th>Reviewer</th><th>Decision</th><th>Reason</th></tr>
-    </thead>
-    <tbody>
-      {% for review in reviews %}
-        <tr>
-          <td>{{ review.created_at|date:"Y-m-d H:i" }}</td>
-          <td>{{ review.reviewer|default:"—" }}</td>
-          <td>{{ review.get_decision_display }}</td>
-          <td>{{ review.reason|default:"—" }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
+<script>
+  (function () {
+    // Highlight the selected decision radio card and pre-focus the reason box
+    // for decisions that need a note.
+    var needsReason = { request_changes: true, reject: true, suspend: true };
+    var form = document.getElementById("moderation-decision-form");
+    var reason = form.querySelector("textarea");
+    function syncCards() {
+      var checked = form.querySelector("input[name='decision']:checked");
+      form.querySelectorAll(".governance-decision-option").forEach(function (label) {
+        label.classList.toggle("is-checked", checked && label.contains(checked));
+      });
+      if (checked && needsReason[checked.value] && reason && !reason.value.trim()) {
+        reason.focus();
+      }
+    }
+    form.addEventListener("change", syncCards);
+    syncCards();
+  })();
+</script>
 {% endblock %}
