@@ -1,0 +1,72 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h2>{{ auction.reference }} — {{ auction.title }}</h2>
+<p>
+  <span class="governance-pill gov-pill-{{ auction.status }}">{{ auction.get_status_display }}</span>
+  <span class="governance-pill gov-pill-{{ auction.moderation_status }}">{{ auction.get_moderation_status_display }}</span>
+  Seller: {{ auction.seller }} · Ends {{ auction.end_at|date:"j M Y H:i" }}
+  {% if flags %} · {% for flag in flags %}<span class="governance-flag">⚠ {{ flag }}</span> {% endfor %}{% endif %}
+  · <a href="{% url 'admin:auctions_auction_change' auction.pk %}">Open item admin</a>
+</p>
+
+<div class="governance-queues">
+  <div class="governance-panel">
+    <h2>Admin controls</h2>
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      {% csrf_token %}
+      {% if auction.status == "live" %}
+        <button type="submit" class="button" name="action" value="pause">⏸ Emergency pause</button>
+      {% endif %}
+      {% if auction.status == "paused" %}
+        <button type="submit" class="button default" name="action" value="resume">▶ Resume</button>
+      {% endif %}
+      {% if auction.status == "live" or auction.status == "paused" %}
+        <label>Extend by
+          <select name="hours" style="width:auto;">
+            <option value="1">1 hour</option>
+            <option value="6">6 hours</option>
+            <option value="24" selected>24 hours</option>
+            <option value="72">3 days</option>
+          </select>
+        </label>
+        <button type="submit" class="button" name="action" value="extend">Extend</button>
+      {% endif %}
+      <input type="hidden" name="reason" value="Cancelled from the bid monitor by staff.">
+      <button type="submit" class="button deletelink" name="action" value="cancel">Cancel auction</button>
+    </form>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Bid history (newest first)</h2>
+    <table class="governance-table">
+      <thead><tr><th>#</th><th>Bidder</th><th>Amount</th><th>Date</th><th>State</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for bid in bids %}
+          <tr {% if bid.voided_at %}style="opacity:.55;text-decoration:line-through;"{% endif %}>
+            <td>{{ bid.pk }}</td>
+            <td>{{ bid.bidder }}</td>
+            <td>AED {{ bid.amount }}</td>
+            <td>{{ bid.created_at|date:"j M H:i" }}</td>
+            <td>
+              {% if bid.voided_at %}<span class="governance-flag">voided {{ bid.voided_at|date:"j M H:i" }}</span>
+              {% elif auction.selected_bid_id == bid.pk %}<span class="governance-pill gov-pill-locked">locked/selected</span>
+              {% else %}<span class="governance-kpi-label">eligible</span>{% endif %}
+            </td>
+            <td>
+              {% if not bid.voided_at and auction.selected_bid_id != bid.pk %}
+                <form method="post" style="display:inline;">{% csrf_token %}
+                  <button type="submit" class="button deletelink" name="action" value="void_bid"
+                          onclick="return confirm('Void bid #{{ bid.pk }} of AED {{ bid.amount }}?')">Void</button>
+                </form>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6">No bids on this auction.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

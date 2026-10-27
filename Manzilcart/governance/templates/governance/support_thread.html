@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Messages about {{ item_title }} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ item_title }}</span>
+  </nav>
+
+  {# Same two-column chat layout as buyer↔seller chats: item context on the #}
+  {# left, conversation on the right (see conversations/detail.html). #}
+  <div class="chat-layout">
+    <aside class="panel chat-context">
+      <div class="chat-listing">
+        {% if item_cover_url %}
+          <img src="{{ item_cover_url }}" alt="" loading="lazy">
+        {% endif %}
+        <div>
+          <h1>{{ item_title }}</h1>
+          {% if item_price %}
+            <p class="detail-price">AED {{ item_price|floatformat:0|intcomma }}</p>
+          {% endif %}
+          {% if item_area_name %}
+            <p class="muted small"><span data-area-name="{{ item_area_name }}">{{ item_area_name }}</span>, <span data-emirate-name="{{ item_emirate_name }}">{{ item_emirate_name }}</span></p>
+          {% endif %}
+          {% if item_status %}
+            <p class="muted small" data-status>{{ item_status }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if item_moderation %}
+        <dl class="detail-list">
+          <div>
+            <dt>Moderation</dt>
+            <dd>{{ item_moderation }}</dd>
+          </div>
+        </dl>
+      {% endif %}
+
+      {# The team asked for changes -- send the seller straight to the edit form. #}
+      {% if edit_url %}
+        <a class="btn btn-primary btn-small" href="{{ edit_url }}">Edit your {{ item_kind }}</a>
+      {% elif item_url %}
+        <a class="btn btn-quiet btn-small" href="{{ item_url }}">View {{ item_kind }}</a>
+      {% endif %}
+
+      <p class="safety-note">
+        <strong>Marketplace team.</strong> Staff feedback about keeping listings
+        and auctions safe and accurate. Replies come from ManzilCart operations.
+      </p>
+    </aside>
+
+    <div class="panel chat-panel">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <h2 data-i18n="marketplace_team">Marketplace team</h2>
+          {% if thread.status == "needs_seller_reply" %}
+            <span class="chat-status" data-state="connected">Needs your reply</span>
+          {% elif thread.status == "resolved" %}
+            <span class="chat-status" data-state="connected">Resolved</span>
+          {% else %}
+            <span class="chat-status" data-state="connected">Open</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# -- Review banner: visible reminder + shortcut right above the chat -- #}
+      {% if edit_url %}
+        <div class="chat-auction-banner" style="border-color: #f59e0b; background: color-mix(in srgb, #f59e0b 12%, transparent);">
+          <span>
+            The team requested changes to this {{ item_kind }}. Update it and
+            resubmit for review.
+          </span>
+          <a class="btn btn-primary btn-small" href="{{ edit_url }}">Edit {{ item_kind }}</a>
+        </div>
+      {% endif %}
+
+      <ol id="support-chat" class="chat-log" aria-live="polite" aria-label="Messages">
+        {% for message in chat_messages %}
+          <li
+            class="chat-bubble{% if message.sender_id == thread.customer_id %} is-mine{% else %} is-theirs{% endif %}"
+            id="message-{{ message.pk }}"
+          >
+            <span class="chat-author">
+              {% if message.sender_id == thread.customer_id %}You{% else %}Marketplace team{% endif %}
+            </span>
+            <div class="chat-body">{{ message.message|linebreaksbr }}</div>
+            {% if message.attachment %}
+              <a class="chat-attachment" href="{{ message.attachment.url }}" target="_blank" rel="noopener">📎 Attachment</a>
+            {% endif %}
+            <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
+          </li>
+        {% empty %}
+          <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet.</li>
+        {% endfor %}
+      </ol>
+
+      {# Same composer markup and classes as conversations/detail.html; #}
+      {# governance threads use a plain POST instead of websockets, plus an #}
+      {# optional photo attachment (photo evidence for review). #}
+      {% if can_reply %}
+        <form class="chat-form" method="post" enctype="multipart/form-data" action="{% url 'governance:support_thread' pk=thread.pk %}">
+          {% csrf_token %}
+          <label class="sr-only" for="chat-input">Message</label>
+          <textarea
+            class="input"
+            id="chat-input"
+            name="message"
+            rows="2"
+            maxlength="{{ max_message_length }}"
+            placeholder="Write a message…"
+            required
+          ></textarea>
+          <label class="chat-attach" title="Attach a photo (optional)">
+            📎
+            <input type="file" name="attachment" id="chat-attachment" hidden>
+          </label>
+          <button class="btn btn-primary" type="submit" id="chat-submit">Send</button>
+        </form>
+        <p class="chat-hint muted small">
+          📎 adds a photo to your reply. Messages are saved; unsent text is kept if the page reloads.
+        </p>
+      {% else %}
+        <p class="chat-hint muted small">This conversation is closed. If you need more help, it will be reopened from a new team message.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Show the chosen filename next to the attach icon.
+  (function () {
+    var attach = document.getElementById("chat-attachment");
+    if (!attach) return;
+    attach.addEventListener("change", function () {
+      var label = attach.closest(".chat-attach");
+      if (!label) return;
+      var name = attach.files[0] ? attach.files[0].name : "";
+      label.setAttribute("title", name || "Attach a photo (optional)");
+      label.classList.toggle("has-file", !!name);
+    });
+  })();
+</script>
+{% endblock %}

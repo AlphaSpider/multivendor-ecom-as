@@ -13,45 +13,42 @@
     <div>
       <p class="eyebrow" data-i18n="your_account">Your account</p>
       <h1 data-i18n="messages_title">Messages</h1>
-      <p class="muted" data-i18n="messages_desc">Conversations with buyers and sellers, newest first.</p>
+      <p class="muted" data-i18n="messages_desc">Conversations with buyers, sellers and the marketplace team, newest first.</p>
     </div>
   </div>
 
-  {% if conversations %}
+  {% if inbox %}
     <ul class="conversation-list">
-      {% for conversation in conversations %}
-        <li class="panel conversation-row">
+      {% for entry in inbox %}
+        <li class="panel conversation-row{% if entry.kind == 'support' %} conversation-row-support{% endif %}">
           <div class="conversation-thumb">
-            {% with cover=conversation.cover_image %}
-              {% if cover %}
-                <img src="{{ cover.image.url }}" alt="" loading="lazy">
-              {% else %}
-                <span class="muted small" data-i18n="no_photo">No photo</span>
-              {% endif %}
-            {% endwith %}
+            {% if entry.thumb_url %}
+              <img src="{{ entry.thumb_url }}" alt="" loading="lazy">
+            {% else %}
+              <span class="muted small" data-i18n="no_photo">No photo</span>
+            {% endif %}
           </div>
 
           <div class="conversation-body">
             <div class="conversation-head">
-              <a href="{% url 'conversations:detail' pk=conversation.pk %}">
-                {{ conversation.item_title }}
+              <a href="{{ entry.url }}">
+                {{ entry.title }}
               </a>
-              {% if conversation.unread_count %}
-                <span class="badge">{{ conversation.unread_count }} <span data-i18n="new_badge">new</span></span>
+              {% if entry.unread %}
+                <span class="badge">{{ entry.unread }} <span data-i18n="new_badge">new</span></span>
               {% endif %}
             </div>
             <p class="muted small">
-              <span data-i18n="with_prefix">With</span>
-              {% if conversation.buyer_id == user.pk %}
-                {{ conversation.seller.display_name|default:"the seller" }}
+              {% if entry.kind == 'support' %}
+                <strong data-i18n="marketplace_team">Marketplace team</strong> · {{ entry.status_label }}
               {% else %}
-                {{ conversation.buyer.display_name|default:"a buyer" }}
+                <span data-i18n="with_prefix">With</span> {{ entry.with_label }}
+                {% if entry.area_name %}· <span data-area-name="{{ entry.area_name }}">{{ entry.area_name }}</span>, <span data-emirate-name="{{ entry.emirate_name }}">{{ entry.emirate_name }}</span>{% endif %}
               {% endif %}
-              · <span data-area-name="{{ conversation.service_area.name }}">{{ conversation.service_area.name }}</span>, <span data-emirate-name="{{ conversation.emirate.name }}">{{ conversation.emirate.name }}</span>
             </p>
             <p class="muted small">
-              {% if conversation.last_message_at %}
-                <span data-i18n="last_message_prefix">Last message</span> {{ conversation.last_message_at|naturaltime }}
+              {% if entry.last_message_at %}
+                <span data-i18n="last_message_prefix">Last message</span> {{ entry.last_message_at|naturaltime }}
               {% else %}
                 <span data-i18n="no_messages_yet">No messages yet</span>
               {% endif %}
@@ -59,7 +56,7 @@
           </div>
 
           <div class="conversation-actions">
-            <a class="btn btn-quiet btn-small" href="{% url 'conversations:detail' pk=conversation.pk %}">Open</a>
+            <a class="btn btn-quiet btn-small" href="{{ entry.url }}">Open</a>
           </div>
         </li>
       {% endfor %}

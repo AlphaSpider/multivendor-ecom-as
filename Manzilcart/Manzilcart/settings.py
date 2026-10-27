@@ -99,7 +99,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False  # Must stay readable by our own JS for AJAX posts.
 
-X_FRAME_OPTIONS = "DENY"
+X_FRAME_OPTIONS = env("DJANGO_X_FRAME_OPTIONS", default="DENY")
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
@@ -138,6 +138,8 @@ INSTALLED_APPS = [
     "deals",
     "auctions",
     "notifications",
+    # Admin governance, moderation bookkeeping and the admin chat.
+    "governance",
 ]
 
 MIDDLEWARE = [
@@ -155,11 +157,38 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "Manzilcart.urls"
 
+# Django 6.x wraps the default template loader chain in a cached loader
+# EVEN with DEBUG=True, so template edits would only show up after a
+# restart. In dev, pin the plain (non-caching) loaders; in production,
+# use the cached chain. APP_DIRS stays False because `loaders` is given -
+# app templates still load since the app_directories loader is in the chain.
+TEMPLATE_LOADERS = (
+    [
+        "django.template.loaders.filesystem.Loader",
+        "django.template.loaders.app_directories.Loader",
+    ]
+    if DEBUG
+    else [
+        (
+            "django.template.loaders.cached.Loader",
+            [
+                "django.template.loaders.filesystem.Loader",
+                "django.template.loaders.app_directories.Loader",
+            ],
+        )
+    ]
+)
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
+        "DIRS": [
+            # Governance admin overrides (base_site nav, change_form chat)
+            # must beat django.contrib.admin's built-in templates.
+            BASE_DIR / "governance" / "templates",
+            BASE_DIR / "templates",
+        ],
+        "APP_DIRS": False,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
@@ -167,6 +196,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.marketplace",
             ],
+            "loaders": TEMPLATE_LOADERS,
         },
     },
 ]

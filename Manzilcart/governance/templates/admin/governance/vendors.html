@@ -1,0 +1,51 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+  <a class="button {% if not status %}default{% endif %}" href="?">All vendors</a>
+  <a class="button {% if status == 'verified' %}default{% endif %}" href="?status=verified">Verified</a>
+  <a class="button {% if status == 'pending' %}default{% endif %}" href="?status=pending">Pending</a>
+  <a class="button {% if status == 'suspended' %}default{% endif %}" href="?status=suspended">Suspended</a>
+</div>
+
+<table class="governance-table">
+  <thead>
+    <tr><th>Vendor</th><th>Phone</th><th>Status</th><th>Active listings</th><th>Active auctions</th><th>KYB</th><th>Chats</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for vendor in vendors %}
+      <tr>
+        <td><a href="{% url 'admin:accounts_user_change' vendor.pk %}">{{ vendor }}</a></td>
+        <td>{{ vendor.phone }}</td>
+        <td><span class="governance-pill gov-pill-{{ vendor.seller_status }}">{{ vendor.get_seller_status_display }}</span></td>
+        <td>{{ vendor.active_listings }}</td>
+        <td>{{ vendor.active_auctions }}</td>
+        <td>
+          {% if vendor.is_mobile_verified %}📱 verified{% else %}<span class="governance-flag">unverified</span>{% endif %}
+        </td>
+        <td>{{ vendor.chat_threads }}</td>
+        <td>
+          <form method="post" style="display:inline;">{% csrf_token %}
+            <input type="hidden" name="vendor_id" value="{{ vendor.pk }}">
+            {% if vendor.seller_status != "suspended" %}
+              <button type="submit" class="button deletelink" name="action" value="suspend_vendor"
+                      onclick="return confirm('Suspend {{ vendor }} and delist all their active items?')">Suspend & freeze</button>
+            {% else %}
+              <button type="submit" class="button default" name="action" value="restore_vendor">Restore to verified</button>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8">No vendors match.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if vendors.paginator.count > 30 %}
+  <p>
+    Page {{ vendors.number }} of {{ vendors.paginator.num_pages }}
+    {% if vendors.has_next %} — <a href="?page={{ vendors.next_page_number }}">Next</a>{% endif %}
+  </p>
+{% endif %}
+{% endblock %}

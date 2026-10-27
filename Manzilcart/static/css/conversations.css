@@ -80,6 +80,18 @@
   align-items: center;
 }
 
+/* Marketplace-team rows: same layout, but visibly "official". */
+.conversation-row-support {
+  border-inline-start: 3px solid var(--brand, #0f67a5);
+}
+
+.conversation-row-support .conversation-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted, #f1f3f5);
+}
+
 .conversation-head a {
   font-weight: 700;
 }
@@ -328,6 +340,31 @@
   padding: 0 1rem 0.75rem;
   margin: 0;
   background: var(--surface);
+}
+
+/* Marketplace-team thread extras (attach control + in-bubble attachment) */
+.chat-attach {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  background: var(--surface);
+}
+
+.chat-attach.has-file {
+  border-color: var(--brand);
+}
+
+.chat-bubble .chat-attachment {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
 }
 
 @media (max-width: 760px) {

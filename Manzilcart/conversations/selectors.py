@@ -37,11 +37,12 @@ def unread_total_for(user) -> int:
     Total unread messages for ``user`` across every thread they participate in.
 
     Same definition as the per-thread ``unread_count`` annotation: a message the
-    other side sent and that has no ``read_at`` yet.
+    other side sent and that has no ``read_at`` yet. Marketplace-team
+    (moderation) threads count too, so the shared nav badge covers them.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return 0
-    return (
+    total = (
         Message.objects.filter(
             Q(conversation__buyer=user) | Q(conversation__seller=user),
             read_at__isnull=True,
@@ -49,6 +50,15 @@ def unread_total_for(user) -> int:
         .exclude(sender=user)
         .count()
     )
+    # Governance chat uses ``is_read`` (not ``read_at``); staff replies wait
+    # unread for the seller until the support thread is opened.
+    from governance.models import ListingChatMessage  # lazy: cross-app
+
+    total += ListingChatMessage.objects.filter(
+        thread__customer_id=user.pk,
+        is_read=False,
+    ).exclude(sender_id=user.pk).count()
+    return total
 
 
 def conversation_for_participant(pk: int, user) -> Conversation | None:

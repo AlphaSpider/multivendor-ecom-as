@@ -1,0 +1,17 @@
+{% if message.sender_role == "admin" %}
+<div class="governance-chat-msg governance-chat-msg-staff">
+  {{ message.message|linebreaksbr }}
+  {% if message.attachment %}
+    <div class="governance-chat-attachment"><a href="{{ message.attachment.url }}" target="_blank">📎 attachment</a></div>
+  {% endif %}
+  <span class="governance-chat-meta">Marketplace team · {{ message.created_at|time:"H:i" }} {{ message.created_at|date:"j M" }}{% if message.is_read %} ✓ read{% endif %}</span>
+</div>
+{% else %}
+<div class="governance-chat-msg governance-chat-msg-seller">
+  {{ message.message|linebreaksbr }}
+  {% if message.attachment %}
+    <div class="governance-chat-attachment"><a href="{{ message.attachment.url }}" target="_blank">📎 attachment</a></div>
+  {% endif %}
+  <span class="governance-chat-meta">{{ message.sender.display_name|default:message.sender.phone }} (seller) · {{ message.created_at|time:"H:i" }} {{ message.created_at|date:"j M" }}</span>
+</div>
+{% endif %}

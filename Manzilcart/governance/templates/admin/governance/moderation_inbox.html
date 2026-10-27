@@ -1,0 +1,73 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+  Moderation inbox: every admin↔seller conversation in one card list.
+
+  Each card shows the item (cover photo + title), the seller, the thread
+  status, a preview of the most recent message and one click-through to the
+  item's review/change screen with the chat drawer.
+{% endcomment %}
+{% load i18n %}
+
+{% block content %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+  <a class="button {% if chosen_view == 'attention' %}default{% endif %}" href="?view=attention">Needs attention</a>
+  <a class="button {% if chosen_view == 'needs_reply' %}default{% endif %}" href="?view=needs_reply">Waiting for a reply</a>
+  <a class="button {% if chosen_view == 'open' %}default{% endif %}" href="?view=open">Open</a>
+  <a class="button {% if chosen_view == 'resolved' %}default{% endif %}" href="?view=resolved">Resolved</a>
+  <a class="button {% if chosen_view == 'all' %}default{% endif %}" href="?view=all">All threads</a>
+  <form method="get" style="display:inline;">
+    {% if chosen_view %}<input type="hidden" name="view" value="{{ chosen_view }}">{% endif %}
+    <select name="item_type" onchange="this.form.submit()">
+      <option value="">All item types</option>
+      <option value="listing" {% if item_type == 'listing' %}selected{% endif %}>Fixed-price posts</option>
+      <option value="auction" {% if item_type == 'auction' %}selected{% endif %}>Auctions</option>
+    </select>
+    <select name="seller" onchange="this.form.submit()">
+      <option value="">All sellers</option>
+      {% for seller in sellers %}
+        <option value="{{ seller.pk }}" {% if request.GET.seller == seller.pk|stringformat:"s" %}selected{% endif %}>{{ seller }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% for thread in threads %}
+  <div class="governance-panel" style="padding:12px 14px;{% if thread.unread_customer_messages %}border-inline-start:4px solid var(--gov-warn,#d97706);{% endif %}">
+    <div class="gov-thread-item">
+      {% if thread.item_cover_url %}
+        <a href="{{ thread.item_admin_url }}"><img class="gov-thumb" src="{{ thread.item_cover_url }}" alt="{{ thread.item_title }}"></a>
+      {% else %}
+        <a href="{{ thread.item_admin_url }}"><span class="gov-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--darkened-bg,#f1f5f9)">—</span></a>
+      {% endif %}
+      <div style="min-width:0;" class="gov-thread-body">
+        <div>
+          <span class="gov-thread-title">{{ thread.item_title|truncatechars:52 }}</span>
+          <span class="governance-pill gov-pill-{{ thread.content_type.model }}">{{ thread.content_type.model }}</span>
+          <span class="governance-pill gov-pill-{{ thread.status }}">{{ thread.get_status_display }}</span>
+          {% if thread.unread_customer_messages %}<span class="governance-badge-unread">{{ thread.unread_customer_messages }} unread</span>{% endif %}
+        </div>
+        <div class="gov-thread-meta">
+          {{ thread.customer }} · last message {{ thread.last_message_at|date:"j M Y H:i"|default:"—" }}
+        </div>
+        <div class="gov-thread-preview{% if thread.unread_customer_messages %} governance-flag{% endif %}">
+          {% if thread.last_message %}{{ thread.last_message|truncatechars:130 }}{% else %}<em>No messages yet.</em>{% endif %}
+        </div>
+      </div>
+      <div class="gov-thread-actions">
+        <a class="button default" href="{{ thread.item_admin_url }}">Open item &amp; chat ↗</a>
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="governance-panel governance-empty">
+    Nothing here — this view is clear. Try “All threads”.
+  </div>
+{% endfor %}
+
+{% if threads.paginator.count > 30 %}
+  <p>
+    Page {{ threads.number }} of {{ threads.paginator.num_pages }} · {{ threads.paginator.count }} threads
+    {% if threads.has_next %} — <a href="?page={{ threads.next_page_number }}&view={{ chosen_view }}&item_type={{ item_type }}">Next</a>{% endif %}
+  </p>
+{% endif %}
+{% endblock %}

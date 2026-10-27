@@ -27,7 +27,7 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
-  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.13">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.16">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}{% if current_emirate and request.resolver_match.namespace != 'locations' %} has-mobile-tabbar{% endif %}">
@@ -112,7 +112,7 @@
             <a href="{% url 'accounts:login' %}" data-i18n="nav_sign_in">Sign in</a>
           {% endif %}
 
-          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell_plus"> Sell </a>
+          <a class="btn btn-small btn-primary nav-sell-btn" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" data-i18n="nav_sell_plus"> Sell Furniture</a>
         </nav>
       {% endif %}
     </div>

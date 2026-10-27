@@ -1,0 +1,55 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="governance-queues">
+  <div class="governance-panel">
+    <h2>Active auctions: bid audit summary</h2>
+    <table class="governance-table">
+      <thead>
+        <tr><th>Auction</th><th>Status</th><th>Bids</th><th>Bidders</th><th>Top bid</th><th>Ends</th><th>Flags</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% with auction=row.0 flags=row.1 %}
+            <td>{{ auction.reference }} — {{ auction.title|truncatechars:40 }}</td>
+            <td><span class="governance-pill gov-pill-{{ auction.status }}">{{ auction.get_status_display }}</span></td>
+            <td>{{ auction.bid_count }}</td>
+            <td>{{ auction.distinct_bidders }}</td>
+            <td>{% if auction.top_bid %}AED {{ auction.top_bid }}{% else %}—{% endif %}</td>
+            <td>{{ auction.end_at|date:"j M H:i" }}</td>
+            <td>
+              {% for flag in flags %}<span class="governance-flag">⚠ {{ flag }}</span>{% empty %}<span class="governance-kpi-label">none</span>{% endfor %}
+            </td>
+            <td><a class="button default" href="{% url 'admin:governance_bid_auction' auction.pk %}">Audit</a></td>
+            {% endwith %}
+          </tr>
+        {% empty %}
+          <tr><td colspan="8">No active auctions.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Recently voided bids</h2>
+    <table class="governance-table">
+      <thead><tr><th>Bid</th><th>Auction</th><th>Bidder</th><th>Amount</th><th>Voided by</th><th>When</th></tr></thead>
+      <tbody>
+        {% for bid in recently_voided %}
+          <tr>
+            <td>#{{ bid.pk }}</td>
+            <td>{{ bid.auction.reference }}</td>
+            <td>{{ bid.bidder }}</td>
+            <td>AED {{ bid.amount }}</td>
+            <td>{{ bid.voided_by|default:"—" }}</td>
+            <td>{{ bid.voided_at|date:"j M H:i" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6">No voided bids.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

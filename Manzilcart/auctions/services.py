@@ -181,7 +181,11 @@ def eligible_bids(auction: Auction) -> list[Bid]:
     starting_price = auction.reserve_price
     seen: set[int] = set()
     rows: list[Bid] = []
-    bids = auction.bids.select_related("bidder").order_by("-amount", "created_at", "id")
+    bids = (
+        auction.bids.select_related("bidder")
+        .filter(voided_at__isnull=True)
+        .order_by("-amount", "created_at", "id")
+    )
     for bid in bids:
         if bid.bidder_id in seen:
             continue
@@ -594,6 +598,137 @@ def reject_auction(auction: Auction, *, reviewer, reason: str, request=None) -> 
 
 
 # ---------------------------------------------------------------------------
+# Admin auction controls (bid monitor)
+# ---------------------------------------------------------------------------
+
+
+def _ensure_staff(actor) -> None:
+    if actor is None or not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Marketplace staff only.")
+
+
+@transaction.atomic
+def pause_auction(auction: Auction, *, actor, request=None) -> Auction:
+    """Emergency pause: the page stays up but bids are refused until resumed."""
+    _ensure_staff(actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.status != Auction.Status.LIVE:
+        raise StateTransitionError("Only a live auction can be paused.")
+    locked.status = Auction.Status.PAUSED
+    locked.save(update_fields=["status", "updated_at"])
+    _record_event(
+        locked,
+        AuctionEvent.Type.PAUSED,
+        actor=actor,
+        summary="Auction paused by admin",
+    )
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} paused by admin",
+        request=request,
+    )
+    return locked
+
+
+@transaction.atomic
+def resume_auction(auction: Auction, *, actor, request=None) -> Auction:
+    _ensure_staff(actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.status != Auction.Status.PAUSED:
+        raise StateTransitionError("Only a paused auction can be resumed.")
+    now = timezone.now()
+    if locked.end_at <= now:
+        raise StateTransitionError("This auction already ended; extend it first.")
+    locked.status = Auction.Status.LIVE
+    locked.save(update_fields=["status", "updated_at"])
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} resumed by admin",
+        request=request,
+    )
+    return locked
+
+
+@transaction.atomic
+def extend_auction(auction: Auction, *, hours: int, actor, request=None) -> Auction:
+    """Push the end time out; also revives a paused auction inside its window."""
+    _ensure_staff(actor)
+    if hours <= 0 or hours > 24 * 14:
+        raise ValidationError({"hours": "Extend between 1 hour and 14 days."})
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.status not in {Auction.Status.LIVE, Auction.Status.PAUSED}:
+        raise StateTransitionError("Only a live or paused auction can be extended.")
+    now = timezone.now()
+    new_end = max(locked.end_at, now) + timedelta(hours=hours)
+    locked.end_at = new_end
+    if locked.status == Auction.Status.PAUSED:
+        locked.status = Auction.Status.LIVE
+    locked.save(update_fields=["end_at", "status", "updated_at"])
+    _record_event(
+        locked,
+        AuctionEvent.Type.EXTENDED,
+        actor=actor,
+        summary=f"End time extended to {new_end:%d %b %Y %H:%M} by admin",
+    )
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction {locked.reference} end time extended to {new_end:%Y-%m-%d %H:%M}",
+        request=request,
+    )
+    return locked
+
+
+@transaction.atomic
+def void_bid(auction: Auction, bid: Bid, *, reviewer, request=None) -> Bid:
+    """
+    Void a fraudulent bid atomically.
+
+    Ranking, top-bid displays and the bid-placement floor all exclude voided
+    bids, so the highest bid recalculates automatically from the remaining rows.
+    Voiding the bid behind the rewarded/locked selection is refused: that
+    decision should go through the selection fallback instead.
+    """
+    _ensure_staff(reviewer)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    bid = locked.bids.select_for_update().get(pk=bid.pk)
+    if bid.voided_at is not None:
+        raise StateTransitionError("This bid is already voided.")
+    if locked.selected_bid_id == bid.pk:
+        raise StateTransitionError(
+            "This bid holds the current selection. Use the selection fallback to invalidate it."
+        )
+    bid.voided_at = timezone.now()
+    bid.voided_by = reviewer
+    bid.save(update_fields=["voided_at", "voided_by"])
+    _record_event(
+        locked,
+        AuctionEvent.Type.BID_VOIDED,
+        actor=reviewer,
+        summary=f"Bid #{bid.pk} of AED {bid.amount} voided",
+        metadata={"bid_id": bid.pk, "bidder_id": bid.bidder_id, "amount": str(bid.amount)},
+    )
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=reviewer,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Bid #{bid.pk} voided on auction {locked.reference}",
+        metadata={"bid_id": bid.pk},
+        request=request,
+    )
+    return bid
+
+
+# ---------------------------------------------------------------------------
 # Images
 # ---------------------------------------------------------------------------
 
@@ -663,7 +798,7 @@ def cancel_auction(auction: Auction, *, actor, reason="", request=None) -> Aucti
     is_staff = actor is not None and getattr(actor, "is_staff", False)
     if not (is_seller or is_staff):
         raise PermissionDeniedError("Only the seller or operations can cancel this auction.")
-    if locked.status not in {Auction.Status.SCHEDULED, Auction.Status.LIVE}:
+    if locked.status not in {Auction.Status.SCHEDULED, Auction.Status.LIVE, Auction.Status.PAUSED}:
         raise StateTransitionError("This auction can no longer be cancelled.")
     if is_seller and locked.bids.exists():
         raise StateTransitionError("Bids already exist; ask operations to resolve this auction.")
@@ -730,7 +865,9 @@ def place_bid(
         raise StateTransitionError("You have reached the bid limit for this auction.")
 
     amount = _money(amount)
-    highest = lock.bids.order_by("-amount", "created_at", "id").first()
+    highest = (
+        lock.bids.filter(voided_at__isnull=True).order_by("-amount", "created_at", "id").first()
+    )
     increment = Decimal(settings.AUCTION_MIN_BID_INCREMENT)
     starting_price = lock.starting_price
     minimum_bid = (

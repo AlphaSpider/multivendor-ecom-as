@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Marketplace messages - ManzilCart{% endblock %}
+
+{% block content %}
+<section class="page">
+  <h1>Marketplace messages</h1>
+  <p class="muted">Feedback from the marketplace team about your posts and auctions.</p>
+
+  <div class="panel">
+    {% if threads %}
+      <ul class="thread-list">
+        {% for thread in threads %}
+          <li>
+            <a class="card-link" href="{% url 'governance:support_thread' thread.pk %}">
+              <div class="row-between">
+                <strong>
+                  {% if thread.content_type.model == "auction" %}Auction{% else %}Listing{% endif %}:
+                  {{ thread.item|truncatechars:52 }}
+                </strong>
+                {% if thread.unread_count %}<span class="count-badge">{{ thread.unread_count }}</span>{% endif %}
+              </div>
+              <span class="muted">Last activity {{ thread.last_message_at|date:"j M Y H:i"|default:"—" }} · {{ thread.get_status_display }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No marketplace messages yet. When the team reviews one of your items, their feedback appears here.</p>
+    {% endif %}
+  </div>
+
+  <a class="btn btn-quiet" href="{% url 'accounts:dashboard' %}">Back to My account</a>
+</section>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="governance-kpi-grid">
+  <div class="governance-kpi">
+    <div class="governance-kpi-value">AED {{ gmv }}</div>
+    <div class="governance-kpi-label">Total GMV (accepted deals)</div>
+  </div>
+</div>
+
+<p class="governance-kpi-label" style="margin-bottom:16px;">
+  This marketplace settles payment directly between buyer and seller at accept-offer time
+  (<code>Deal.agreed_price</code>); there is no escrow or payout ledger yet, so commission
+  columns are intentionally absent rather than fabricated.
+</p>
+
+<div class="governance-queues">
+  <div class="governance-panel" id="disputes">
+    <h2>Dispute resolution (cancellation requests)</h2>
+    <table class="governance-table">
+      <thead><tr><th>Deal</th><th>Requested by</th><th>Reason</th><th>Status</th><th>Decision</th></tr></thead>
+      <tbody>
+        {% for cancellation in disputes %}
+          <tr>
+            <td>{{ cancellation.deal.reference }}<br>
+              <span class="governance-kpi-label">{{ cancellation.deal.buyer }} ⇄ {{ cancellation.deal.seller }}</span></td>
+            <td>{{ cancellation.requested_by|default:"—" }}</td>
+            <td>{{ cancellation.reason|truncatechars:80 }}</td>
+            <td><span class="governance-pill gov-pill-{{ cancellation.status }}">{{ cancellation.get_status_display }}</span></td>
+            <td>
+              {% if cancellation.status == "pending" or cancellation.status == "escalated" %}
+                <form method="post">{% csrf_token %}
+                  <input type="hidden" name="cancellation_id" value="{{ cancellation.pk }}">
+                  <button type="submit" class="button" name="decision" value="accept">Approve cancellation</button>
+                  <button type="submit" class="button" name="decision" value="reject">Keep deal</button>
+                </form>
+              {% else %}{{ cancellation.resolved_at|date:"j M Y"|default:"—" }}{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">No cancellation requests.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="governance-panel">
+    <h2>Accepted deals (GMV ledger)</h2>
+    <table class="governance-table">
+      <thead><tr><th>Reference</th><th>Buyer ⇄ Seller</th><th>Item</th><th>Agreed</th><th>Status</th><th>Accepted</th></tr></thead>
+      <tbody>
+        {% for deal in deals %}
+          <tr>
+            <td>{{ deal.reference }}</td>
+            <td>{{ deal.buyer }} ⇄ {{ deal.seller }}</td>
+            <td>{% firstof deal.listing.title deal.auction.title "(item removed)" %}</td>
+            <td>AED {{ deal.agreed_price|default:"—" }}</td>
+            <td><span class="governance-pill gov-pill-{{ deal.status }}">{{ deal.get_status_display }}</span></td>
+            <td>{{ deal.accepted_at|date:"j M Y"|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6">No deals yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

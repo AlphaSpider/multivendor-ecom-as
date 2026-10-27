@@ -17,7 +17,7 @@ class BidInline(admin.TabularInline):
     model = Bid
     extra = 0
     can_delete = False
-    fields = ("bidder", "amount", "client_bid_id", "created_at")
+    fields = ("bidder", "amount", "client_bid_id", "voided_at", "created_at")
     readonly_fields = fields
     ordering = ("-amount", "created_at", "id")
 

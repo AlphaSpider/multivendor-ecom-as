@@ -21,6 +21,7 @@ class UserAdmin(BaseUserAdmin):
     list_display = (
         "phone",
         "display_name",
+        "seller_status",
         "emirate",
         "service_area",
         "is_mobile_verified",
@@ -28,7 +29,14 @@ class UserAdmin(BaseUserAdmin):
         "is_staff",
         "date_joined",
     )
-    list_filter = ("is_active", "is_staff", "emirate", "service_area", "phone_verified_at")
+    list_filter = (
+        "seller_status",
+        "is_active",
+        "is_staff",
+        "emirate",
+        "service_area",
+        "phone_verified_at",
+    )
     search_fields = ("phone", "display_name", "email")
     list_select_related = ("emirate", "service_area")
     autocomplete_fields = ("emirate", "service_area")
@@ -38,7 +46,7 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {"fields": ("phone", "password")}),
         ("Member", {"fields": ("display_name", "first_name", "last_name", "email")}),
-        ("Marketplace", {"fields": ("emirate", "service_area")}),
+        ("Marketplace", {"fields": ("emirate", "service_area", "seller_status")}),
         ("Verification", {"fields": ("phone_verified_at",)}),
         (
             "Permissions",

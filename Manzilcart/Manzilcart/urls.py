@@ -26,6 +26,7 @@ urlpatterns = [
     path("", include("deals.urls")),
     path("", include("auctions.urls")),
     path("", include("locations.urls_public")),
+    path("", include("governance.urls")),
 ]
 
 if settings.DEBUG:

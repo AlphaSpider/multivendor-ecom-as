@@ -1,0 +1,17 @@
+{% extends "admin/change_form.html" %}
+{% comment %}
+Listing/Auction change form with the contextual chat drawer.
+
+The slot needs `clear: both`: Django admin floats the form container, and
+a plain block after it would wrap up beside the float instead of dropping
+below it.
+{% endcomment %}
+
+{% block content %}
+  {{ block.super }}
+  {% if governance_chat %}
+    <div class="governance-chat-slot">
+      {% include "admin/governance/chat_panel.html" %}
+    </div>
+  {% endif %}
+{% endblock %}

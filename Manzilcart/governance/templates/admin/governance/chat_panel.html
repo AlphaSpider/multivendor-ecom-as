@@ -1,0 +1,151 @@
+{# Sticky "Customer chat about this post" panel for the item change form. #}
+{% load i18n %}
+<div class="governance-chat-panel"
+     id="governance-chat"
+     data-messages-url="{{ governance_chat.messages_url }}"
+     data-send-url="{{ governance_chat.send_url }}"
+     data-username="{% firstof request.user.get_full_name request.user.username 'staff' %}">
+  <div class="governance-chat-header">
+    <strong>💬 Customer chat about this post</strong>
+    <span class="governance-chat-thread-status">{% firstof governance_chat.thread.get_status_display "Open" %}</span>
+  </div>
+  <div class="governance-chat-scroll" id="governance-chat-messages"
+       data-max-message="4000">
+    {% include "admin/governance/chat_messages.html" with messages=governance_chat.messages thread=governance_chat.thread %}
+  </div>
+  <form id="governance-chat-composer" class="governance-chat-composer">
+    {% comment %}
+    CRITICAL FORM RULE: this is intentionally NOT nested inside the admin
+    item form, and its buttons are type="button" + fetch - sending a chat
+    message can never submit/save/validate the main product form.
+    {% endcomment %}
+    <div class="governance-chat-row">
+      <textarea id="governance-chat-input" rows="2" maxlength="4000"
+                placeholder="Write to the seller about this post…"></textarea>
+    </div>
+    <div class="governance-chat-row governance-chat-actions">
+      <label class="governance-chat-attach">
+        📎 <input type="file" id="governance-chat-attachment" name="attachment" hidden />
+        <span id="governance-chat-attach-name">Attach</span>
+      </label>
+      <button type="button" class="button" id="governance-chat-send">Send</button>
+    </div>
+    <p class="governance-chat-error" id="governance-chat-error" hidden></p>
+  </form>
+</div>
+
+<style>
+  .governance-chat-panel {
+    position: sticky;
+    top: 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 16px;
+    max-width: 420px;
+    background: var(--body-bg, #fff);
+  }
+  .governance-chat-header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .governance-chat-thread-status { color: var(--body-quiet-color, #64748b); font-size: 12px; }
+  .governance-chat-scroll {
+    height: 320px; overflow-y: auto; margin: 10px 0; padding-right: 4px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .governance-chat-msg { border-radius: 10px; padding: 8px 10px; font-size: 13px; max-width: 92%; }
+  /* Theme-aware bubble colours (admin vars flip with the light/dark toggle). */
+  .governance-chat-msg-seller { background: var(--darkened-bg, #f1f5f9); color: var(--body-fg); }
+  .governance-chat-msg-staff { background: var(--button-bg, #0f67a5); color: var(--button-fg, #fff); }
+  .governance-chat-msg-system { background: var(--darkened-bg, #fef9c3); color: var(--body-fg); border: 1px solid var(--hairline-color, #e0e0d4); }
+  .governance-chat-meta { display: block; color: var(--body-quiet-color, #64748b); font-size: 11px; margin-top: 4px; }
+  .governance-chat-composer textarea { width: 100%; }
+  .governance-chat-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .governance-chat-attach { cursor: pointer; color: #0757ba; }
+  .governance-chat-error { color: var(--error-fg, #d00); font-size: 12px; }
+  .governance-badge-unread { background: #dc2626; color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; }
+</style>
+
+<script>
+  (function () {
+    var panel = document.getElementById("governance-chat");
+    if (!panel) return;
+    var messagesUrl = panel.getAttribute("data-messages-url");
+    var sendUrl = panel.getAttribute("data-send-url");
+    var listEl = document.getElementById("governance-chat-messages");
+    var input = document.getElementById("governance-chat-input");
+    var attachment = document.getElementById("governance-chat-attachment");
+    var attachName = document.getElementById("governance-chat-attach-name");
+    var errorEl = document.getElementById("governance-chat-error");
+    var sendBtn = document.getElementById("governance-chat-send");
+    var pollMs = 12000;
+    var paused = false;
+
+    // Staff actions typing/reading scroll to bottom; keep manual control.
+    function scrollBottom() { listEl.scrollTop = listEl.scrollHeight; }
+    scrollBottom();
+
+    attachment.addEventListener("change", function () {
+      attachName.textContent = attachment.files[0] ? attachment.files[0].name : "Attach";
+    });
+
+    function showError(text) {
+      errorEl.hidden = !text;
+      errorEl.textContent = text || "";
+    }
+
+    function refresh() {
+      fetch(messagesUrl, {
+        headers: { "X-Requested-With": "fetch" },
+        credentials: "same-origin",
+      })
+        .then(function (response) { return response.ok ? response.text() : Promise.reject(); })
+        .then(function (html) {
+          listEl.innerHTML = html;
+          scrollBottom();
+        })
+        .catch(function () { /* transient admin fetch failure; next poll retries */ });
+    }
+
+    function send() {
+      var text = input.value.trim();
+      if (!text && !(attachment.files && attachment.files.length)) {
+        showError("Write a short message first.");
+        return;
+      }
+      var data = new FormData();
+      data.append("message", text);
+      if (attachment.files.length) data.append("attachment", attachment.files[0]);
+
+      var csrf = document.querySelector("input[name='csrfmiddlewaretoken']");
+      if (csrf) data.append("csrfmiddlewaretoken", csrf.value);
+      sendBtn.disabled = true;
+      paused = true;
+      fetch(sendUrl, {
+        method: "POST",
+        body: data,
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "fetch" },
+      })
+        .then(function (response) {
+          if (!response.ok) return response.text().then(function (t) { throw new Error(t || "Send failed"); });
+          return response.text();
+        })
+        .then(function (html) {
+          listEl.innerHTML = html;
+          input.value = "";
+          attachment.value = "";
+          attachName.textContent = "Attach";
+          showError("");
+          scrollBottom();
+        })
+        .catch(function (error) { showError(error.message); })
+        .finally(function () { sendBtn.disabled = false; paused = false; });
+    }
+
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") send();
+    });
+
+    setInterval(function () { if (!paused) refresh(); }, pollMs);
+  })();
+</script>

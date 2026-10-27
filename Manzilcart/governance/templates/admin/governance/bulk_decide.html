@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h2>
+  {% if mode == "suspend" %}Suspend {{ listing_count }} item(s){% else %}Request changes for {{ listing_count }} item(s){% endif %}
+</h2>
+<p>
+  The reason you write here is delivered to each seller as a system message in their item's
+  chat thread and (when possible) as a WhatsApp notification.
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <textarea name="note" rows="5" style="width:100%;max-width:640px;"
+            placeholder="{% if mode == 'suspend' %}Suspension reason shown to the seller…{% else %}What exactly needs to change?{% endif %}"
+            required></textarea>
+  <div style="margin:12px 0;">
+    <button type="submit" class="button default">Apply to {{ listing_count }} item(s)</button>
+    <a class="button" href="#back">Cancel</a>
+  </div>
+  <table class="governance-table">
+    <thead><tr><th>Item</th><th>Seller</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for item in listings %}
+        <tr><td>{{ item.title|truncatechars:54 }}</td><td>{{ item.seller }}</td>
+            <td><span class="governance-pill gov-pill-{% if item.status %}{{ item.status }}{% elif item.moderation_status %}{{ item.moderation_status }}{% endif %}">
+                {% firstof item.get_status_display item.get_moderation_status_display }}</span></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+
+<a href="#back" style="display:none;" id="back"></a>
+<script>
+  // "Cancel" simply goes back to the changelist page the user came from.
+  document.getElementById("back").href = document.referrer || "/admin/";
+</script>
+{% endblock %}

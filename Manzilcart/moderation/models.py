@@ -26,6 +26,8 @@ class ListingReview(models.Model):
     class Decision(models.TextChoices):
         APPROVE = "approve", "Approved"
         REJECT = "reject", "Rejected"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+        SUSPENDED = "suspended", "Suspended"
 
     listing = models.ForeignKey(
         Listing, on_delete=models.CASCADE, related_name="reviews"
@@ -37,13 +39,13 @@ class ListingReview(models.Model):
         on_delete=models.SET_NULL,
         related_name="listing_reviews",
     )
-    decision = models.CharField(max_length=16, choices=Decision.choices)
+    decision = models.CharField(max_length=20, choices=Decision.choices)
     reason = models.TextField(
         blank=True,
         help_text="Shown to the seller when a listing is rejected. Required for rejections.",
     )
-    previous_status = models.CharField(max_length=16, blank=True)
-    new_status = models.CharField(max_length=16, blank=True)
+    previous_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -74,6 +76,8 @@ class AuctionReview(models.Model):
     class Decision(models.TextChoices):
         APPROVE = "approve", "Approved"
         REJECT = "reject", "Rejected"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+        SUSPENDED = "suspended", "Suspended"
 
     auction = models.ForeignKey(
         "auctions.Auction", on_delete=models.CASCADE, related_name="reviews"
@@ -85,13 +89,13 @@ class AuctionReview(models.Model):
         on_delete=models.SET_NULL,
         related_name="auction_reviews",
     )
-    decision = models.CharField(max_length=16, choices=Decision.choices)
+    decision = models.CharField(max_length=20, choices=Decision.choices)
     reason = models.TextField(
         blank=True,
         help_text="Shown to the seller when an auction is rejected. Required for rejections.",
     )
-    previous_status = models.CharField(max_length=16, blank=True)
-    new_status = models.CharField(max_length=16, blank=True)
+    previous_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

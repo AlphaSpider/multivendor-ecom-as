@@ -415,6 +415,44 @@ a:hover { color: var(--brand-strong); }
 
 .inline-form { display: inline; }
 
+/* Desktop header: a deliberate two-row layout instead of an accidental wrap.
+   Row 1 — brand on the left, emirate + language + theme on the right.
+   Row 2 — full-width menu: links left, Sell button pinned to the right. */
+@media (min-width: 761px) {
+  .header-inner {
+    row-gap: 0.45rem;
+    padding-block: 0.55rem 0.65rem;
+  }
+
+  .main-nav {
+    flex: 1 1 100%;
+    gap: 0.4rem;
+    padding-block: 0.15rem 0.4rem;
+  }
+
+  .main-nav a,
+  .main-nav .link-button {
+    padding: 0.35rem 0.7rem;
+    border-radius: 9px;
+    transition: color 0.12s ease, background-color 0.12s ease, text-decoration 0s;
+  }
+
+  /* Pill hover instead of a bare underline so links don't jump. */
+  .main-nav a:hover,
+  .main-nav .link-button:hover {
+    background: var(--sand);
+    text-decoration: none;
+  }
+
+  .main-nav a.nav-sell-btn {
+    margin-inline-start: auto;
+  }
+
+  .main-nav a.nav-sell-btn:hover {
+    background: #b91c1c !important; /* brand red hover for the filled CTA */
+  }
+}
+
 /* Unread-chat count badge (mobile tab bar + desktop nav Messages link). */
 .tab-badge,
 .nav-badge {
