@@ -14,6 +14,8 @@ redis==8.1.0                    # Redis client (channel layer + cache)
 
 # --- Uploads ---------------------------------------------------------------
 Pillow==13.0.0                  # Image validation and thumbnailing
+django-storages[s3]==1.14.6     # Neon Object Storage via its S3-compatible API
+boto3==1.43.123                 # S3 client used by django-storages
 
 # --- Static files ----------------------------------------------------------
 whitenoise==6.12.0              # Serves compressed static files from the app process

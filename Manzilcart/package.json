@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "build": "..\\venv\\Scripts\\python.exe manage.py check",
+    "start": "..\\venv\\Scripts\\python.exe manage.py runserver 127.0.0.1:8000"
+  },
+  "dependencies": {
+    "@neon/config": "^1.10.0",
+    "@neon/env": "^1.6.8"
+  }
+}

@@ -14,7 +14,9 @@ Design notes
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -64,6 +66,9 @@ def env_list(name: str, default: tuple[str, ...] = ()) -> list[str]:
 ENVIRONMENT = (env("DJANGO_ENV", "development") or "development").lower()
 IS_PRODUCTION = ENVIRONMENT == "production"
 IS_TESTING = ENVIRONMENT in {"testing", "test"}
+# Django's test runner does not set DJANGO_ENV. Keep test uploads local even
+# when a developer's .env contains the Neon Object Storage credentials.
+RUNNING_TESTS = IS_TESTING or "test" in sys.argv
 
 DEBUG = env_bool("DJANGO_DEBUG", default=not IS_PRODUCTION)
 
@@ -229,8 +234,42 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Database
 # ---------------------------------------------------------------------------
 DB_ENGINE = (env("DB_ENGINE", "postgresql") or "postgresql").lower()
+DATABASE_URL = env("DATABASE_URL")
 
-if DB_ENGINE in {"postgres", "postgresql"}:
+if DATABASE_URL:
+    # Neon injects a standard Postgres URL. Prefer it when present so deployed
+    # environments need no duplicated DB_HOST/DB_NAME/DB_USER credentials.
+    parsed_database_url = urlparse(DATABASE_URL)
+    if parsed_database_url.scheme not in {"postgres", "postgresql"}:
+        raise ImproperlyConfigured(
+            "DATABASE_URL must use the postgres or postgresql scheme."
+        )
+    if not parsed_database_url.hostname or not parsed_database_url.path.strip("/"):
+        raise ImproperlyConfigured(
+            "DATABASE_URL must include a Postgres host and database name."
+        )
+
+    database_options = {
+        key: values[-1]
+        for key, values in parse_qs(parsed_database_url.query).items()
+        if values
+    }
+    database_options.setdefault("connect_timeout", env_int("DB_CONNECT_TIMEOUT", 5))
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed_database_url.path.lstrip("/")),
+            "USER": unquote(parsed_database_url.username or ""),
+            "PASSWORD": unquote(parsed_database_url.password or ""),
+            "HOST": parsed_database_url.hostname,
+            "PORT": str(parsed_database_url.port or 5432),
+            "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 0 if not IS_PRODUCTION else 60),
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": database_options,
+        }
+    }
+elif DB_ENGINE in {"postgres", "postgresql"}:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -341,17 +380,60 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT", str(BASE_DIR / "media")))
 
+# Neon Object Storage is S3-compatible. When `neon deploy` has populated the
+# AWS_* values, use its private `assets` bucket for uploaded listing and auction
+# images. The S3 backend emits signed URLs, so objects are never made public.
+NEON_OBJECT_STORAGE_BUCKET = env("NEON_OBJECT_STORAGE_BUCKET", "assets")
+_NEON_STORAGE_ENV_NAMES = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_ENDPOINT_URL_S3",
+    "AWS_REGION",
+)
+_neon_storage_env_available = all(env(name) for name in _NEON_STORAGE_ENV_NAMES)
+USE_NEON_OBJECT_STORAGE = (
+    env_bool("USE_NEON_OBJECT_STORAGE", _neon_storage_env_available) and not RUNNING_TESTS
+)
+
+if USE_NEON_OBJECT_STORAGE:
+    missing_neon_storage_vars = [
+        name for name in _NEON_STORAGE_ENV_NAMES if not env(name)
+    ]
+    if missing_neon_storage_vars:
+        missing_names = ", ".join(missing_neon_storage_vars)
+        raise ImproperlyConfigured(
+            f"Neon Object Storage is enabled but missing: {missing_names}."
+        )
+
+    DEFAULT_FILE_STORAGE = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "access_key": env("AWS_ACCESS_KEY_ID"),
+            "secret_key": env("AWS_SECRET_ACCESS_KEY"),
+            "bucket_name": NEON_OBJECT_STORAGE_BUCKET,
+            "endpoint_url": env("AWS_ENDPOINT_URL_S3"),
+            "region_name": env("AWS_REGION"),
+            # Neon Object Storage requires S3 path-style addressing and SigV4.
+            "addressing_style": "path",
+            "signature_version": "s3v4",
+            "file_overwrite": False,
+            "querystring_auth": True,
+        },
+    }
+else:
+    DEFAULT_FILE_STORAGE = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
 if IS_PRODUCTION:
     # Manifest + compression keeps a small VM cheap: Whitenoise serves the hashed files.
     STORAGES = {
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "default": DEFAULT_FILE_STORAGE,
         "staticfiles": {
             "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
         },
     }
 else:
     STORAGES = {
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "default": DEFAULT_FILE_STORAGE,
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
         },
