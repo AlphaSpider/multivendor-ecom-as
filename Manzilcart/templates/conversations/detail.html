@@ -1,15 +1,17 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load static humanize tz %}
 
 {% block title %}Chat about {{ conversation.item_title }} — ManzilCart{% endblock %}
+
+{% block body_class %}chat-page{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/conversations.css' %}">
 {% endblock %}
 
 {% block content %}
-<section class="container section">
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
+<section class="container section chat-shell">
+  <nav class="breadcrumbs chat-breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
     <span aria-hidden="true">/</span>
     <span>{{ conversation.item_title }}</span>
@@ -192,6 +194,96 @@
     </aside>
 
     <div class="panel chat-panel">
+      {# -- Mobile-only top bar: back, listing avatar, other person, menu -- #}
+      <div class="chat-mobile-bar">
+        <a class="chat-mobile-back" href="{% url 'conversations:list' %}" aria-label="Back to messages">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5"></path>
+            <path d="m12 19-7-7 7-7"></path>
+          </svg>
+        </a>
+
+        <div class="chat-mobile-person">
+          <span class="chat-mobile-avatar">
+            {% with cover=conversation.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy">
+              {% else %}
+                <span class="chat-mobile-avatar-fallback">{{ other.display_name|default:"M"|slice:":1" }}</span>
+              {% endif %}
+            {% endwith %}
+          </span>
+          <span class="chat-mobile-person-text">
+            <span class="chat-mobile-name">{{ other.display_name|default:"ManzilCart member" }}</span>
+            <span class="chat-mobile-substatus" id="chat-mobile-status" data-state="connecting" data-i18n="chat_connecting">Connecting…</span>
+          </span>
+        </div>
+
+        <details class="chat-mobile-menu">
+          <summary aria-label="Conversation options">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.8"></circle>
+              <circle cx="12" cy="12" r="1.8"></circle>
+              <circle cx="12" cy="19" r="1.8"></circle>
+            </svg>
+          </summary>
+          <div class="chat-mobile-menu-list">
+            {% if conversation.item_url %}
+              <a href="{{ conversation.item_url }}">View {{ conversation.item_kind }}</a>
+            {% endif %}
+            {% if existing_deal %}
+              <a href="{% url 'deals:detail' pk=existing_deal.pk %}">View deal</a>
+            {% endif %}
+            <a href="{% url 'conversations:list' %}">All messages</a>
+          </div>
+        </details>
+      </div>
+
+      {# -- Mobile-only listing strip -- #}
+      <div class="chat-mobile-listing">
+        <span class="chat-mobile-listing-title">{{ conversation.item_title }}</span>
+        <span class="chat-mobile-listing-price">
+          {% if conversation.listing_id %}
+            AED {{ conversation.listing.asking_price|floatformat:0|intcomma }}
+          {% elif auction_top_bid %}
+            AED {{ auction_top_bid.amount|floatformat:0|intcomma }}
+          {% else %}
+            Auction
+          {% endif %}
+        </span>
+      </div>
+
+      {# -- Mobile-only contextual banner -- #}
+      <div class="chat-mobile-promo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </svg>
+        <span>
+          {% if is_seller %}
+            Reply quickly to keep buyers interested.
+          {% elif conversation.listing_id %}
+            {% if can_start_deal or can_offer_in_deal %}
+              Make an offer to start negotiating — no online payment.
+            {% elif existing_deal.status == "accepted" %}
+              Offer accepted — arrange the handover with the seller in chat.
+            {% elif existing_deal.status == "cancellation_requested" %}
+              A cancellation was requested. Chat here to sort it out.
+            {% elif existing_deal %}
+              Your offer is with the seller. Chat here to agree the handover.
+            {% elif conversation.listing.status == "reserved" or conversation.listing.status == "sold" %}
+              This listing is {{ conversation.listing.get_status_display|lower }} — no longer available for offers.
+            {% else %}
+              This listing is not open for offers right now. Chat with the seller.
+            {% endif %}
+          {% else %}
+            Chat directly with the seller about this auction.
+          {% endif %}
+        </span>
+      </div>
+
       <div class="chat-header">
         <div class="chat-header-left">
           <h2 data-i18n="chat_conversation_heading">Conversation</h2>
@@ -250,6 +342,7 @@
         </div>
       {% endif %}
 
+      {% get_current_timezone as current_tz %}
       <ol
         class="chat-log"
         id="chat-log"
@@ -258,22 +351,159 @@
         data-conversation-id="{{ conversation.pk }}"
         data-user-id="{{ user.pk }}"
         data-message-length="{{ max_message_length }}"
+        data-timezone="{{ current_tz }}"
       >
-        {% for message in chat_messages %}
-          <li
-            class="chat-bubble{% if message.sender_id == user.pk %} is-mine{% else %} is-theirs{% endif %}"
-            id="message-{{ message.pk }}"
-            data-message-id="{{ message.pk }}"
-            data-sender-id="{{ message.sender_id }}"
-          >
-            <span class="chat-author">{{ message.sender.display_name|default:"ManzilCart member" }}</span>
-            <div class="chat-body">{{ message.body|linebreaksbr }}</div>
-            <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
-          </li>
-        {% empty %}
+        {% if chat_messages %}
+          {% regroup chat_messages by created_at|date:"Y-m-d" as chat_days %}
+          {% now "Y-m-d" as today_key %}
+          {% for day in chat_days %}
+            <li class="chat-day" data-chat-day="{{ day.grouper }}">
+              <span>{% if day.grouper == today_key %}Today{% else %}{{ day.list.0.created_at|date:"j M Y" }}{% endif %}</span>
+            </li>
+            {% for message in day.list %}
+              <li
+                class="chat-bubble{% if message.sender_id == user.pk %} is-mine{% else %} is-theirs{% endif %}"
+                id="message-{{ message.pk }}"
+                data-message-id="{{ message.pk }}"
+                data-sender-id="{{ message.sender_id }}"
+                data-chat-day="{{ day.grouper }}"
+              >
+                <span class="chat-author">{{ message.sender.display_name|default:"ManzilCart member" }}</span>
+                <div class="chat-body">{{ message.body|linebreaksbr }}</div>
+                <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">
+                  <span class="chat-time-relative">{{ message.created_at|naturaltime }}</span>
+                  <span class="chat-time-clock">{{ message.created_at|time:"H:i" }}</span>
+                  {% if message.sender_id == user.pk %}
+                    <svg class="chat-tick" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  {% endif %}
+                </time>
+              </li>
+            {% endfor %}
+          {% endfor %}
+        {% else %}
           <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet. Say hello and ask about the {% if conversation.auction_id %}auction{% else %}furniture{% endif %}.</li>
-        {% endfor %}
+        {% endif %}
       </ol>
+
+      {# -- Mobile-only offer sheet with Make Offer / Chat switch -- #}
+      {% if conversation.listing_id and not is_seller %}
+        {% if can_start_deal or existing_deal %}
+          {% widthratio listing_asking_price 100 100 as offer_100 %}
+          {% widthratio listing_asking_price 100 95 as offer_95 %}
+          {% widthratio listing_asking_price 100 90 as offer_90 %}
+          {% widthratio listing_asking_price 100 85 as offer_85 %}
+          {% widthratio listing_asking_price 100 80 as offer_80 %}
+
+          <div class="chat-mobile-switch" role="group" aria-label="Conversation actions"
+               data-default-view="{% if can_start_deal or can_offer_in_deal %}offer{% else %}chat{% endif %}">
+            <button type="button" class="chat-mobile-switch-btn"
+                    data-chat-view="offer"
+                    aria-pressed="{% if can_start_deal or can_offer_in_deal %}true{% else %}false{% endif %}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 12V22H4V12"></path>
+                <path d="M22 7H2v5h20V7z"></path>
+                <path d="M12 22V7"></path>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+              </svg>
+              <span>Make offer</span>
+            </button>
+            <button type="button" class="chat-mobile-switch-btn"
+                    data-chat-view="chat"
+                    aria-pressed="{% if can_start_deal or can_offer_in_deal %}false{% else %}true{% endif %}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+              </svg>
+              <span>Chat</span>
+            </button>
+          </div>
+
+          <section class="chat-mobile-offer" id="chat-mobile-offer" aria-label="Make an offer">
+            {% if existing_deal %}
+              <div class="chat-mobile-offer-head">
+                <span class="chat-mobile-offer-eyebrow">Your offer</span>
+                <strong class="chat-mobile-offer-asking">{{ existing_deal.get_status_display }}</strong>
+              </div>
+              {% if pending_offer %}
+                <p class="chat-mobile-offer-note">
+                  Pending offer <strong>AED {{ pending_offer.amount|floatformat:0|intcomma }}</strong> — waiting for the seller.
+                </p>
+              {% else %}
+                <p class="chat-mobile-offer-note">No offer is pending right now.</p>
+              {% endif %}
+              <div class="chat-mobile-offer-actions">
+                <a class="btn btn-primary btn-small" href="{% url 'deals:detail' pk=existing_deal.pk %}">View deal</a>
+              </div>
+
+              {% if can_offer_in_deal %}
+                {% include "conversations/_offer_chips.html" %}
+                <form class="chat-mobile-offer-form"
+                      method="post"
+                      action="{% url 'deals:action' pk=existing_deal.pk %}"
+                      data-asking-price="{{ listing_asking_price|floatformat:0 }}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="offer">
+                  <div class="chat-mobile-offer-row">
+                    <label class="sr-only" for="m-chat-offer-amount">Your offer (AED)</label>
+                    <div class="chat-mobile-offer-field">
+                      <span class="chat-mobile-offer-currency">AED</span>
+                      <input class="chat-mobile-offer-input"
+                             id="m-chat-offer-amount"
+                             name="amount"
+                             type="number"
+                             min="1" step="1" inputmode="numeric"
+                             placeholder="{{ listing_asking_price|floatformat:0 }}"
+                             required>
+                    </div>
+                    <button class="btn btn-primary chat-mobile-offer-submit" type="submit">
+                      Send offer
+                    </button>
+                  </div>
+                  <p class="chat-mobile-offer-hint" data-offer-hint>Fair offers get faster replies.</p>
+                </form>
+              {% endif %}
+
+            {% elif can_start_deal %}
+              <div class="chat-mobile-offer-head">
+                <span class="chat-mobile-offer-eyebrow">Asking price</span>
+                <strong class="chat-mobile-offer-asking">AED {{ listing_asking_price|floatformat:0|intcomma }}</strong>
+              </div>
+
+              {% include "conversations/_offer_chips.html" %}
+
+              <form class="chat-mobile-offer-form"
+                    method="post"
+                    action="{% url 'deals:start' listing_id=conversation.listing.pk %}"
+                    data-asking-price="{{ listing_asking_price|floatformat:0 }}">
+                {% csrf_token %}
+                <div class="chat-mobile-offer-row">
+                  <label class="sr-only" for="m-chat-offer-amount">Your offer (AED)</label>
+                  <div class="chat-mobile-offer-field">
+                    <span class="chat-mobile-offer-currency">AED</span>
+                    <input class="chat-mobile-offer-input"
+                           id="m-chat-offer-amount"
+                           name="amount"
+                           type="number"
+                           min="1" step="1" inputmode="numeric"
+                           placeholder="{{ listing_asking_price|floatformat:0 }}"
+                           required>
+                  </div>
+                  <button class="btn btn-primary chat-mobile-offer-submit" type="submit">
+                    Make offer
+                  </button>
+                </div>
+                <p class="chat-mobile-offer-hint" data-offer-hint>Fair offers get faster replies.</p>
+              </form>
+            {% endif %}
+          </section>
+        {% endif %}
+      {% endif %}
 
       <form
         class="chat-form"
@@ -289,11 +519,19 @@
           name="body"
           rows="2"
           maxlength="{{ max_message_length }}"
-          placeholder="Write a message…"
+          placeholder="Type here…"
           data-placeholder-i18n="chat_placeholder"
           required
         ></textarea>
-        <button class="btn btn-primary" type="submit" id="chat-submit" data-i18n="chat_send">Send</button>
+        <button class="btn btn-primary chat-send" type="submit" id="chat-submit" data-i18n="chat_send">
+          <span class="chat-send-label">Send</span>
+          <svg class="chat-send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true">
+            <path d="m22 2-7 20-4-9-9-4Z"></path>
+            <path d="M22 2 11 13"></path>
+          </svg>
+        </button>
       </form>
       <p class="chat-hint muted small" id="chat-hint">
         Messages are saved. If the connection drops, your unsent message is retried automatically.
@@ -305,4 +543,5 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/chat.js' %}" defer></script>
+<script src="{% static 'js/chat-mobile.js' %}" defer></script>
 {% endblock %}

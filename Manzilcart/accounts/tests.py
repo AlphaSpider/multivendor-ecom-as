@@ -420,7 +420,8 @@ class HttpSignInTests(AccountTestBase):
 
         response = self._start_and_verify("+971501234567")
 
-        self.assertRedirects(response, reverse("accounts:dashboard"))
+        expected_url = reverse("marketplace:home", kwargs={"emirate_slug": user.emirate.slug})
+        self.assertRedirects(response, expected_url)
         challenge = self.latest_challenge("+971501234567")
         self.assertEqual(challenge.purpose, OTPChallenge.Purpose.LOGIN)
         self.assertIsNotNone(challenge.consumed_at)
@@ -432,14 +433,15 @@ class HttpSignInTests(AccountTestBase):
         )
 
     def test_external_next_is_not_used_after_sign_in(self):
-        self.make_user(phone="+971501234567")
+        user = self.make_user(phone="+971501234567")
         OTPChallenge.objects.all().delete()
 
         response = self._start_and_verify(
             "+971501234567", next_url="https://evil.example/steal"
         )
 
-        self.assertRedirects(response, reverse("accounts:dashboard"))
+        expected_url = reverse("marketplace:home", kwargs={"emirate_slug": user.emirate.slug})
+        self.assertRedirects(response, expected_url)
 
     def test_local_next_is_honoured_after_sign_in(self):
         self.make_user(phone="+971501234567")
@@ -491,7 +493,8 @@ class HttpSignInTests(AccountTestBase):
                 "service_area": self.area.pk,
             },
         )
-        self.assertRedirects(details, reverse("accounts:dashboard"))
+        expected_home = reverse("marketplace:home", kwargs={"emirate_slug": self.emirate.slug})
+        self.assertRedirects(details, expected_home)
 
         user = User.objects.get(phone=phone)
         self.assertEqual(user.display_name, "New Member")
@@ -528,6 +531,13 @@ class HttpSignInTests(AccountTestBase):
     def test_verify_without_a_session_challenge_redirects_to_start(self):
         response = self.client.get(reverse("accounts:verify"))
         self.assertRedirects(response, reverse("accounts:start"))
+
+    def test_authenticated_user_accessing_start_redirects_to_home(self):
+        user = self.make_user(phone="+971501234567")
+        self.client.force_login(user)
+        response = self.client.get(reverse("accounts:start"))
+        expected_url = reverse("marketplace:home", kwargs={"emirate_slug": user.emirate.slug})
+        self.assertRedirects(response, expected_url)
 
     def test_details_without_a_verified_challenge_redirects_to_start(self):
         response = self.client.get(reverse("accounts:details"))
