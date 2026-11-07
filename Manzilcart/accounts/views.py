@@ -40,7 +40,11 @@ from accounts.forms import (
 from accounts.models import OTPChallenge, User
 from core.exceptions import DomainError, RateLimitedError
 from core.logging_utils import mask_phone
-from locations.selectors import active_emirate_for_slug, emirate_from_session
+from locations.selectors import (
+    active_emirate_for_slug,
+    emirate_from_session,
+    remember_emirate_in_session,
+)
 
 logger = logging.getLogger("manzilcart.accounts.views")
 
@@ -71,6 +75,26 @@ class RegistrationStepMixin:
         return mask_phone(phone) if phone else ""
 
 
+def get_post_login_redirect_url(request, user=None) -> str:
+    """Determine the home redirect URL for a signed-in member.
+
+    Redirects to the marketplace home for the member's emirate (or session emirate),
+    falling back to the site landing page.
+    """
+    u = user if user is not None else getattr(request, "user", None)
+    emirate = None
+    if u and getattr(u, "is_authenticated", False):
+        emirate = getattr(u, "emirate", None)
+    if emirate is None:
+        emirate = emirate_from_session(request)
+
+    if emirate and getattr(emirate, "is_active", False):
+        remember_emirate_in_session(request, emirate)
+        return reverse("marketplace:home", kwargs={"emirate_slug": emirate.slug})
+
+    return reverse("locations:landing")
+
+
 class PhoneEntryView(RegistrationStepMixin, FormView):
     """
     Step 1 - the single entry point for both registration and sign-in.
@@ -84,7 +108,7 @@ class PhoneEntryView(RegistrationStepMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect("accounts:dashboard")
+            return redirect(get_post_login_redirect_url(request))
         # The emirate can be supplied by the marketplace URL (…/join/) or inherited
         # from the session.
         slug = kwargs.get("emirate_slug")
@@ -184,7 +208,7 @@ class VerifyCodeView(RegistrationStepMixin, FormView):
             target, {self.request.get_host()}, require_https=self.request.is_secure()
         ):
             return target
-        return reverse("accounts:dashboard")
+        return get_post_login_redirect_url(self.request)
 
 
 class ResendCodeView(RegistrationStepMixin, View):
@@ -269,7 +293,7 @@ class RegistrationDetailsView(RegistrationStepMixin, FormView):
         from django.contrib.auth import login as auth_login
 
         auth_login(self.request, user)
-        return redirect("accounts:dashboard")
+        return redirect(get_post_login_redirect_url(self.request, user=user))
 
 
 class LogoutView(View):

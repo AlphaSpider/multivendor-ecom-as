@@ -1,0 +1,8 @@
+{% load humanize %}
+<div class="chat-offer-chips" role="group" aria-label="Quick offer amounts">
+  <button type="button" class="chat-offer-chip" data-amount="{{ offer_100 }}" aria-pressed="false">AED {{ offer_100|intcomma }}</button>
+  <button type="button" class="chat-offer-chip" data-amount="{{ offer_95 }}" aria-pressed="false">AED {{ offer_95|intcomma }}</button>
+  <button type="button" class="chat-offer-chip" data-amount="{{ offer_90 }}" aria-pressed="false">AED {{ offer_90|intcomma }}</button>
+  <button type="button" class="chat-offer-chip" data-amount="{{ offer_85 }}" aria-pressed="false">AED {{ offer_85|intcomma }}</button>
+  <button type="button" class="chat-offer-chip" data-amount="{{ offer_80 }}" aria-pressed="false">AED {{ offer_80|intcomma }}</button>
+</div>

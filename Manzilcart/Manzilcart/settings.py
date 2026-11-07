@@ -228,32 +228,48 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
-DB_ENGINE = (env("DB_ENGINE", "postgresql") or "postgresql").lower()
+DATABASE_URL = env("DATABASE_URL")
 
-if DB_ENGINE in {"postgres", "postgresql"}:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("DB_NAME", "manzilsample"),
-            "USER": env("DB_USER", "postgres"),
-            "PASSWORD": env("DB_PASSWORD", ""),
-            "HOST": env("DB_HOST", "localhost"),
-            "PORT": env("DB_PORT", "5432"),
-            "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 0 if not IS_PRODUCTION else 60),
-            "CONN_HEALTH_CHECKS": True,
-            "OPTIONS": {"connect_timeout": env_int("DB_CONNECT_TIMEOUT", 5)},
+if DATABASE_URL:
+    import dj_database_url
+
+    default_db = dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=env_int("DB_CONN_MAX_AGE", 0 if not IS_PRODUCTION else 60),
+        conn_health_checks=True,
+    )
+    # Ensure connect_timeout option is present if not specified
+    default_db.setdefault("OPTIONS", {})
+    default_db["OPTIONS"].setdefault("connect_timeout", env_int("DB_CONNECT_TIMEOUT", 5))
+
+    DATABASES = {"default": default_db}
+else:
+    DB_ENGINE = (env("DB_ENGINE", "postgresql") or "postgresql").lower()
+
+    if DB_ENGINE in {"postgres", "postgresql"}:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": env("DB_NAME", "manzilsample"),
+                "USER": env("DB_USER", "postgres"),
+                "PASSWORD": env("DB_PASSWORD", ""),
+                "HOST": env("DB_HOST", "localhost"),
+                "PORT": env("DB_PORT", "5432"),
+                "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 0 if not IS_PRODUCTION else 60),
+                "CONN_HEALTH_CHECKS": True,
+                "OPTIONS": {"connect_timeout": env_int("DB_CONNECT_TIMEOUT", 5)},
+            }
         }
-    }
-elif DB_ENGINE == "sqlite":
-    # Convenience fallback (lightweight local runs / CI without PostgreSQL).
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": env("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+    elif DB_ENGINE == "sqlite":
+        # Convenience fallback (lightweight local runs / CI without PostgreSQL).
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": env("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+            }
         }
-    }
-else:  # pragma: no cover - misconfiguration
-    raise ImproperlyConfigured(f"Unsupported DB_ENGINE: {DB_ENGINE!r}")
+    else:  # pragma: no cover - misconfiguration
+        raise ImproperlyConfigured(f"Unsupported DB_ENGINE: {DB_ENGINE!r}")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -377,7 +393,7 @@ USE_TZ = True
 # Authentication redirects
 # ---------------------------------------------------------------------------
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "accounts:dashboard"
+LOGIN_REDIRECT_URL = "locations:landing"
 LOGOUT_REDIRECT_URL = "locations:landing"
 
 

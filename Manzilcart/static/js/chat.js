@@ -17,11 +17,13 @@
   var input = document.getElementById("chat-input");
   var submit = document.getElementById("chat-submit");
   var statusEl = document.getElementById("chat-status");
+  var mobileStatusEl = document.getElementById("chat-mobile-status");
   var hint = document.getElementById("chat-hint");
 
   var conversationId = log.dataset.conversationId;
   var userId = parseInt(log.dataset.userId, 10);
   var maxLength = parseInt(log.dataset.messageLength, 10) || 2000;
+  var timeZone = log.dataset.timezone || "";
 
   var socket = null;
   var attempts = 0;
@@ -30,9 +32,11 @@
   var pending = new Map(); // client_message_id -> body
 
   function setStatus(text, state) {
-    if (!statusEl) return;
-    statusEl.textContent = text;
-    statusEl.dataset.state = state || "";
+    [statusEl, mobileStatusEl].forEach(function (el) {
+      if (!el) return;
+      el.textContent = text;
+      el.dataset.state = state || "";
+    });
   }
 
   function socketUrl() {
@@ -69,7 +73,46 @@
   function formatTime(iso) {
     var date = new Date(iso);
     if (isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    try {
+      return new Intl.DateTimeFormat([], {
+        timeZone: timeZone || undefined,
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    } catch (err) {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  function dayKey(iso) {
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return "";
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: timeZone || undefined,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+    } catch (err) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+
+  function dayLabel(iso) {
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return "";
+    if (dayKey(iso) === dayKey(new Date().toISOString())) return "Today";
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        timeZone: timeZone || undefined,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    } catch (err) {
+      return date.toDateString();
+    }
   }
 
   function appendMessage(message) {
@@ -79,10 +122,23 @@
     var empty = log.querySelector(".chat-empty");
     if (empty) empty.remove();
 
+    var key = dayKey(message.created_at);
+    var lastBubble = log.querySelector(".chat-bubble:last-of-type");
+    if (!lastBubble || lastBubble.dataset.chatDay !== key) {
+      var day = document.createElement("li");
+      day.className = "chat-day";
+      day.dataset.chatDay = key;
+      var dayText = document.createElement("span");
+      dayText.textContent = dayLabel(message.created_at);
+      day.appendChild(dayText);
+      log.appendChild(day);
+    }
+
     var item = document.createElement("li");
     item.id = "message-" + id;
     item.dataset.messageId = id;
     item.dataset.senderId = String(message.sender_id);
+    item.dataset.chatDay = key;
     item.className = "chat-bubble " + (message.sender_id === userId ? "is-mine" : "is-theirs");
 
     var author = document.createElement("span");
@@ -96,7 +152,26 @@
     var time = document.createElement("time");
     time.className = "chat-time";
     time.dateTime = message.created_at || "";
-    time.textContent = formatTime(message.created_at);
+
+    var relative = document.createElement("span");
+    relative.className = "chat-time-relative";
+    relative.textContent = "just now";
+
+    var clock = document.createElement("span");
+    clock.className = "chat-time-clock";
+    clock.textContent = formatTime(message.created_at);
+
+    time.appendChild(relative);
+    time.appendChild(clock);
+
+    if (message.sender_id === userId) {
+      time.insertAdjacentHTML(
+        "beforeend",
+        '<svg class="chat-tick" width="13" height="13" viewBox="0 0 24 24" fill="none" ' +
+          'stroke="currentColor" stroke-width="3" stroke-linecap="round" ' +
+          'stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+      );
+    }
 
     item.appendChild(author);
     item.appendChild(body);

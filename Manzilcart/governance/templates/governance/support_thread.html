@@ -3,13 +3,15 @@
 
 {% block title %}Messages about {{ item_title }} — ManzilCart{% endblock %}
 
+{% block body_class %}chat-page chat-page-support{% endblock %}
+
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/conversations.css' %}">
 {% endblock %}
 
 {% block content %}
-<section class="container section">
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
+<section class="container section chat-shell">
+  <nav class="breadcrumbs chat-breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
     <span aria-hidden="true">/</span>
     <span>{{ item_title }}</span>
@@ -60,6 +62,88 @@
     </aside>
 
     <div class="panel chat-panel">
+      {# -- Mobile-only top bar: back, item avatar, team name, menu -- #}
+      <div class="chat-mobile-bar">
+        <a class="chat-mobile-back" href="{% url 'conversations:list' %}" aria-label="Back to messages">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5"></path>
+            <path d="m12 19-7-7 7-7"></path>
+          </svg>
+        </a>
+
+        <div class="chat-mobile-person">
+          <span class="chat-mobile-avatar chat-mobile-avatar-official">
+            {% if item_cover_url %}
+              <img src="{{ item_cover_url }}" alt="" loading="lazy">
+            {% else %}
+              <img src="{% static 'images/logo-mark.png' %}" alt="" loading="lazy">
+            {% endif %}
+          </span>
+          <span class="chat-mobile-person-text">
+            <span class="chat-mobile-name">Marketplace team</span>
+            <span class="chat-mobile-substatus"
+                  data-state="{% if thread.status == 'resolved' %}closed{% elif thread.status == 'needs_seller_reply' %}attention{% else %}open{% endif %}">
+              {% if thread.status == "needs_seller_reply" %}Needs your reply{% elif thread.status == "resolved" %}Resolved{% else %}Open{% endif %}
+            </span>
+          </span>
+        </div>
+
+        <details class="chat-mobile-menu">
+          <summary aria-label="Conversation options">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.8"></circle>
+              <circle cx="12" cy="12" r="1.8"></circle>
+              <circle cx="12" cy="19" r="1.8"></circle>
+            </svg>
+          </summary>
+          <div class="chat-mobile-menu-list">
+            {% if item_url %}
+              <a href="{{ item_url }}">View {{ item_kind }}</a>
+            {% endif %}
+            {% if edit_url %}
+              <a href="{{ edit_url }}">Edit your {{ item_kind }}</a>
+            {% endif %}
+            <a href="{% url 'governance:support_threads' %}">All marketplace messages</a>
+          </div>
+        </details>
+      </div>
+
+      {# -- Mobile-only item strip -- #}
+      <div class="chat-mobile-listing">
+        <span class="chat-mobile-listing-title">{{ item_title }}</span>
+        <span class="chat-mobile-listing-price">
+          {% if item_price %}
+            AED {{ item_price|floatformat:0|intcomma }}
+          {% elif item_status %}
+            {{ item_status }}
+          {% else %}
+            {{ thread.get_status_display }}
+          {% endif %}
+        </span>
+      </div>
+
+      {# -- Mobile-only contextual banner -- #}
+      <div class="chat-mobile-promo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </svg>
+        <span>
+          {% if edit_url %}
+            The team requested changes to this {{ item_kind }}.
+            <a class="chat-mobile-promo-link" href="{{ edit_url }}">Edit</a>
+          {% elif thread.status == "resolved" %}
+            This conversation is closed. A new team message reopens it.
+          {% elif thread.status == "needs_seller_reply" %}
+            The marketplace team is waiting for your reply.
+          {% else %}
+            Replies come from ManzilCart operations.
+          {% endif %}
+        </span>
+      </div>
+
       <div class="chat-header">
         <div class="chat-header-left">
           <h2 data-i18n="marketplace_team">Marketplace team</h2>
@@ -85,23 +169,43 @@
       {% endif %}
 
       <ol id="support-chat" class="chat-log" aria-live="polite" aria-label="Messages">
-        {% for message in chat_messages %}
-          <li
-            class="chat-bubble{% if message.sender_id == thread.customer_id %} is-mine{% else %} is-theirs{% endif %}"
-            id="message-{{ message.pk }}"
-          >
-            <span class="chat-author">
-              {% if message.sender_id == thread.customer_id %}You{% else %}Marketplace team{% endif %}
-            </span>
-            <div class="chat-body">{{ message.message|linebreaksbr }}</div>
-            {% if message.attachment %}
-              <a class="chat-attachment" href="{{ message.attachment.url }}" target="_blank" rel="noopener">📎 Attachment</a>
-            {% endif %}
-            <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">{{ message.created_at|naturaltime }}</time>
-          </li>
-        {% empty %}
+        {% if chat_messages %}
+          {% regroup chat_messages by created_at|date:"Y-m-d" as chat_days %}
+          {% now "Y-m-d" as today_key %}
+          {% for day in chat_days %}
+            <li class="chat-day" data-chat-day="{{ day.grouper }}">
+              <span>{% if day.grouper == today_key %}Today{% else %}{{ day.list.0.created_at|date:"j M Y" }}{% endif %}</span>
+            </li>
+            {% for message in day.list %}
+              <li
+                class="chat-bubble{% if message.sender_id == thread.customer_id %} is-mine{% else %} is-theirs{% endif %}"
+                id="message-{{ message.pk }}"
+                data-chat-day="{{ day.grouper }}"
+              >
+                <span class="chat-author">
+                  {% if message.sender_id == thread.customer_id %}You{% else %}Marketplace team{% endif %}
+                </span>
+                <div class="chat-body">{{ message.message|linebreaksbr }}</div>
+                {% if message.attachment %}
+                  <a class="chat-attachment" href="{{ message.attachment.url }}" target="_blank" rel="noopener">📎 Attachment</a>
+                {% endif %}
+                <time class="chat-time" datetime="{{ message.created_at|date:'c' }}">
+                  <span class="chat-time-relative">{{ message.created_at|naturaltime }}</span>
+                  <span class="chat-time-clock">{{ message.created_at|time:"H:i" }}</span>
+                  {% if message.sender_id == thread.customer_id %}
+                    <svg class="chat-tick" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  {% endif %}
+                </time>
+              </li>
+            {% endfor %}
+          {% endfor %}
+        {% else %}
           <li class="chat-empty muted" data-i18n="chat_empty_messages">No messages yet.</li>
-        {% endfor %}
+        {% endif %}
       </ol>
 
       {# Same composer markup and classes as conversations/detail.html; #}
@@ -117,20 +221,33 @@
             name="message"
             rows="2"
             maxlength="{{ max_message_length }}"
-            placeholder="Write a message…"
+            placeholder="Type here…"
             required
           ></textarea>
           <label class="chat-attach" title="Attach a photo (optional)">
-            📎
+            <svg class="chat-attach-icon" width="19" height="19" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+            <span class="sr-only">Attach a photo</span>
             <input type="file" name="attachment" id="chat-attachment" hidden>
           </label>
-          <button class="btn btn-primary" type="submit" id="chat-submit">Send</button>
+          <button class="btn btn-primary chat-send" type="submit" id="chat-submit">
+            <span class="chat-send-label">Send</span>
+            <svg class="chat-send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+              <path d="m22 2-7 20-4-9-9-4Z"></path>
+              <path d="M22 2 11 13"></path>
+            </svg>
+          </button>
         </form>
         <p class="chat-hint muted small">
           📎 adds a photo to your reply. Messages are saved; unsent text is kept if the page reloads.
         </p>
       {% else %}
-        <p class="chat-hint muted small">This conversation is closed. If you need more help, it will be reopened from a new team message.</p>
+        <p class="chat-hint chat-closed-note muted small">This conversation is closed. If you need more help, it will be reopened from a new team message.</p>
       {% endif %}
     </div>
   </div>
@@ -138,6 +255,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'js/chat-mobile.js' %}" defer></script>
 <script>
   // Show the chosen filename next to the attach icon.
   (function () {

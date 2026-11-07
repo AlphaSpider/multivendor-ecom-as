@@ -308,11 +308,46 @@
 }
 
 .chat-time {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
   font-size: 0.68rem;
   color: var(--muted);
   margin-top: 0.2rem;
   text-align: right;
+}
+
+.chat-time-clock,
+.chat-tick {
+  display: none;
+}
+
+/* Mobile chat chrome is hidden on larger screens; the desktop two-column
+   layout (sidebar + chat panel) stays exactly as it was. */
+.chat-mobile-bar,
+.chat-mobile-listing,
+.chat-mobile-promo,
+.chat-mobile-switch,
+.chat-mobile-offer,
+.chat-send-icon {
+  display: none;
+}
+
+.chat-day {
+  align-self: center;
+  text-align: center;
+  margin: 0.35rem 0 0.1rem;
+}
+
+.chat-day span {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: var(--sand);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .chat-empty {
@@ -476,4 +511,623 @@
 
 .chat-make-offer-form {
   margin: 0;
+}
+
+/* ==========================================================================
+   Mobile conversation view (full-screen chat)
+   --------------------------------------------------------------------------
+   On phones the conversation becomes its own screen: a compact top bar, the
+   listing strip, the message thread, an optional Make Offer / Chat switcher
+   and a rounded composer. The desktop sidebar is hidden, but its data is
+   reused in the mobile header and offer sheet.
+   ========================================================================== */
+
+@media (max-width: 760px) {
+  body.chat-page {
+    padding-bottom: 0;
+    overflow: hidden;
+    background: var(--surface-warm);
+  }
+
+  body.chat-page .site-header,
+  body.chat-page .site-footer,
+  body.chat-page .mobile-tabbar,
+  body.chat-page .mobile-fab {
+    display: none !important;
+  }
+
+  body.chat-page main {
+    height: 100dvh;
+  }
+
+  body.chat-page .message-stack {
+    position: fixed;
+    inset-inline: 0.75rem;
+    top: 0.75rem;
+    z-index: 100;
+  }
+
+  .chat-page .chat-shell {
+    max-width: none;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .chat-page .chat-breadcrumbs {
+    display: none;
+  }
+
+  .chat-page .chat-layout {
+    display: block;
+    height: 100%;
+    gap: 0;
+  }
+
+  .chat-page .chat-context {
+    display: none;
+  }
+
+  .chat-page .chat-panel {
+    margin: 0;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--surface-warm);
+    box-shadow: none;
+  }
+
+  .chat-page .chat-header {
+    display: none;
+  }
+
+  /* -- Top bar ------------------------------------------------------------ */
+  .chat-mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.55rem 0.65rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    z-index: 5;
+    flex: 0 0 auto;
+  }
+
+  .chat-mobile-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .chat-mobile-back:hover {
+    background: var(--sand);
+    color: var(--ink);
+  }
+
+  .chat-mobile-person {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .chat-mobile-avatar {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--sand);
+  }
+
+  .chat-mobile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .chat-mobile-avatar-fallback {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--brand);
+  }
+
+  .chat-mobile-person-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+  }
+
+  .chat-mobile-name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-mobile-substatus {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .chat-mobile-substatus[data-state="open"] { color: #047857; }
+  .chat-mobile-substatus[data-state="connecting"],
+  .chat-mobile-substatus[data-state="reconnecting"],
+  .chat-mobile-substatus[data-state="sending"] { color: #b45309; }
+
+  .chat-mobile-menu {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .chat-mobile-menu summary {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--ink);
+    cursor: pointer;
+    list-style: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .chat-mobile-menu summary::-webkit-details-marker { display: none; }
+
+  .chat-mobile-menu summary:hover,
+  .chat-mobile-menu[open] summary {
+    background: var(--sand);
+  }
+
+  .chat-mobile-menu-list {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.35rem);
+    min-width: 185px;
+    display: flex;
+    flex-direction: column;
+    padding: 0.35rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+    z-index: 20;
+  }
+
+  .chat-mobile-menu-list a {
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+
+  .chat-mobile-menu-list a:hover {
+    background: var(--sand);
+    color: var(--brand);
+  }
+
+  /* -- Listing strip ------------------------------------------------------ */
+  .chat-mobile-listing {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+    flex: 0 0 auto;
+  }
+
+  .chat-mobile-listing-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .chat-mobile-listing-price {
+    flex: 0 0 auto;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  /* -- Context banner ----------------------------------------------------- */
+  .chat-mobile-promo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.55rem 1rem;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.09), rgba(220, 38, 38, 0.02));
+    border-bottom: 1px solid var(--line);
+    color: var(--brand-strong);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.3;
+    flex: 0 0 auto;
+  }
+
+  .chat-mobile-promo svg {
+    flex: 0 0 auto;
+  }
+
+  /* -- Message thread ----------------------------------------------------- */
+  .chat-page .chat-auction-banner,
+  .chat-page .chat-history-link {
+    flex: 0 0 auto;
+  }
+
+  .chat-page .chat-log {
+    padding: 0.9rem 0.9rem 1rem;
+    gap: 0.45rem;
+    background: var(--surface-warm);
+  }
+
+  .chat-page .chat-bubble {
+    max-width: 82%;
+    padding: 0.55rem 0.7rem 0.35rem;
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .chat-page .chat-bubble.is-mine {
+    background: var(--brand-soft);
+    border-color: rgba(220, 38, 38, 0.18);
+    border-bottom-right-radius: 5px;
+  }
+
+  .chat-page .chat-bubble.is-theirs {
+    background: var(--surface);
+    border-color: var(--line);
+    border-bottom-left-radius: 5px;
+  }
+
+  /* The header already names the other person, so bubble author labels are
+     noise on a phone. */
+  .chat-page .chat-author {
+    display: none;
+  }
+
+  .chat-page .chat-time {
+    font-size: 0.66rem;
+    margin-top: 0.25rem;
+  }
+
+  .chat-page .chat-time-relative {
+    display: none;
+  }
+
+  .chat-page .chat-time-clock {
+    display: inline;
+  }
+
+  .chat-page .chat-tick {
+    display: inline-block;
+    flex: 0 0 auto;
+    color: #64748b;
+  }
+
+  /* -- Make Offer / Chat switcher ---------------------------------------- */
+  .chat-mobile-switch {
+    display: flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0 0.6rem;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+
+  .chat-mobile-switch-btn {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.7rem 0.5rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .chat-mobile-switch-btn svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+  }
+
+  .chat-mobile-switch-btn[aria-pressed="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--brand);
+  }
+
+  .chat-mobile-switch-btn[aria-pressed="true"] svg {
+    color: var(--brand);
+  }
+
+  /* -- Offer sheet -------------------------------------------------------- */
+  .chat-mobile-offer {
+    display: block;
+    flex: 0 0 auto;
+    min-width: 0;
+    max-height: 48vh;
+    overflow-y: auto;
+    padding: 0.7rem 0.9rem 0.75rem;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+
+  .chat-mobile-offer[hidden] {
+    display: none;
+  }
+
+  .chat-mobile-offer-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .chat-mobile-offer-eyebrow {
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .chat-mobile-offer-asking {
+    color: var(--ink);
+    font-size: 0.95rem;
+  }
+
+  .chat-mobile-offer-note {
+    margin: 0 0 0.55rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .chat-mobile-offer-actions {
+    margin-bottom: 0.6rem;
+  }
+
+  .chat-offer-chips {
+    display: flex;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.55rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chat-offer-chips::-webkit-scrollbar { display: none; }
+
+  .chat-offer-chip {
+    flex: 0 0 auto;
+    padding: 0.42rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .chat-offer-chip:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .chat-offer-chip[aria-pressed="true"] {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #ffffff;
+  }
+
+  .chat-mobile-offer-form { margin: 0; }
+
+  .chat-mobile-offer-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .chat-mobile-offer-field {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-warm);
+  }
+
+  .chat-mobile-offer-field:focus-within {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+  }
+
+  .chat-mobile-offer-currency {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .chat-mobile-offer-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.55rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+
+  .chat-mobile-offer-input:focus { outline: none; }
+
+  .chat-mobile-offer-submit {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 48px;
+    height: auto;
+    padding: 0 1rem;
+    white-space: nowrap;
+  }
+
+  .chat-mobile-offer-hint {
+    margin: 0.45rem 0 0;
+    color: #047857;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .chat-mobile-offer-hint[data-tone="fair"] { color: #b45309; }
+  .chat-mobile-offer-hint[data-tone="low"] { color: var(--muted); }
+  .chat-mobile-offer-hint[data-tone="neutral"] { color: var(--muted); }
+
+  /* -- Composer ----------------------------------------------------------- */
+  .chat-page .chat-form {
+    flex: 0 0 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.7rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+
+  .chat-page .chat-form .input {
+    height: auto;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 110px;
+    padding: 0.65rem 0.95rem;
+    border-radius: 999px;
+    background: var(--surface-warm);
+    resize: none;
+    font-size: 0.95rem;
+    field-sizing: content;
+  }
+
+  .chat-page .chat-send {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .chat-page .chat-send-label {
+    display: none;
+  }
+
+  .chat-page .chat-send-icon {
+    display: block;
+  }
+
+  .chat-page .chat-hint {
+    display: none;
+  }
+
+  /* A closed marketplace-team thread has no composer, so its notice must stay
+     visible even though the composer hints are hidden on phones. */
+  .chat-page .chat-closed-note {
+    display: block;
+    padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  /* -- Marketplace-team thread (admin ↔ seller) --------------------------- */
+  /* The mobile promo already carries the review reminder and its Edit action. */
+  .chat-page-support .chat-auction-banner {
+    display: none;
+  }
+
+  .chat-mobile-avatar-official {
+    background: var(--brand-soft);
+    border-color: rgba(220, 38, 38, 0.18);
+  }
+
+  .chat-mobile-avatar-official img {
+    object-fit: contain;
+    padding: 4px;
+  }
+
+  .chat-mobile-substatus[data-state="attention"] { color: #b45309; }
+  .chat-mobile-substatus[data-state="closed"] { color: var(--muted); }
+
+  .chat-mobile-promo-link {
+    color: var(--brand);
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+  }
+
+  .chat-page .chat-attach {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border-color: transparent;
+    background: var(--surface-warm);
+    color: var(--muted);
+  }
+
+  .chat-page .chat-attach.has-file {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .chat-attach-icon {
+    display: block;
+  }
+
+  [dir="rtl"] .chat-mobile-back svg {
+    transform: scaleX(-1);
+  }
 }
