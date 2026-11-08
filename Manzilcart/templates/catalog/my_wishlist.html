@@ -11,18 +11,25 @@
       <h1 data-i18n="my_wishlist">My wishlist</h1>
       <p class="muted" data-i18n="my_wishlist_desc">Products you saved while browsing. Remove one any time.</p>
     </div>
-    {% if wishlist_count %}
-      <span class="status-pill">{{ wishlist_count }} saved product{{ wishlist_count|pluralize }}</span>
-    {% endif %}
+    <span class="status-pill" data-wishlist-counter{% if not wishlist_count %} style="display: none;"{% endif %}>{{ wishlist_count }} saved product{{ wishlist_count|pluralize }}</span>
   </div>
 
   {% if wishlist_items %}
-    <div class="listing-grid">
+    <div class="listing-grid" data-wishlist-grid>
       {% for item in wishlist_items %}
         {% include "partials/listing_card.html" with listing=item.listing show_status=True %}
       {% endfor %}
     </div>
     <p class="muted small wishlist-note" data-i18n="wishlist_unavailable_note">Saved products remain here if they are sold or removed from the marketplace.</p>
+    <div class="empty-state" data-wishlist-empty style="display: none;">
+      <h3 data-i18n="wishlist_empty_title">No saved products yet</h3>
+      <p data-i18n="wishlist_empty_desc">Tap the heart on any listing to save it here.</p>
+      {% if user.emirate and user.emirate.is_active %}
+        <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=user.emirate.slug %}" data-i18n="browse_listings">Browse listings</a>
+      {% else %}
+        <a class="btn btn-primary" href="{% url 'locations:landing' %}" data-i18n="choose_emirate">Choose your emirate</a>
+      {% endif %}
+    </div>
   {% else %}
     <div class="empty-state">
       <h3 data-i18n="wishlist_empty_title">No saved products yet</h3>

@@ -1,10 +1,10 @@
 {% comment %}A listing card used by grids across the marketplace.{% endcomment %}
 {% load humanize %}
-<article class="listing-card">
+<article class="listing-card" data-listing-id="{{ listing.pk }}" data-listing-slug="{{ listing.slug }}">
   {% if user.is_authenticated %}
     {% if listing.pk in wishlist_ids or listing.seller_id != user.id %}
       {% if listing.is_public or show_status %}
-        <form class="wishlist-heart-form" method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=listing.emirate.slug slug=listing.slug %}">
+        <form class="wishlist-heart-form" method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=listing.emirate.slug slug=listing.slug %}" data-wishlist-toggle data-listing-id="{{ listing.pk }}" data-listing-slug="{{ listing.slug }}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <button class="wishlist-heart{% if listing.pk in wishlist_ids %} is-saved{% endif %}"
@@ -45,11 +45,11 @@
         <span class="status-pill status-{{ listing.status }}">{{ listing.get_status_display }}</span>
       {% endif %}
     </div>
-    <h3 class="listing-card-title">
+    <h3 class="listing-card-title" title="{{ listing.title }}">
       {% if listing.is_public %}
-        <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+        <a href="{{ listing.get_absolute_url }}" title="{{ listing.title }}">{{ listing.title }}</a>
       {% else %}
-        <span>{{ listing.title }}</span>
+        <span title="{{ listing.title }}">{{ listing.title }}</span>
       {% endif %}
     </h3>
     <p class="listing-card-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
