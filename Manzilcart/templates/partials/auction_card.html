@@ -15,8 +15,8 @@
       <span class="badge" data-condition="{{ auction.condition }}">{{ auction.get_condition_display }}</span>
       <span class="status-pill status-auction-{{ auction.status }}">{{ auction.get_status_display }}</span>
     </div>
-    <h3 class="listing-card-title">
-      <a href="{{ auction.get_absolute_url }}">{{ auction.title }}</a>
+    <h3 class="listing-card-title" title="{{ auction.title }}">
+      <a href="{{ auction.get_absolute_url }}" title="{{ auction.title }}">{{ auction.title }}</a>
     </h3>
     <p class="listing-card-price">
       {% if auction.awarded_deal %}

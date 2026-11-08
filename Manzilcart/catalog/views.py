@@ -466,7 +466,27 @@ class WishlistToggleView(LoginRequiredMixin, EmirateRequiredMixin, View):
 
     login_url = "accounts:login"
 
+    def handle_no_permission(self):
+        if self._is_ajax(self.request):
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "Authentication required",
+                    "login_url": reverse("accounts:login"),
+                },
+                status=401,
+            )
+        return super().handle_no_permission()
+
+    def _is_ajax(self, request):
+        return (
+            request.headers.get("x-requested-with") == "XMLHttpRequest"
+            or "application/json" in request.headers.get("Accept", "")
+            or request.content_type == "application/json"
+        )
+
     def post(self, request, *args, **kwargs):
+        is_ajax = self._is_ajax(request)
         listing = get_object_or_404(
             Listing.objects.select_related("emirate"),
             slug=kwargs["slug"],
@@ -474,18 +494,43 @@ class WishlistToggleView(LoginRequiredMixin, EmirateRequiredMixin, View):
         )
         already_saved = is_wishlisted(request.user, listing)
         if not listing.is_public and not already_saved:
+            if is_ajax:
+                return JsonResponse(
+                    {"ok": False, "error": "Listing not found."}, status=404
+                )
             raise Http404("Listing not found.")
 
         try:
             saved = services.toggle_wishlist(listing, user=request.user)
-        except StateTransitionError as exc:
+        except (StateTransitionError, PermissionDeniedError) as exc:
+            if is_ajax:
+                return JsonResponse({"ok": False, "error": exc.message}, status=400)
             messages.error(request, exc.message)
+            saved = False
         else:
-            messages.success(
-                request,
-                "Saved to your wishlist."
-                if saved
-                else "Removed from your wishlist.",
+            if not is_ajax:
+                messages.success(
+                    request,
+                    "Saved to your wishlist."
+                    if saved
+                    else "Removed from your wishlist.",
+                )
+
+        if is_ajax:
+            wishlist_count = request.user.wishlist_items.count()
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "saved": saved,
+                    "wishlist_count": wishlist_count,
+                    "listing_id": listing.pk,
+                    "listing_slug": listing.slug,
+                    "message": (
+                        "Saved to your wishlist."
+                        if saved
+                        else "Removed from your wishlist."
+                    ),
+                }
             )
 
         next_url = request.POST.get("next", "")

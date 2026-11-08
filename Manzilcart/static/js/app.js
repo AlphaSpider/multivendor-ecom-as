@@ -532,6 +532,8 @@ var uiPhrases = {
   "Remove from wishlist": "إزالة من قائمة الرغبات",
   "Saved to your wishlist.": "تم الحفظ في قائمة رغباتك.",
   "Removed from your wishlist.": "تمت الإزالة من قائمة رغباتك.",
+  "View wishlist": "عرض قائمة الرغبات",
+  "Could not update wishlist.": "تعذر تحديث قائمة الرغبات.",
   "Browse listings": "تصفح المعروضات",
   "Choose your emirate": "اختر إمارتك",
   "Offers and deals": "العروض والصفقات",
@@ -1332,6 +1334,11 @@ var uiPhrases = {
       try {
         selectedThumb.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
       } catch (err) {}
+
+      var counterPill = gallery.querySelector("[data-gallery-counter]");
+      if (counterPill && thumbs.length) {
+        counterPill.textContent = (currentIndex + 1) + " / " + thumbs.length;
+      }
     }
 
     thumbs.forEach(function (thumb, idx) {
@@ -1388,6 +1395,36 @@ var uiPhrases = {
         mainImg.style.transform = "scale(1)";
         mainImg.style.transformOrigin = "center center";
       });
+
+      // Touch swipe support for mobile image switching
+      var touchStartX = 0;
+      var touchStartY = 0;
+      viewport.addEventListener("touchstart", function (e) {
+        if (e.touches && e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      viewport.addEventListener("touchend", function (e) {
+        if (!thumbs.length || !e.changedTouches || e.changedTouches.length === 0) return;
+        var diffX = e.changedTouches[0].clientX - touchStartX;
+        var diffY = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(diffX) > 35 && Math.abs(diffX) > Math.abs(diffY)) {
+          var isRtl = document.documentElement.getAttribute("dir") === "rtl";
+          if (diffX < 0) {
+            var nextIdx = isRtl
+              ? (currentIndex - 1 + thumbs.length) % thumbs.length
+              : (currentIndex + 1) % thumbs.length;
+            selectImage(nextIdx);
+          } else {
+            var prevIdx = isRtl
+              ? (currentIndex + 1) % thumbs.length
+              : (currentIndex - 1 + thumbs.length) % thumbs.length;
+            selectImage(prevIdx);
+          }
+        }
+      }, { passive: true });
     }
   }
 
@@ -1629,5 +1666,219 @@ var uiPhrases = {
     }
     updateHighlightAndReadout();
   }
+
+  // --- Asynchronous Wishlist Toggle ----------------------------------------
+  var toastContainer = null;
+
+  function getCsrfToken(form) {
+    var input = form ? form.querySelector("input[name='csrfmiddlewaretoken']") : null;
+    if (input && input.value) return input.value;
+    var match = document.cookie && document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function showToast(message, type, link) {
+    if (!toastContainer) {
+      toastContainer = document.querySelector(".mc-toast-container");
+      if (!toastContainer) {
+        toastContainer = document.createElement("div");
+        toastContainer.className = "mc-toast-container";
+        document.body.appendChild(toastContainer);
+      }
+    }
+
+    // Limit active toasts to at most 2
+    while (toastContainer.children.length >= 2) {
+      toastContainer.removeChild(toastContainer.firstChild);
+    }
+
+    var toast = document.createElement("div");
+    toast.className = "mc-toast" + (type ? " mc-toast-" + type : "");
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+
+    var msgSpan = document.createElement("span");
+    msgSpan.textContent = message;
+    toast.appendChild(msgSpan);
+
+    if (link && link.url && link.label) {
+      var a = document.createElement("a");
+      a.href = link.url;
+      a.className = "mc-toast-link";
+      a.textContent = link.label;
+      toast.appendChild(a);
+    }
+
+    toastContainer.appendChild(toast);
+
+    setTimeout(function () {
+      toast.classList.add("is-leaving");
+      setTimeout(function () {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 230);
+    }, 2600);
+  }
+
+  function updateWishlistButtonState(btn, isSaved, isArabic) {
+    btn.classList.toggle("is-saved", isSaved);
+
+    // Detail button text
+    var span = btn.querySelector("span");
+    if (span) {
+      var text = isSaved ? "Saved to wishlist" : "Save to wishlist";
+      span.textContent = isArabic ? translateString(text) : text;
+    }
+
+    // Heart button labels
+    var label = isSaved ? "Remove from wishlist" : "Save to wishlist";
+    var translatedLabel = isArabic ? translateString(label) : label;
+    btn.setAttribute("aria-label", translatedLabel);
+    btn.setAttribute("title", translatedLabel);
+  }
+
+  function syncAllWishlistButtons(actionUrl, listingId, isSaved, isArabic, sourceForm) {
+    var selector = "form[data-wishlist-toggle], .wishlist-heart-form, .wishlist-detail-form";
+    document.querySelectorAll(selector).forEach(function (f) {
+      if (f === sourceForm) return;
+      var matchesAction = actionUrl && f.getAttribute("action") === actionUrl;
+      var matchesId = listingId && f.getAttribute("data-listing-id") === String(listingId);
+      if (matchesAction || matchesId) {
+        var otherBtn = f.querySelector("button[type='submit']") || f.querySelector("button");
+        if (otherBtn) {
+          updateWishlistButtonState(otherBtn, isSaved, isArabic);
+        }
+      }
+    });
+  }
+
+  function updateWishlistCounters(count) {
+    var isArabic = (document.documentElement.getAttribute("lang") || "en") === "ar";
+    document.querySelectorAll("[data-wishlist-counter]").forEach(function (pill) {
+      if (count <= 0) {
+        pill.style.display = "none";
+      } else {
+        pill.style.display = "";
+        var label = count === 1 ? (isArabic ? "منتج محفوظ" : "saved product") : (isArabic ? "منتجات محفوظة" : "saved products");
+        pill.textContent = count + " " + label;
+      }
+    });
+
+    document.querySelectorAll("[data-wishlist-stat]").forEach(function (el) {
+      el.textContent = count;
+    });
+  }
+
+  function initWishlistAsync() {
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      if (!form || !form.matches) return;
+      if (!form.matches(".wishlist-heart-form") && !form.matches(".wishlist-detail-form") && !form.hasAttribute("data-wishlist-toggle")) {
+        return;
+      }
+
+      e.preventDefault();
+
+      var btn = form.querySelector("button[type='submit']") || form.querySelector("button");
+      if (!btn) return;
+
+      var actionUrl = form.getAttribute("action");
+      if (!actionUrl) return;
+
+      var isArabic = (document.documentElement.getAttribute("lang") || "en") === "ar";
+      var wasSaved = btn.classList.contains("is-saved");
+      var willBeSaved = !wasSaved;
+      var listingId = form.getAttribute("data-listing-id") || "";
+
+      // Instant optimistic UI update & subtle bounce animation
+      updateWishlistButtonState(btn, willBeSaved, isArabic);
+      btn.classList.add("is-animating");
+      setTimeout(function () {
+        btn.classList.remove("is-animating");
+      }, 450);
+
+      // Synchronize any other button instances on screen
+      syncAllWishlistButtons(actionUrl, listingId, willBeSaved, isArabic, form);
+
+      var csrfToken = getCsrfToken(form);
+
+      fetch(actionUrl, {
+        method: "POST",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "application/json",
+          "X-CSRFToken": csrfToken,
+        },
+        body: new FormData(form),
+      })
+      .then(function (res) {
+        if (res.status === 401) {
+          return res.json().then(function (data) {
+            window.location.href = data.login_url || "/accounts/login/";
+          }).catch(function () {
+            window.location.href = "/accounts/login/";
+          });
+        }
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || data.ok === false) {
+          // Revert optimistic state
+          updateWishlistButtonState(btn, wasSaved, isArabic);
+          syncAllWishlistButtons(actionUrl, listingId, wasSaved, isArabic, form);
+          showToast(data && data.error ? data.error : (isArabic ? "تعذر تحديث قائمة الرغبات" : "Could not update wishlist."), "error");
+          return;
+        }
+
+        var actualSaved = !!data.saved;
+        if (actualSaved !== willBeSaved) {
+          updateWishlistButtonState(btn, actualSaved, isArabic);
+          syncAllWishlistButtons(actionUrl, listingId, actualSaved, isArabic, form);
+        }
+
+        // Floating toast feedback
+        var toastText = actualSaved ? "Saved to your wishlist." : "Removed from your wishlist.";
+        var translatedToast = isArabic ? translateString(toastText) : toastText;
+        var viewLink = actualSaved ? {
+          label: isArabic ? translateString("View wishlist") : "View wishlist",
+          url: "/my/wishlist/",
+        } : null;
+        showToast(translatedToast, "success", viewLink);
+
+        // If on the /my/wishlist/ page and un-saving
+        var grid = document.querySelector("[data-wishlist-grid]");
+        if (grid && !actualSaved) {
+          var card = form.closest(".listing-card");
+          if (card) {
+            card.classList.add("is-removing");
+            setTimeout(function () {
+              card.remove();
+              var remaining = grid.querySelectorAll(".listing-card").length;
+              updateWishlistCounters(remaining);
+              if (remaining === 0) {
+                var emptyState = document.querySelector("[data-wishlist-empty]");
+                if (emptyState) emptyState.style.display = "";
+                var note = document.querySelector(".wishlist-note");
+                if (note) note.style.display = "none";
+              }
+            }, 280);
+          }
+        } else if (typeof data.wishlist_count === "number") {
+          updateWishlistCounters(data.wishlist_count);
+        }
+      })
+      .catch(function () {
+        updateWishlistButtonState(btn, wasSaved, isArabic);
+        syncAllWishlistButtons(actionUrl, listingId, wasSaved, isArabic, form);
+        showToast(isArabic ? "تعذر تحديث قائمة الرغبات" : "Could not update wishlist.", "error");
+      });
+    });
+  }
+
+  initWishlistAsync();
 })();
 

@@ -280,6 +280,48 @@ class CatalogTestCase(TestCase):
             "No saved products yet",
         )
 
+    def test_buyer_can_save_and_remove_wishlist_via_ajax(self):
+        self.client.force_login(self.buyer)
+        toggle_url = reverse(
+            "catalog:wishlist_toggle",
+            kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+        )
+
+        # 1. AJAX toggle save
+        response = self.client.post(
+            toggle_url,
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_ACCEPT="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["saved"])
+        self.assertEqual(data["wishlist_count"], 1)
+        self.assertEqual(data["listing_id"], self.listing.pk)
+        self.assertTrue(
+            WishlistItem.objects.filter(
+                user=self.buyer, listing=self.listing
+            ).exists()
+        )
+
+        # 2. AJAX toggle remove
+        response2 = self.client.post(
+            toggle_url,
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_ACCEPT="application/json",
+        )
+        self.assertEqual(response2.status_code, 200)
+        data2 = response2.json()
+        self.assertTrue(data2["ok"])
+        self.assertFalse(data2["saved"])
+        self.assertEqual(data2["wishlist_count"], 0)
+        self.assertFalse(
+            WishlistItem.objects.filter(
+                user=self.buyer, listing=self.listing
+            ).exists()
+        )
+
     def test_wishlist_requires_sign_in(self):
         response = self.client.post(
             reverse(
@@ -289,6 +331,22 @@ class CatalogTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("accounts:login"), response["Location"])
+        self.assertFalse(WishlistItem.objects.exists())
+
+    def test_wishlist_ajax_requires_sign_in(self):
+        response = self.client.post(
+            reverse(
+                "catalog:wishlist_toggle",
+                kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_ACCEPT="application/json",
+        )
+        self.assertEqual(response.status_code, 401)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error"], "Authentication required")
+        self.assertIn(reverse("accounts:login"), data["login_url"])
         self.assertFalse(WishlistItem.objects.exists())
 
     def test_only_public_products_can_be_added_to_a_wishlist(self):

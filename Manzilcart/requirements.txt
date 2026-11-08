@@ -26,5 +26,3 @@ python-dotenv==1.2.4            # Reads .env in development
 
 # --- Data quality ----------------------------------------------------------
 phonenumbers==9.0.21            # Pure-Python phone parsing -> E.164 normalisation
-
-dj-database-url-3.1.2

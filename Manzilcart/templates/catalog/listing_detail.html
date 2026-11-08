@@ -3,19 +3,21 @@
 
 {% block title %}{{ listing.title }} — ManzilCart{% endblock %}
 {% block meta_description %}{{ listing.description|truncatechars:155 }}{% endblock %}
+{% block body_class %}detail-page{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/deals.css' %}">
+<link rel="stylesheet" href="{% static 'css/listing_detail.css' %}?v=1.1">
 {% endblock %}
 
 {% block content %}
-<section class="container section">
+<section class="container section detail-page-container">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <a href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</a>
-    <span aria-hidden="true">/</span>
+    <span aria-hidden="true" class="breadcrumb-slash">/</span>
     <a href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}" data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</a>
-    <span aria-hidden="true">/</span>
-    <span>{{ listing.title }}</span>
+    <span aria-hidden="true" class="breadcrumb-slash breadcrumb-hide-mobile">/</span>
+    <span class="breadcrumb-current">{{ listing.title }}</span>
   </nav>
 
   {% if not listing.is_public %}
@@ -30,11 +32,12 @@
   {% endif %}
 
   <div class="detail-layout">
+    <!-- Gallery Section -->
     <div class="detail-gallery" data-product-gallery>
       {% if listing.images.all %}
         {% with cover=listing.cover_image|default:listing.images.first %}
         <div class="gallery-main-container">
-          <div class="gallery-zoom-viewport" data-zoom-viewport tabindex="0" role="region" aria-label="Product image viewer with zoom">
+          <div class="gallery-zoom-viewport" data-zoom-viewport tabindex="0" role="region" aria-label="Product image viewer">
             <img id="gallery-main-img"
                  class="gallery-main-img"
                  src="{{ cover.image.url }}"
@@ -52,6 +55,7 @@
             {% if listing.images.count > 1 %}
               <button type="button" class="gallery-arrow gallery-prev" data-gallery-prev aria-label="Previous photo">‹</button>
               <button type="button" class="gallery-arrow gallery-next" data-gallery-next aria-label="Next photo">›</button>
+              <span class="gallery-counter-pill" data-gallery-counter>1 / {{ listing.images.count }}</span>
             {% endif %}
           </div>
         </div>
@@ -88,45 +92,97 @@
           </div>
         </div>
       {% endif %}
-
-    <div class="panel detail-description">
-      <h2 data-i18n="about_piece">About this piece</h2>
-      {{ listing.description|linebreaks }}
     </div>
-  </div>
 
-  <aside class="detail-panel">
-      <div class="detail-badges">
-        <span class="badge" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
-        {% if listing.status == "reserved" %}<span class="status-pill status-reserved" data-i18n="status_reserved">Reserved</span>{% endif %}
-        {% if listing.status == "sold" %}<span class="status-pill status-sold" data-i18n="status_sold">Sold</span>{% endif %}
+    <!-- Main Product Action & Specs Panel (Positioned FIRST after gallery on mobile!) -->
+    <aside class="detail-panel">
+      <div class="detail-header-row">
+        <div class="detail-badges">
+          <span class="badge" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
+          {% if listing.status == "reserved" %}<span class="status-pill status-reserved" data-i18n="status_reserved">Reserved</span>{% endif %}
+          {% if listing.status == "sold" %}<span class="status-pill status-sold" data-i18n="status_sold">Sold</span>{% endif %}
+        </div>
+
+        {% if listing.is_public and not is_owner and user.is_authenticated %}
+          <div class="wishlist-detail-form">
+            <form method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=emirate.slug slug=listing.slug %}" data-wishlist-toggle data-listing-id="{{ listing.pk }}" data-listing-slug="{{ listing.slug }}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="btn btn-quiet wishlist-detail-btn{% if is_wishlisted %} is-saved{% endif %}" type="submit" aria-label="{% if is_wishlisted %}Remove from wishlist{% else %}Save to wishlist{% endif %}">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
+                </svg>
+                <span>{% if is_wishlisted %}Saved to wishlist{% else %}Save to wishlist{% endif %}</span>
+              </button>
+            </form>
+          </div>
+        {% endif %}
       </div>
 
-      <h1>{{ listing.title }}</h1>
-      <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+      <h1 class="detail-title">{{ listing.title }}</h1>
+      <div class="detail-price-box">
+        <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
+      </div>
 
-      {% if listing.is_public and not is_owner and user.is_authenticated %}
-        <div class="wishlist-detail-form">
-          <form method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=emirate.slug slug=listing.slug %}">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <button class="btn btn-quiet wishlist-detail-btn{% if is_wishlisted %} is-saved{% endif %}" type="submit">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
-              </svg>
-              <span>{% if is_wishlisted %}Saved to wishlist{% else %}Save to wishlist{% endif %}</span>
-            </button>
-          </form>
+      <!-- Quick Specifications Grid -->
+      <div class="detail-specs-grid">
+        <div class="detail-spec-card">
+          <span class="detail-spec-label" data-i18n="detail_category">Category</span>
+          <span class="detail-spec-val" data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</span>
+        </div>
+        <div class="detail-spec-card">
+          <span class="detail-spec-label" data-i18n="detail_area">Location</span>
+          <span class="detail-spec-val" data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}, {{ listing.emirate.name }}</span>
+        </div>
+        <div class="detail-spec-card">
+          <span class="detail-spec-label" data-i18n="condition_label">Condition</span>
+          <span class="detail-spec-val" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
+        </div>
+        <div class="detail-spec-card">
+          <span class="detail-spec-label" data-i18n="detail_listed">Listed</span>
+          <span class="detail-spec-val">{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</span>
+        </div>
+      </div>
+
+      <!-- Action Panel (Chat / Offer / Edit) -->
+      {% if is_owner %}
+        <div class="form-actions detail-owner-actions">
+          {% if can_edit %}
+            <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}" data-i18n="edit_listing">Edit listing</a>
+          {% endif %}
+          <a class="btn btn-quiet" href="{% url 'accounts:listings' %}" data-i18n="all_my_listings">All my listings</a>
+        </div>
+      {% else %}
+        <div class="contact-panel">
+          {% if user.is_authenticated %}
+            <form method="post" action="{% url 'conversations:start' listing_id=listing.pk %}" class="detail-action-form">
+              {% csrf_token %}
+              <button class="btn btn-primary btn-large detail-msg-btn" type="submit">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span data-i18n="msg_seller">Message the seller</span>
+              </button>
+            </form>
+            <p class="muted small text-center" data-i18n="chat_instructions">Ask questions, then agree a price in chat.</p>
+
+            <form class="offer-form" method="post" action="{% url 'deals:start' listing_id=listing.pk %}">
+              {% csrf_token %}
+              <label class="field-label" for="offer-amount" data-i18n="make_offer">Or make an offer (AED)</label>
+              <div class="offer-form-row">
+                <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" placeholder="{{ listing.asking_price|floatformat:0 }}" required>
+                <button class="btn btn-quiet" type="submit" data-i18n="btn_make_offer">Make offer</button>
+              </div>
+            </form>
+            <p class="muted small text-center" data-i18n="handover_note">There is no online payment. You agree handover and payment directly.</p>
+          {% else %}
+            <a class="btn btn-primary btn-large detail-msg-btn" href="{% url 'accounts:start' %}" data-i18n="sign_in_to_message">Sign in to message the seller</a>
+            <p class="muted small text-center" data-i18n="chat_verified_only">Chat is available to verified members.</p>
+          {% endif %}
         </div>
       {% endif %}
 
-      <dl class="detail-list">
-        <div><dt data-i18n="detail_category">Category</dt><dd data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</dd></div>
-        <div><dt data-i18n="detail_area">Area</dt><dd data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}</dd></div>
-        <div><dt data-i18n="detail_emirate">Emirate</dt><dd data-emirate-name="{{ listing.emirate.name }}">{{ listing.emirate.name }}</dd></div>
-        <div><dt data-i18n="detail_listed">Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
-      </dl>
-
+      <!-- Delivery Promo Card -->
       {% if listing.is_public %}
         <div class="delivery-promo">
           <div class="delivery-promo-main">
@@ -163,51 +219,32 @@
           </div>
         </div>
       {% endif %}
+    </aside>
+
+    <!-- Description & Seller Section (Follows the panel on mobile, left column below gallery on desktop) -->
+    <div class="detail-description-section">
+      <div class="panel detail-description">
+        <h2 data-i18n="about_piece">About this piece</h2>
+        <div class="detail-description-content">
+          {{ listing.description|linebreaks }}
+        </div>
+      </div>
 
       <div class="seller-card">
         <span class="seller-avatar" aria-hidden="true">{{ listing.seller.short_name|slice:":1"|upper }}</span>
         <div>
-          <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong><br>
+          <div class="seller-meta-name">
+            <strong>{{ listing.seller.display_name|default:"ManzilCart member" }}</strong>
+            <span class="seller-verified-tag" data-i18n="verified_seller">Verified Seller</span>
+          </div>
           <span class="muted small"><span data-i18n="member_since">Member since</span> {{ listing.seller.date_joined|date:"M Y" }}</span>
         </div>
       </div>
 
-      {% if is_owner %}
-        <div class="form-actions">
-          {% if can_edit %}
-            <a class="btn btn-primary" href="{% url 'catalog:listing_edit' emirate_slug=emirate.slug slug=listing.slug %}" data-i18n="edit_listing">Edit listing</a>
-          {% endif %}
-          <a class="btn btn-quiet" href="{% url 'accounts:listings' %}" data-i18n="all_my_listings">All my listings</a>
-        </div>
-      {% else %}
-        <div class="contact-panel">
-          {% if user.is_authenticated %}
-            <form method="post" action="{% url 'conversations:start' listing_id=listing.pk %}">
-              {% csrf_token %}
-              <button class="btn btn-primary" type="submit" data-i18n="msg_seller">Message the seller</button>
-            </form>
-            <p class="muted small" data-i18n="chat_instructions">Ask questions, then agree a price in chat.</p>
-
-            <form class="offer-form" method="post" action="{% url 'deals:start' listing_id=listing.pk %}">
-              {% csrf_token %}
-              <label class="field-label" for="offer-amount" data-i18n="make_offer">Or make an offer (AED)</label>
-              <div class="offer-form-row">
-                <input class="input" id="offer-amount" type="number" name="amount" min="1" step="1" placeholder="{{ listing.asking_price|floatformat:0 }}" required>
-                <button class="btn btn-primary" type="submit" data-i18n="btn_make_offer">Make offer</button>
-              </div>
-            </form>
-            <p class="muted small" data-i18n="handover_note">There is no online payment. You agree handover and payment directly.</p>
-          {% else %}
-            <a class="btn btn-primary" href="{% url 'accounts:start' %}" data-i18n="sign_in_to_message">Sign in to message the seller</a>
-            <p class="muted small" data-i18n="chat_verified_only">Chat is available to verified members.</p>
-          {% endif %}
-        </div>
-      {% endif %}
-
       <p class="safety-note">
         <strong data-i18n="stay_safe">Stay safe.</strong> <span data-i18n="safety_text">View the furniture before paying. ManzilCart does not process, hold or guarantee the purchase price — payment is agreed directly between buyer and seller.</span>
       </p>
-    </aside>
+    </div>
   </div>
 </section>
 
@@ -228,3 +265,4 @@
 </section>
 {% endif %}
 {% endblock %}
+
