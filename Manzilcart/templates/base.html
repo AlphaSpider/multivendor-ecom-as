@@ -27,7 +27,7 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="{% static 'images/logo-mark.png' %}">
-  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.16">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=1.17">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}{% if current_emirate and request.resolver_match.namespace != 'locations' %} has-mobile-tabbar{% endif %}">
@@ -103,6 +103,7 @@
           {% if user.is_authenticated %}
             <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages{% if unread_messages %}<span class="nav-badge" title="Unread messages">{% if unread_messages > 9 %}9+{% else %}{{ unread_messages }}{% endif %}</span>{% endif %}</a>
             <a href="{% url 'deals:list' %}" data-i18n="nav_deals">Deals</a>
+            <a href="{% url 'accounts:wishlist' %}" data-i18n="wishlist">Wishlist</a>
             <a href="{% url 'accounts:dashboard' %}" data-i18n="nav_my_account">My account</a>
             <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
               {% csrf_token %}
@@ -216,6 +217,7 @@
           <a href="{% url 'accounts:dashboard' %}" data-i18n="nav_my_account">My account</a>
           <a href="{% url 'conversations:list' %}" data-i18n="nav_messages">Messages</a>
           <a href="{% url 'deals:list' %}" data-i18n="nav_deals">Deals</a>
+          <a href="{% url 'accounts:wishlist' %}" data-i18n="wishlist">Wishlist</a>
           <a href="{% url 'auctions:mine' %}" data-i18n="footer_my_auctions">My auctions</a>
           <a href="{% url 'accounts:profile' %}" data-i18n="footer_profile">Profile</a>
         {% else %}
@@ -233,7 +235,7 @@
     </div>
   </footer>
 
-  <script src="{% static 'js/app.js' %}?v=3.0" defer></script>
+  <script src="{% static 'js/app.js' %}?v=3.1" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

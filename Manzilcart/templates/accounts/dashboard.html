@@ -41,6 +41,10 @@
       <strong>{{ listings_count }}</strong>
       <span data-i18n="my_listings">My listings</span>
     </a>
+    <a class="account-stat" href="{% url 'accounts:wishlist' %}">
+      <strong>{{ wishlist_count }}</strong>
+      <span data-i18n="wishlist">Wishlist</span>
+    </a>
     <a class="account-stat" href="{% url 'auctions:mine' %}">
       <strong>{{ auctions_count }}</strong>
       <span data-i18n="my_auctions">My auctions</span>

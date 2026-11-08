@@ -25,7 +25,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from PIL import Image
 
-from catalog.models import Listing, ListingImage
+from catalog.models import Listing, ListingImage, WishlistItem
 from core.audit import record_audit
 from core.exceptions import PermissionDeniedError, StateTransitionError
 from core.images import sanitise_image, validate_image_upload
@@ -375,3 +375,39 @@ def delete_listing_image(image: ListingImage, *, actor) -> None:
         if replacement is not None:
             replacement.is_cover = True
             replacement.save(update_fields=["is_cover"])
+
+
+# ---------------------------------------------------------------------------
+# Wishlist
+# ---------------------------------------------------------------------------
+
+
+@transaction.atomic
+def toggle_wishlist(listing: Listing, *, user) -> bool:
+    """
+    Save or unsave a public listing for a member.
+
+    Returns ``True`` when the listing is now saved. Sold, reserved and unpublished
+    products cannot be added, but an existing save can always be removed.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        raise PermissionDeniedError("Please sign in to save products.")
+
+    locked = Listing.objects.select_for_update().get(pk=listing.pk)
+    existing = WishlistItem.objects.filter(user=user, listing=locked).first()
+    if existing is not None:
+        existing.delete()
+        return False
+
+    if not locked.is_public:
+        raise StateTransitionError(
+            "Only published products can be saved to a wishlist."
+        )
+
+    try:
+        with transaction.atomic():
+            WishlistItem.objects.create(user=user, listing=locked)
+    except IntegrityError:
+        # A concurrent double-click already saved it; the end state is the same.
+        pass
+    return True

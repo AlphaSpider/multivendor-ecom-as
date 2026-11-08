@@ -98,6 +98,7 @@ class ListingAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
         "emirate",
         "service_area",
         "asking_price",
+        "wishlist_count",
         "submitted_at",
         "published_at",
         "chat_badge",
@@ -125,6 +126,7 @@ class ListingAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
         "reviewed_at",
         "review_link",
         "gallery",
+        "wishlist_count",
     )
     fieldsets = (
         ("Listing", {"fields": ("title", "category", "condition", "asking_price", "description")}),
@@ -151,6 +153,7 @@ class ListingAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
                     "reviewed_by",
                     "reviewed_at",
                     "review_link",
+                    "wishlist_count",
                 )
             },
         ),
@@ -177,6 +180,7 @@ class ListingAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
                 unread_chat=governance_services.unread_staff_replies_subquery(
                     governance_services.content_type_for("listing")
                 ),
+                wishlist_count=Count("wishlist_items", distinct=True),
             )
             .prefetch_related(
                 Prefetch(
@@ -233,6 +237,13 @@ class ListingAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
     @admin.display(description="Preview")
     def photo_preview(self, obj):
         return _cover_thumbnail(obj.images.all())
+
+    @admin.display(description="Wishlist saves", ordering="wishlist_count")
+    def wishlist_count(self, obj):
+        count = getattr(obj, "wishlist_count", None)
+        if count is None:
+            count = obj.wishlist_items.count()
+        return count
 
     @admin.display(description="Review")
     def review_link(self, obj):

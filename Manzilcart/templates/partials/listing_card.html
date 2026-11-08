@@ -1,7 +1,30 @@
 {% comment %}A listing card used by grids across the marketplace.{% endcomment %}
 {% load humanize %}
 <article class="listing-card">
-  <a class="listing-card-media" href="{{ listing.get_absolute_url }}" tabindex="-1" aria-hidden="true">
+  {% if user.is_authenticated %}
+    {% if listing.pk in wishlist_ids or listing.seller_id != user.id %}
+      {% if listing.is_public or show_status %}
+        <form class="wishlist-heart-form" method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=listing.emirate.slug slug=listing.slug %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button class="wishlist-heart{% if listing.pk in wishlist_ids %} is-saved{% endif %}"
+                  type="submit"
+                  aria-label="{% if listing.pk in wishlist_ids %}Remove from wishlist{% else %}Save to wishlist{% endif %}"
+                  title="{% if listing.pk in wishlist_ids %}Remove from wishlist{% else %}Save to wishlist{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
+            </svg>
+          </button>
+        </form>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {% if listing.is_public %}
+    <a class="listing-card-media" href="{{ listing.get_absolute_url }}" tabindex="-1" aria-hidden="true">
+  {% else %}
+    <div class="listing-card-media" aria-hidden="true">
+  {% endif %}
     {% with cover=listing.cover_image %}
       {% if cover %}
         <img src="{{ cover.image.url }}" alt="" loading="lazy" width="{{ cover.width|default:640 }}" height="{{ cover.height|default:480 }}">
@@ -9,7 +32,12 @@
         <span class="listing-placeholder" aria-hidden="true">{{ listing.category.name|slice:":1" }}</span>
       {% endif %}
     {% endwith %}
-  </a>
+  {% if listing.is_public %}
+    </a>
+  {% else %}
+    </div>
+  {% endif %}
+
   <div class="listing-card-body">
     <div class="listing-card-top">
       <span class="badge" data-condition="{{ listing.condition }}">{{ listing.get_condition_display }}</span>
@@ -18,7 +46,11 @@
       {% endif %}
     </div>
     <h3 class="listing-card-title">
-      <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+      {% if listing.is_public %}
+        <a href="{{ listing.get_absolute_url }}">{{ listing.title }}</a>
+      {% else %}
+        <span>{{ listing.title }}</span>
+      {% endif %}
     </h3>
     <p class="listing-card-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
     <p class="listing-card-meta">

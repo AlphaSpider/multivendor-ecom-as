@@ -315,3 +315,41 @@ class ListingImage(models.Model):
         if not self.height:
             return 4 / 3
         return round(self.width / self.height, 4)
+
+
+class WishlistItem(models.Model):
+    """A member's saved listing, used for demand signals in operations."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items",
+    )
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "wishlist item"
+        verbose_name_plural = "wishlist items"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                name="wishlist_unique_user_listing",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "-created_at"], name="wishlist_user_created_idx"
+            ),
+            models.Index(
+                fields=["listing", "-created_at"], name="wishlist_listing_created_idx"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} saved listing {self.listing_id}"

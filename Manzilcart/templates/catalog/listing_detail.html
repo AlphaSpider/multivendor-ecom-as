@@ -105,6 +105,21 @@
       <h1>{{ listing.title }}</h1>
       <p class="detail-price">AED {{ listing.asking_price|floatformat:0|intcomma }}</p>
 
+      {% if listing.is_public and not is_owner and user.is_authenticated %}
+        <div class="wishlist-detail-form">
+          <form method="post" action="{% url 'catalog:wishlist_toggle' emirate_slug=emirate.slug slug=listing.slug %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="btn btn-quiet wishlist-detail-btn{% if is_wishlisted %} is-saved{% endif %}" type="submit">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
+              </svg>
+              <span>{% if is_wishlisted %}Saved to wishlist{% else %}Save to wishlist{% endif %}</span>
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
       <dl class="detail-list">
         <div><dt data-i18n="detail_category">Category</dt><dd data-category-name="{{ listing.category.name }}">{{ listing.category.name }}</dd></div>
         <div><dt data-i18n="detail_area">Area</dt><dd data-area-name="{{ listing.service_area.name }}">{{ listing.service_area.name }}</dd></div>

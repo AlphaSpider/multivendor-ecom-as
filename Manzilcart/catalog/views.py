@@ -24,6 +24,7 @@ from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import TemplateView
 
@@ -35,9 +36,12 @@ from catalog.selectors import (
     active_categories,
     category_by_slug,
     category_listing_counts,
+    is_wishlisted,
     listing_by_slug,
     search_listings,
     seller_listings,
+    wishlist_items,
+    wishlist_listing_ids,
 )
 from core.exceptions import PermissionDeniedError, StateTransitionError
 from locations.mixins import EmirateRequiredMixin
@@ -103,6 +107,9 @@ class ListingListView(EmirateRequiredMixin, TemplateView):
                 "emirate": self.emirate,
                 "page_obj": page,
                 "listings": page.object_list,
+                "wishlist_ids": wishlist_listing_ids(
+                    request.user, [listing.pk for listing in page.object_list]
+                ),
                 "total_results": paginator.count,
                 "active_filter_count": active_filter_count,
                 "modal_filter_count": modal_filter_count,
@@ -159,6 +166,7 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
                 "can_edit": request.user.is_authenticated
                 and request.user.pk == listing.seller_id
                 and listing.is_editable_by_owner,
+                "is_wishlisted": is_wishlisted(request.user, listing),
             },
         )
 
@@ -371,6 +379,60 @@ class MyListingsView(LoginRequiredMixin, TemplateView):
         context["listings"] = listings
         context["statuses"] = Listing.Status.choices
         return context
+
+
+class MyWishlistView(LoginRequiredMixin, TemplateView):
+    """Products a member has saved from any marketplace."""
+
+    template_name = "catalog/my_wishlist.html"
+    login_url = "accounts:login"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        items = list(wishlist_items(self.request.user))
+        context["wishlist_items"] = items
+        context["wishlist_ids"] = {item.listing_id for item in items}
+        context["wishlist_count"] = len(items)
+        return context
+
+
+class WishlistToggleView(LoginRequiredMixin, EmirateRequiredMixin, View):
+    """POST-only save/remove action used by product cards and the detail page."""
+
+    login_url = "accounts:login"
+
+    def post(self, request, *args, **kwargs):
+        listing = get_object_or_404(
+            Listing.objects.select_related("emirate"),
+            slug=kwargs["slug"],
+            emirate=self.emirate,
+        )
+        already_saved = is_wishlisted(request.user, listing)
+        if not listing.is_public and not already_saved:
+            raise Http404("Listing not found.")
+
+        try:
+            saved = services.toggle_wishlist(listing, user=request.user)
+        except StateTransitionError as exc:
+            messages.error(request, exc.message)
+        else:
+            messages.success(
+                request,
+                "Saved to your wishlist."
+                if saved
+                else "Removed from your wishlist.",
+            )
+
+        next_url = request.POST.get("next", "")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            {request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+        if listing.is_public:
+            return redirect(listing.get_absolute_url())
+        return redirect("accounts:wishlist")
 
 
 class ListingImageView(LoginRequiredMixin, View):

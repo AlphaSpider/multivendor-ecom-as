@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from django.db.models import Count, Q
 
-from catalog.models import Category, Listing
+from catalog.models import Category, Listing, WishlistItem
 
 
 def public_listings(emirate):
@@ -117,6 +117,40 @@ def seller_listings(user):
         .select_related("category", "emirate", "service_area")
         .prefetch_related("images")
         .order_by("-created_at")
+    )
+
+
+def wishlist_listing_ids(user, listing_ids) -> set[int]:
+    """Listing ids from ``listing_ids`` that the member has saved."""
+    ids = list(listing_ids)
+    if not getattr(user, "is_authenticated", False) or not ids:
+        return set()
+    return set(
+        WishlistItem.objects.filter(user=user, listing_id__in=ids).values_list(
+            "listing_id", flat=True
+        )
+    )
+
+
+def is_wishlisted(user, listing) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return WishlistItem.objects.filter(user=user, listing=listing).exists()
+
+
+def wishlist_items(user):
+    """A member's saved products, newest first, ready for the wishlist page."""
+    return (
+        WishlistItem.objects.filter(user=user)
+        .select_related(
+            "listing",
+            "listing__seller",
+            "listing__category",
+            "listing__emirate",
+            "listing__service_area",
+        )
+        .prefetch_related("listing__images")
+        .order_by("-created_at", "-id")
     )
 
 

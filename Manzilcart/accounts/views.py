@@ -337,6 +337,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Activity counts. Two-way stats need the union of both roles, so they are
         # summed; every query is a cheap indexed count scoped to one member.
         context["listings_count"] = user.listings.count()
+        context["wishlist_count"] = user.wishlist_items.count()
         context["auctions_count"] = (
             user.auctions.count()
             + user.bids.count()

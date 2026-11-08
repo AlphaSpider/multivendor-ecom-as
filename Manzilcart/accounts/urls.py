@@ -10,7 +10,7 @@ conversations and deals can legitimately span more than one marketplace.
 from django.urls import path
 
 from accounts import views
-from catalog.views import MyListingsView
+from catalog.views import MyListingsView, MyWishlistView
 
 app_name = "accounts"
 
@@ -25,6 +25,7 @@ urlpatterns = [
     # Member area.
     path("my/", views.DashboardView.as_view(), name="dashboard"),
     path("my/listings/", MyListingsView.as_view(), name="listings"),
+    path("my/wishlist/", MyWishlistView.as_view(), name="wishlist"),
     path("my/profile/", views.ProfileView.as_view(), name="profile"),
     path("my/settings/", views.SettingsView.as_view(), name="settings"),
 ]

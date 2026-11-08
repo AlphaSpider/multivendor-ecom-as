@@ -172,4 +172,34 @@
     </table>
   </div>
 </div>
+
+<div class="governance-panel">
+  <h2>Top 10 wishlisted products</h2>
+  <table class="governance-table">
+    <thead><tr><th></th><th>Product</th><th>Category</th><th>Status</th><th>Wishlist saves</th><th></th></tr></thead>
+    <tbody>
+      {% for listing in top_wishlisted %}
+        <tr>
+          <td>
+            {% with cover=listing.cover_image %}
+              {% if cover %}
+                <a href="{% url 'admin:catalog_listing_change' listing.pk %}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ listing.title }}"></a>
+              {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            <strong>{{ listing.title|truncatechars:48 }}</strong><br>
+            <span class="governance-kpi-label">{{ listing.emirate.name }} · AED {{ listing.asking_price|intcomma }}</span>
+          </td>
+          <td>{{ listing.category.name }}</td>
+          <td><span class="governance-pill gov-pill-{{ listing.status }}">{{ listing.get_status_display }}</span></td>
+          <td><strong>{{ listing.wishlist_total }}</strong></td>
+          <td><a class="button" href="{% url 'admin:catalog_listing_change' listing.pk %}">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">No products have been wishlisted yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

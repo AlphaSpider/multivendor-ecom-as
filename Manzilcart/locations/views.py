@@ -66,6 +66,7 @@ class MarketplaceHomeView(EmirateRequiredMixin, View):
             category_listing_counts,
             featured_listings,
             marketplace_listing_stats,
+            wishlist_listing_ids,
         )
 
         categories = list(active_categories())
@@ -73,6 +74,7 @@ class MarketplaceHomeView(EmirateRequiredMixin, View):
         for category in categories:
             category.listing_count = counts.get(category.pk, 0)
 
+        featured = list(featured_listings(self.emirate, limit=8))
         return render(
             request,
             self.template_name,
@@ -80,7 +82,10 @@ class MarketplaceHomeView(EmirateRequiredMixin, View):
                 "emirate": self.emirate,
                 "service_areas": service_areas_for_emirate(self.emirate),
                 "categories": categories,
-                "featured_listings": featured_listings(self.emirate, limit=8),
+                "featured_listings": featured,
+                "wishlist_ids": wishlist_listing_ids(
+                    request.user, [listing.pk for listing in featured]
+                ),
                 "listing_stats": marketplace_listing_stats(self.emirate),
             },
         )

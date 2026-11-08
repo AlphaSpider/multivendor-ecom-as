@@ -213,6 +213,13 @@ def dashboard(request):
         ).aggregate(total=Sum("agreed_price"))["total"]
         or 0
     )
+    top_wishlisted = (
+        Listing.objects.filter(wishlist_items__isnull=False)
+        .annotate(wishlist_total=Count("wishlist_items"))
+        .select_related("category", "emirate", "seller")
+        .prefetch_related("images")
+        .order_by("-wishlist_total", "-published_at", "-id")[:10]
+    )
 
     context = {
         "title": "Command centre",
@@ -263,6 +270,7 @@ def dashboard(request):
         .select_related("applicant", "category", "emirate", "service_area")
         .prefetch_related("images")
         .order_by("submitted_at", "id")[:10],
+        "top_wishlisted": top_wishlisted,
         "recent_chats": _recent_chat_rows(),
         "escalated": DealCancellation.objects.filter(
             status__in=[

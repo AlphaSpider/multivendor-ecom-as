@@ -24,7 +24,7 @@ from PIL import Image as PILImage
 
 from accounts.models import User
 from auctions.models import Auction, AuctionEvent, Bid
-from catalog.models import Category, Listing, ListingImage
+from catalog.models import Category, Listing, ListingImage, WishlistItem
 from core.exceptions import PermissionDeniedError, StateTransitionError
 from governance import services
 from governance.models import ListingChatMessage, ListingChatThread
@@ -533,3 +533,33 @@ class GovernancePagesTests(GovernanceBase):
         html = response.content.decode("utf-8")
         self.assertIn("Total fixed-price products", html)
         self.assertIn("Total auction products", html)
+
+    def test_dashboard_shows_top_wishlisted_products(self):
+        WishlistItem.objects.create(user=self.buyer, listing=self.listing)
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("admin:governance_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Top 10 wishlisted products")
+        self.assertContains(response, "Walnut desk")
+        self.assertEqual(response.context["top_wishlisted"][0].wishlist_total, 1)
+
+    def test_listing_admin_shows_wishlist_count(self):
+        WishlistItem.objects.create(user=self.buyer, listing=self.listing)
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("admin:catalog_listing_changelist"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Wishlist saves")
+        row = next(
+            obj
+            for obj in response.context["cl"].result_list
+            if obj.pk == self.listing.pk
+        )
+        self.assertEqual(row.wishlist_count, 1)
+
+        detail = self.client.get(
+            reverse("admin:catalog_listing_change", args=[self.listing.pk])
+        )
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "Wishlist saves")

@@ -954,6 +954,7 @@ a:hover { color: var(--brand-strong); }
 }
 
 .listing-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -961,6 +962,83 @@ a:hover { color: var(--brand-strong); }
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
   display: flex;
   flex-direction: column;
+}
+
+.wishlist-heart-form {
+  position: absolute;
+  top: 0.65rem;
+  inset-inline-end: 0.65rem;
+  z-index: 2;
+  margin: 0;
+}
+
+.wishlist-heart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.wishlist-heart:hover {
+  color: var(--brand);
+  border-color: var(--brand);
+  transform: scale(1.05);
+}
+
+.wishlist-heart.is-saved {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.wishlist-heart.is-saved svg {
+  fill: currentColor;
+}
+
+.wishlist-heart:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.wishlist-heart svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wishlist-detail-form {
+  margin: 0 0 1rem;
+}
+
+.wishlist-detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wishlist-detail-btn.is-saved {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.wishlist-detail-btn.is-saved svg {
+  fill: currentColor;
+}
+
+.wishlist-note {
+  margin-top: 1.25rem;
 }
 
 .listing-card:hover {

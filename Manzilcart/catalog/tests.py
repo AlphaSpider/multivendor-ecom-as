@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image as PILImage
 
-from catalog.models import Category, Listing, ListingImage
+from catalog.models import Category, Listing, ListingImage, WishlistItem
 from locations.models import Emirate, ServiceArea
 
 User = get_user_model()
@@ -104,6 +104,71 @@ class CatalogTestCase(TestCase):
         self.client.force_login(self.seller)
         response = self.client.get(self.listing.get_absolute_url())
         self.assertContains(response, "Edit listing")
+
+    def test_buyer_can_save_and_remove_a_product_from_the_wishlist(self):
+        self.client.force_login(self.buyer)
+        toggle_url = reverse(
+            "catalog:wishlist_toggle",
+            kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+        )
+
+        response = self.client.post(
+            toggle_url, {"next": self.listing.get_absolute_url()}
+        )
+        self.assertRedirects(response, self.listing.get_absolute_url())
+        self.assertTrue(
+            WishlistItem.objects.filter(
+                user=self.buyer, listing=self.listing
+            ).exists()
+        )
+
+        detail = self.client.get(self.listing.get_absolute_url())
+        self.assertContains(detail, "Saved to wishlist")
+
+        wishlist_page = self.client.get(reverse("accounts:wishlist"))
+        self.assertEqual(wishlist_page.status_code, 200)
+        self.assertContains(wishlist_page, "Walnut coffee table")
+        self.assertEqual(wishlist_page.context["wishlist_count"], 1)
+
+        response = self.client.post(
+            toggle_url, {"next": reverse("accounts:wishlist")}
+        )
+        self.assertRedirects(response, reverse("accounts:wishlist"))
+        self.assertFalse(
+            WishlistItem.objects.filter(
+                user=self.buyer, listing=self.listing
+            ).exists()
+        )
+        self.assertContains(
+            self.client.get(reverse("accounts:wishlist")),
+            "No saved products yet",
+        )
+
+    def test_wishlist_requires_sign_in(self):
+        response = self.client.post(
+            reverse(
+                "catalog:wishlist_toggle",
+                kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+            )
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response["Location"])
+        self.assertFalse(WishlistItem.objects.exists())
+
+    def test_only_public_products_can_be_added_to_a_wishlist(self):
+        self.listing.status = Listing.Status.PENDING
+        self.listing.published_at = None
+        self.listing.save(update_fields=["status", "published_at"])
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse(
+                "catalog:wishlist_toggle",
+                kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(WishlistItem.objects.exists())
 
     def test_my_listings_page_lists_owner_items(self):
         self.client.force_login(self.seller)
