@@ -196,6 +196,22 @@ class MarketplaceHomeTests(LocationTestBase):
             self.assertEqual(area.emirate, self.emirate)
 
 
+class DeliveryInfoTests(LocationTestBase):
+    def test_delivery_page_is_emirate_scoped(self):
+        response = self.client.get(
+            reverse(
+                "marketplace:delivery",
+                kwargs={"emirate_slug": self.emirate.slug},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["emirate"], self.emirate)
+        self.assertContains(response, "Furniture delivery, handled with care.")
+        self.assertContains(response, "seller pays a small transport fee")
+        self.assertContains(response, "delivery-cartoon.svg")
+
+
 class ServiceAreaJsonTests(LocationTestBase):
     def test_returns_active_areas_for_the_requested_emirate(self):
         response = self.client.get(

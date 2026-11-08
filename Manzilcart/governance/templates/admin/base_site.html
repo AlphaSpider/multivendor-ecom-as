@@ -6,7 +6,7 @@
 
 {% block extrastyle %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static "governance/admin.css" %}?v=14">
+  <link rel="stylesheet" href="{% static "governance/admin.css" %}?v=16">
 {% endblock %}
 
 {% block branding %}
@@ -27,6 +27,8 @@
           <span class="governance-badge-unread">{{ governance_unread_threads }}</span>
         {% elif link.badge_key == "applications" and governance_pending_applications %}
           <span class="governance-badge-unread">{{ governance_pending_applications }}</span>
+        {% elif link.badge_key == "delivery" and governance_open_delivery_requests %}
+          <span class="governance-badge-unread">{{ governance_open_delivery_requests }}</span>
         {% endif %}
       </a>
     {% endfor %}

@@ -19,8 +19,9 @@ from django.utils import timezone
 from catalog.models import Category, Listing
 from auctions.models import Auction
 from core.exceptions import PermissionDeniedError, StateTransitionError
+from core.models import AuditEvent
 from deals import services
-from deals.models import Deal, DealOffer, DealServiceSelection
+from deals.models import Deal, DealOffer, DealServiceSelection, DeliveryRequest
 from locations.models import (
     Emirate,
     ServiceArea,
@@ -526,3 +527,78 @@ class AuctionDealTests(DealTestBase):
         self.client.force_login(self.stranger)
         response = self.client.get(reverse("deals:detail", args=[deal.pk]))
         self.assertEqual(response.status_code, 404)
+
+
+class DeliveryRequestTests(DealTestBase):
+    def _staff(self):
+        return User.objects.create_user(
+            phone="+971505000009",
+            display_name="Operations",
+            emirate=self.emirate,
+            service_area=self.area,
+            phone_verified_at=timezone.now(),
+            is_staff=True,
+        )
+
+    def test_buyer_can_request_delivery_and_duplicate_is_idempotent(self):
+        delivery, created = services.request_delivery(
+            listing=self.listing, buyer=self.buyer
+        )
+        self.assertTrue(created)
+        self.assertEqual(delivery.status, DeliveryRequest.Status.PROCESSING)
+        self.assertEqual(delivery.buyer, self.buyer)
+        self.assertEqual(delivery.seller, self.seller)
+        self.assertEqual(DeliveryRequest.objects.count(), 1)
+
+        same, created_again = services.request_delivery(
+            listing=self.listing, buyer=self.buyer
+        )
+        self.assertFalse(created_again)
+        self.assertEqual(same.pk, delivery.pk)
+        self.assertEqual(DeliveryRequest.objects.count(), 1)
+
+    def test_owner_cannot_request_delivery(self):
+        with self.assertRaises(PermissionDeniedError):
+            services.request_delivery(listing=self.listing, buyer=self.seller)
+
+    def test_listing_must_be_public_to_request_delivery(self):
+        self.listing.status = Listing.Status.PENDING
+        self.listing.published_at = None
+        self.listing.save(update_fields=["status", "published_at"])
+
+        with self.assertRaises(StateTransitionError):
+            services.request_delivery(listing=self.listing, buyer=self.buyer)
+
+    def test_staff_can_update_delivery_status_with_audit_trail(self):
+        delivery, _created = services.request_delivery(
+            listing=self.listing, buyer=self.buyer
+        )
+        staff = self._staff()
+
+        updated = services.update_delivery_status(
+            delivery,
+            actor=staff,
+            status=DeliveryRequest.Status.IN_TRANSIT,
+        )
+
+        self.assertEqual(updated.status, DeliveryRequest.Status.IN_TRANSIT)
+        self.assertEqual(updated.status_updated_by, staff)
+        self.assertIsNotNone(updated.status_updated_at)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.DELIVERY_STATUS_UPDATED,
+                entity_type="deals.deliveryrequest",
+                entity_id=str(delivery.pk),
+            ).exists()
+        )
+
+    def test_member_cannot_update_delivery_status(self):
+        delivery, _created = services.request_delivery(
+            listing=self.listing, buyer=self.buyer
+        )
+        with self.assertRaises(PermissionDeniedError):
+            services.update_delivery_status(
+                delivery,
+                actor=self.buyer,
+                status=DeliveryRequest.Status.DELIVERED,
+            )

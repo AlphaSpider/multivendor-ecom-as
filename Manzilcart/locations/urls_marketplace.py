@@ -13,5 +13,6 @@ app_name = "marketplace"
 
 urlpatterns = [
     path("", views.MarketplaceHomeView.as_view(), name="home"),
+    path("delivery/", views.DeliveryInfoView.as_view(), name="delivery"),
     path("areas.json", views.service_area_options, name="service_area_options"),
 ]

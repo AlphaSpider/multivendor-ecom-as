@@ -25,6 +25,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from accounts.models import User
 from auctions import services as auction_services
@@ -34,7 +35,7 @@ from catalog.models import Listing
 from core.exceptions import DomainError
 from core.images import validate_image_upload
 from core.models import AuditEvent
-from deals.models import Deal, DealCancellation
+from deals.models import Deal, DealCancellation, DeliveryRequest
 from governance import services as governance_services
 from governance.models import ListingChatMessage, ListingChatThread
 from locations.models import Emirate
@@ -220,6 +221,9 @@ def dashboard(request):
         .prefetch_related("images")
         .order_by("-wishlist_total", "-published_at", "-id")[:10]
     )
+    open_delivery_requests = DeliveryRequest.objects.exclude(
+        status=DeliveryRequest.Status.DELIVERED
+    )
 
     context = {
         "title": "Command centre",
@@ -255,6 +259,7 @@ def dashboard(request):
                     moderation_status=Auction.ModerationStatus.SUSPENDED
                 ).count()
             ),
+            "open_delivery_requests": open_delivery_requests.count(),
         },
         "pending_listings": Listing.objects.filter(status=Listing.Status.PENDING)
         .select_related("seller", "category", "emirate")
@@ -271,6 +276,17 @@ def dashboard(request):
         .prefetch_related("images")
         .order_by("submitted_at", "id")[:10],
         "top_wishlisted": top_wishlisted,
+        "delivery_requests": (
+            open_delivery_requests.select_related(
+                "listing",
+                "listing__emirate",
+                "listing__service_area",
+                "buyer",
+                "seller",
+            )
+            .prefetch_related("listing__images")
+            .order_by("-created_at", "-id")[:8]
+        ),
         "recent_chats": _recent_chat_rows(),
         "escalated": DealCancellation.objects.filter(
             status__in=[
@@ -1215,5 +1231,125 @@ def financials(request):
             ),
             deals=deals,
             disputes=disputes,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 6. Delivery requests / fulfilment coordination
+# ---------------------------------------------------------------------------
+
+
+def delivery_requests(request):
+    """Products buyers have asked ManzilCart to collect and deliver."""
+    if request.method == "POST":
+        _require_perm(request, "deals.change_deliveryrequest")
+        raw_delivery_id = (request.POST.get("delivery_id") or "").strip()
+        delivery = get_object_or_404(
+            DeliveryRequest.objects.select_related("listing__emirate"),
+            pk=raw_delivery_id if raw_delivery_id.isdigit() else None,
+        )
+        from deals import services as deal_services
+
+        new_status = (request.POST.get("status") or "").strip()
+        try:
+            with transaction.atomic():
+                updated = deal_services.update_delivery_status(
+                    delivery,
+                    actor=request.user,
+                    status=new_status,
+                    request=request,
+                )
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+        except DomainError as exc:
+            messages.error(request, exc.message)
+        except Exception as exc:  # noqa: BLE001 - surface like other admin actions
+            messages.error(request, f"Could not update the delivery request: {exc}")
+        else:
+            messages.success(
+                request,
+                f"{updated.reference} marked as {updated.get_status_display()}.",
+            )
+
+        next_url = request.POST.get("next", "")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            {request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+        return redirect("admin:governance_delivery_requests")
+
+    status = (request.GET.get("status") or "active").strip().lower()
+    queryset = DeliveryRequest.objects.select_related(
+        "listing",
+        "listing__emirate",
+        "listing__service_area",
+        "listing__category",
+        "buyer",
+        "seller",
+        "status_updated_by",
+    ).prefetch_related("listing__images")
+
+    if status == "active":
+        queryset = queryset.exclude(status=DeliveryRequest.Status.DELIVERED)
+    elif status in DeliveryRequest.Status.values:
+        queryset = queryset.filter(status=status)
+    elif status != "all":
+        status = "active"
+        queryset = queryset.exclude(status=DeliveryRequest.Status.DELIVERED)
+
+    search = (request.GET.get("q") or "").strip()
+    if search:
+        phone = search.replace(" ", "")
+        query = (
+            Q(listing__title__icontains=search)
+            | Q(buyer__display_name__icontains=search)
+            | Q(seller__display_name__icontains=search)
+            | Q(buyer__phone__icontains=phone)
+            | Q(seller__phone__icontains=phone)
+        )
+        reference_digits = ""
+        if search.isdigit():
+            reference_digits = search
+        elif search.upper().startswith("MC-DL-"):
+            reference_digits = search[6:]
+        if reference_digits.isdigit():
+            query |= Q(pk=int(reference_digits)) | Q(listing_id=int(reference_digits))
+        queryset = queryset.filter(query)
+
+    emirate_id = request.GET.get("emirate", "")
+    if emirate_id.isdigit():
+        queryset = queryset.filter(listing__emirate_id=int(emirate_id))
+
+    queryset = queryset.order_by("-created_at", "-id")
+    paginator = Paginator(queryset, PAGE_SIZE)
+    page = paginator.get_page(request.GET.get("page"))
+
+    counts = {
+        "active": DeliveryRequest.objects.exclude(
+            status=DeliveryRequest.Status.DELIVERED
+        ).count(),
+        "all": DeliveryRequest.objects.count(),
+    }
+    for value, _label in DeliveryRequest.Status.choices:
+        counts[value] = DeliveryRequest.objects.filter(status=value).count()
+
+    return render(
+        request,
+        "admin/governance/delivery_requests.html",
+        _each_context(
+            request,
+            title="Delivery requests",
+            delivery_requests=page,
+            page_obj=page,
+            status=status,
+            counts=counts,
+            search=search,
+            emirates=Emirate.objects.order_by("display_order", "name"),
+            emirate_id=emirate_id,
+            status_choices=DeliveryRequest.Status.choices,
+            can_update=request.user.has_perm("deals.change_deliveryrequest"),
         ),
     )

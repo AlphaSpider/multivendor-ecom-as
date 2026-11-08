@@ -16,6 +16,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_GET, require_POST
+from django.views.generic import TemplateView
 
 from core.exceptions import LocationError
 from locations.mixins import EmirateRequiredMixin
@@ -89,6 +90,12 @@ class MarketplaceHomeView(EmirateRequiredMixin, View):
                 "listing_stats": marketplace_listing_stats(self.emirate),
             },
         )
+
+
+class DeliveryInfoView(EmirateRequiredMixin, TemplateView):
+    """Explain how ManzilCart furniture delivery works in this marketplace."""
+
+    template_name = "locations/delivery.html"
 
 
 @require_POST

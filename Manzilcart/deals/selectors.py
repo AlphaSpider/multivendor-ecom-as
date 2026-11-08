@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from deals.models import Deal
+from deals.models import Deal, DeliveryRequest
 
 
 def deals_for(user):
@@ -26,6 +26,19 @@ def deals_for(user):
             "accepted_offer",
         )
         .order_by("-created_at", "-id")
+    )
+
+
+def delivery_request_for(user, listing) -> DeliveryRequest | None:
+    """The signed-in buyer's request for this listing, if one exists."""
+    if not getattr(user, "is_authenticated", False):
+        return None
+    if user.pk == listing.seller_id:
+        return None
+    return (
+        DeliveryRequest.objects.filter(listing=listing, buyer=user)
+        .select_related("listing", "buyer", "seller")
+        .first()
     )
 
 

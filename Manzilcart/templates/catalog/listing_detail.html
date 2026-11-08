@@ -127,6 +127,43 @@
         <div><dt data-i18n="detail_listed">Listed</dt><dd>{{ listing.published_at|default:listing.created_at|date:"j M Y" }}</dd></div>
       </dl>
 
+      {% if listing.is_public %}
+        <div class="delivery-promo">
+          <div class="delivery-promo-main">
+            <span class="delivery-promo-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h11v11H3z"></path>
+                <path d="M14 10h4l3 3v4h-7z"></path>
+                <circle cx="7" cy="18" r="2"></circle>
+                <circle cx="18" cy="18" r="2"></circle>
+              </svg>
+            </span>
+            <div>
+              <strong data-i18n="delivery_available">Delivery available</strong>
+              <p class="muted small" data-i18n="delivery_promo_text">ManzilCart can collect this item from the seller and deliver it safely to the buyer. A small seller transport contribution applies.</p>
+            </div>
+          </div>
+          <div class="delivery-promo-actions">
+            <a class="btn btn-quiet btn-small delivery-promo-link" href="{% url 'marketplace:delivery' emirate_slug=emirate.slug %}" data-i18n="delivery_know_more">Know more</a>
+            {% if not is_owner %}
+              {% if delivery_request %}
+                <span class="delivery-request-state">
+                  <span class="muted small" data-i18n="Delivery requested">Delivery requested</span>
+                  <span class="status-pill status-delivery-{{ delivery_request.status }}" data-i18n="{{ delivery_request.get_status_display }}">{{ delivery_request.get_status_display }}</span>
+                </span>
+              {% elif user.is_authenticated %}
+                <form method="post" action="{% url 'catalog:request_delivery' emirate_slug=emirate.slug slug=listing.slug %}">
+                  {% csrf_token %}
+                  <button class="btn btn-primary btn-small" type="submit" data-i18n="Ask for delivery">Ask for delivery</button>
+                </form>
+              {% else %}
+                <a class="btn btn-primary btn-small" href="{% url 'accounts:start' %}" data-i18n="Sign in to ask for delivery">Sign in to ask for delivery</a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
       <div class="seller-card">
         <span class="seller-avatar" aria-hidden="true">{{ listing.seller.short_name|slice:":1"|upper }}</span>
         <div>

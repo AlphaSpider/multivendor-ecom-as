@@ -51,6 +51,10 @@
     <div class="governance-kpi-value">{{ kpis.open_disputes }}</div>
     <div class="governance-kpi-label">Open disputes</div>
   </a>
+  <a class="governance-kpi" href="{% url 'admin:governance_delivery_requests' %}">
+    <div class="governance-kpi-value">{{ kpis.open_delivery_requests }}</div>
+    <div class="governance-kpi-label">Delivery requests to coordinate</div>
+  </a>
   <a class="governance-kpi" href="{% url 'admin:governance_vendors' %}?status=suspended">
     <div class="governance-kpi-value">{{ kpis.suspended_items }}</div>
     <div class="governance-kpi-label">Suspended items</div>
@@ -171,6 +175,35 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="governance-panel governance-delivery-panel">
+  <h2>Delivery requests needing coordination</h2>
+  <table class="governance-table">
+    <thead><tr><th></th><th>Product</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for delivery in delivery_requests %}
+        <tr>
+          <td>
+            {% with cover=delivery.listing.cover_image %}
+              {% if cover %}
+                <a href="{{ delivery.item_url }}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ delivery.listing.title }}"></a>
+              {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            <strong><a href="{{ delivery.item_url }}">{{ delivery.listing.title|truncatechars:44 }}</a></strong><br>
+            <span class="governance-kpi-label">{{ delivery.item_reference }} · {{ delivery.listing.emirate.name }} · {{ delivery.created_at|naturaltime }}</span><br>
+            <span class="governance-kpi-label">Buyer {{ delivery.buyer.display_name|default:delivery.buyer.phone }} · Seller {{ delivery.seller.display_name|default:delivery.seller.phone }}</span>
+          </td>
+          <td><span class="governance-pill gov-pill-{{ delivery.status }}">{{ delivery.get_status_display }}</span></td>
+          <td><a class="button" href="{% url 'admin:governance_delivery_requests' %}?status=active#delivery-{{ delivery.pk }}">Manage</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">No delivery requests need coordination.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <div class="governance-panel">

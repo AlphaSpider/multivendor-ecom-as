@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" role="img" aria-labelledby="deliveryTitle deliveryDesc">
+  <title id="deliveryTitle">ManzilCart delivery truck carrying a sofa</title>
+  <desc id="deliveryDesc">A cartoon red delivery truck with a sofa on board, travelling to a customer's address.</desc>
+
+  <defs>
+    <linearGradient id="deliverySky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7f7"/>
+      <stop offset="1" stop-color="#fee2e2"/>
+    </linearGradient>
+    <filter id="deliveryShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#7f1d1d" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="560" height="380" rx="32" fill="url(#deliverySky)"/>
+  <circle cx="468" cy="86" r="72" fill="#fecaca" opacity="0.65"/>
+  <circle cx="105" cy="90" r="42" fill="#ffffff" opacity="0.7"/>
+  <circle cx="160" cy="72" r="22" fill="#ffffff" opacity="0.55"/>
+  <path d="M50 300c80-20 155 15 230 0s130-8 230 5v75H50z" fill="#fca5a5" opacity="0.35"/>
+  <path d="M50 330h460" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-dasharray="26 22"/>
+
+  <g stroke="#18181b" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M38 190h48M22 218h52M54 246h36" stroke="#dc2626" stroke-width="6" opacity="0.55"/>
+
+    <rect x="126" y="144" width="246" height="128" rx="18" fill="#ffffff" filter="url(#deliveryShadow)"/>
+    <path d="M372 190h72l44 42v40H372z" fill="#dc2626"/>
+    <path d="M390 202h44l26 26h-70z" fill="#e0f2fe"/>
+    <path d="M372 190v82"/>
+    <path d="M392 232h22" stroke-width="5"/>
+
+    <circle cx="196" cy="278" r="34" fill="#18181b"/>
+    <circle cx="196" cy="278" r="14" fill="#f4f4f5"/>
+    <circle cx="430" cy="278" r="34" fill="#18181b"/>
+    <circle cx="430" cy="278" r="14" fill="#f4f4f5"/>
+
+    <path d="M154 214v-38a14 14 0 0 1 14-14h18v52" fill="#f5d7b8"/>
+    <rect x="178" y="190" width="152" height="44" rx="14" fill="#f5d7b8"/>
+    <rect x="160" y="200" width="20" height="44" rx="10" fill="#e7b98d"/>
+    <rect x="330" y="200" width="20" height="44" rx="10" fill="#e7b98d"/>
+    <path d="M196 190v44M242 190v44" stroke="#d9a777" stroke-width="4"/>
+    <rect x="200" y="176" width="42" height="30" rx="10" fill="#dc2626"/>
+    <rect x="250" y="176" width="42" height="30" rx="10" fill="#ffffff"/>
+  </g>
+
+  <text x="249" y="264" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#dc2626">ManzilCart</text>
+
+  <g transform="translate(452 132)" stroke="#18181b" stroke-width="5" stroke-linejoin="round">
+    <path d="M0 50C0 50 42 24 42-4A42 42 0 1 0-42-4C-42 24 0 50 0 50Z" fill="#dc2626"/>
+    <circle cx="0" cy="-4" r="14" fill="#ffffff"/>
+  </g>
+</svg>

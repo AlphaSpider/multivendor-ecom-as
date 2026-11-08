@@ -69,6 +69,9 @@ class AuditEvent(models.Model):
         )
         DEAL_CANCELLED = "deal.cancelled", "Deal cancelled"
         DEAL_COMPLETED = "deal.completed", "Deal completed"
+        # Delivery requests
+        DELIVERY_REQUESTED = "delivery.requested", "Delivery requested"
+        DELIVERY_STATUS_UPDATED = "delivery.status_updated", "Delivery status updated"
         # Auctions
         AUCTION_CREATED = "auction.created", "Auction created"
         AUCTION_SUBMITTED = "auction.submitted", "Auction submitted for review"

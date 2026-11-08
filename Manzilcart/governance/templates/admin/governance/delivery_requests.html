@@ -1,0 +1,127 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Fulfilment</p>
+    <h1>Delivery requests</h1>
+    <p class="gov-subtitle">Products buyers have asked ManzilCart to collect and deliver. Contact both parties, then move each request through the delivery stages.</p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="{% url 'admin:governance_dashboard' %}">Command centre</a>
+  </div>
+</div>
+
+<div class="gov-toolbar">
+  <nav class="gov-tabs" aria-label="Delivery status">
+    <a class="{% if status == 'active' %}is-active{% endif %}" href="?status=active">Open <span>{{ counts.active }}</span></a>
+    <a class="{% if status == 'processing' %}is-active{% endif %}" href="?status=processing">Processing <span>{{ counts.processing }}</span></a>
+    <a class="{% if status == 'pickup' %}is-active{% endif %}" href="?status=pickup">Pickup <span>{{ counts.pickup }}</span></a>
+    <a class="{% if status == 'in_transit' %}is-active{% endif %}" href="?status=in_transit">In transit <span>{{ counts.in_transit }}</span></a>
+    <a class="{% if status == 'delivered' %}is-active{% endif %}" href="?status=delivered">Delivered <span>{{ counts.delivered }}</span></a>
+    <a class="{% if status == 'all' %}is-active{% endif %}" href="?status=all">All <span>{{ counts.all }}</span></a>
+  </nav>
+
+  <form class="gov-filter" method="get">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="search" name="q" value="{{ search }}" placeholder="Product, buyer, seller, phone or reference" aria-label="Search delivery requests">
+    <select name="emirate" aria-label="Filter by emirate">
+      <option value="">All emirates</option>
+      {% for emirate in emirates %}
+        <option value="{{ emirate.pk }}"{% if emirate_id == emirate.pk|stringformat:"s" %} selected{% endif %}>{{ emirate.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="button" type="submit">Search</button>
+    {% if search or emirate_id %}
+      <a class="button" href="?status={{ status }}">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="governance-panel governance-delivery-page">
+  <table class="governance-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Product &amp; parties</th>
+        <th>Status</th>
+        <th>Update</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for delivery in delivery_requests %}
+        <tr id="delivery-{{ delivery.pk }}">
+          <td>
+            {% with cover=delivery.listing.cover_image %}
+              {% if cover %}
+                <a href="{{ delivery.item_url }}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ delivery.listing.title }}"></a>
+              {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            <strong><a href="{{ delivery.item_url }}">{{ delivery.listing.title|truncatechars:56 }}</a></strong><br>
+            <span class="governance-kpi-label">
+              {{ delivery.reference }} · {{ delivery.item_reference }} · {{ delivery.listing.category.name }}
+            </span><br>
+            <span class="governance-kpi-label">
+              AED {{ delivery.listing.asking_price|intcomma }} · {{ delivery.listing.service_area.name }}, {{ delivery.listing.emirate.name }}
+            </span><br>
+            <span class="governance-pill gov-pill-{{ delivery.listing.status }}">{{ delivery.listing.get_status_display }}</span><br>
+            <span class="governance-kpi-label">
+              Buyer <a href="{% url 'admin:accounts_user_change' delivery.buyer.pk %}">{{ delivery.buyer.display_name|default:delivery.buyer.phone }}</a> · {{ delivery.buyer.phone }}
+            </span><br>
+            <span class="governance-kpi-label">
+              Seller <a href="{% url 'admin:accounts_user_change' delivery.seller.pk %}">{{ delivery.seller.display_name|default:delivery.seller.phone }}</a> · {{ delivery.seller.phone }}
+            </span>
+          </td>
+          <td>
+            <span class="governance-pill gov-pill-{{ delivery.status }}">{{ delivery.get_status_display }}</span><br>
+            <span class="governance-kpi-label">
+              Requested {{ delivery.created_at|naturaltime }}<br>
+              {{ delivery.created_at|date:"j M Y, H:i" }}
+            </span>
+            {% if delivery.status_updated_at %}
+              <br><span class="governance-kpi-label">
+                Updated {{ delivery.status_updated_at|naturaltime }}
+                {% if delivery.status_updated_by %}by {{ delivery.status_updated_by.display_name|default:delivery.status_updated_by.phone }}{% endif %}
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if can_update %}
+              <form class="gov-status-form" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="delivery_id" value="{{ delivery.pk }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <select name="status" aria-label="Delivery status for {{ delivery.reference }}">
+                  {% for value, label in status_choices %}
+                    <option value="{{ value }}"{% if delivery.status == value %} selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <button class="button default" type="submit">Save</button>
+              </form>
+            {% else %}
+              <span class="governance-kpi-label">No status-change permission</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">No delivery requests match this view.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+  <p>
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    {% if page_obj.has_previous %}
+      — <a href="?status={{ status }}{% if search %}&q={{ search|urlencode }}{% endif %}{% if emirate_id %}&emirate={{ emirate_id }}{% endif %}&page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      — <a href="?status={{ status }}{% if search %}&q={{ search|urlencode }}{% endif %}{% if emirate_id %}&emirate={{ emirate_id }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </p>
+{% endif %}
+{% endblock %}

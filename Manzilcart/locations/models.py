@@ -165,7 +165,9 @@ class ServiceOption(TimeStampedModel):
     (delivery/transportation, assembly, disassembly).
 
     ManzilCart only *records* the selection and notifies the operations team; there
-    is deliberately no scheduling, pricing or fulfilment model behind it.
+    is deliberately no scheduling or pricing behind it. A buyer who wants delivery
+    can additionally create the product-page ``DeliveryRequest`` that operations
+    tracks through pickup and delivery.
     """
 
     class Code(models.TextChoices):

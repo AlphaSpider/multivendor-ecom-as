@@ -26,6 +26,7 @@ from accounts.models import User
 from auctions.models import Auction, AuctionEvent, Bid
 from catalog.models import Category, Listing, ListingImage, WishlistItem
 from core.exceptions import PermissionDeniedError, StateTransitionError
+from deals.models import DeliveryRequest
 from governance import services
 from governance.models import ListingChatMessage, ListingChatThread
 from locations.models import Emirate, ServiceArea
@@ -514,6 +515,7 @@ class GovernancePagesTests(GovernanceBase):
             "admin:governance_bid_monitor",
             "admin:governance_vendors",
             "admin:governance_financials",
+            "admin:governance_delivery_requests",
         ):
             with self.subTest(url=name):
                 response = self.client.get(reverse(name))
@@ -543,6 +545,54 @@ class GovernancePagesTests(GovernanceBase):
         self.assertContains(response, "Top 10 wishlisted products")
         self.assertContains(response, "Walnut desk")
         self.assertEqual(response.context["top_wishlisted"][0].wishlist_total, 1)
+
+    def test_dashboard_shows_open_delivery_requests(self):
+        DeliveryRequest.objects.create(
+            listing=self.listing,
+            buyer=self.buyer,
+            seller=self.seller,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("admin:governance_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Delivery requests needing coordination")
+        self.assertContains(response, "Walnut desk")
+
+
+class DeliveryRequestOperationsTests(GovernanceBase):
+    def setUp(self):
+        self.delivery = DeliveryRequest.objects.create(
+            listing=self.listing,
+            buyer=self.buyer,
+            seller=self.seller,
+        )
+        self.client.force_login(self.staff)
+
+    def test_page_lists_delivery_requests_and_updates_status(self):
+        url = reverse("admin:governance_delivery_requests")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Walnut desk")
+        self.assertContains(response, self.buyer.phone)
+
+        response = self.client.post(
+            url,
+            {
+                "delivery_id": self.delivery.pk,
+                "status": DeliveryRequest.Status.IN_TRANSIT,
+                "next": url,
+            },
+            follow=True,
+        )
+        self.assertContains(response, "marked as In transit")
+
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.status, DeliveryRequest.Status.IN_TRANSIT)
+        self.assertEqual(self.delivery.status_updated_by, self.staff)
+
+        response = self.client.get(url)
+        self.assertContains(response, "In transit")
 
     def test_listing_admin_shows_wishlist_count(self):
         WishlistItem.objects.create(user=self.buyer, listing=self.listing)

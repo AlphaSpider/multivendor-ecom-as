@@ -18,6 +18,7 @@ from deals.models import (
     DealEvent,
     DealOffer,
     DealServiceSelection,
+    DeliveryRequest,
 )
 
 
@@ -171,6 +172,50 @@ class DealAdmin(admin.ModelAdmin):
             f"{finalised} deal(s) cancelled, {skipped} skipped.",
             messages.SUCCESS if finalised else messages.WARNING,
         )
+
+
+@admin.register(DeliveryRequest)
+class DeliveryRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "reference_display",
+        "listing",
+        "buyer",
+        "seller",
+        "status",
+        "status_updated_at",
+        "created_at",
+    )
+    list_filter = ("status", "listing__emirate", "created_at")
+    search_fields = (
+        "id",
+        "listing__title",
+        "buyer__phone",
+        "buyer__display_name",
+        "seller__phone",
+        "seller__display_name",
+    )
+    list_select_related = ("listing", "buyer", "seller", "status_updated_by")
+    date_hierarchy = "created_at"
+    readonly_fields = (
+        "listing",
+        "buyer",
+        "seller",
+        "status",
+        "status_updated_by",
+        "status_updated_at",
+        "created_at",
+        "updated_at",
+    )
+
+    @admin.display(description="Reference")
+    def reference_display(self, obj):
+        return obj.reference
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(DealCancellation)

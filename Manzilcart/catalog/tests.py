@@ -17,6 +17,7 @@ from django.utils import timezone
 from PIL import Image as PILImage
 
 from catalog.models import Category, Listing, ListingImage, WishlistItem
+from deals.models import DeliveryRequest
 from locations.models import Emirate, ServiceArea
 
 User = get_user_model()
@@ -170,6 +171,75 @@ class CatalogTestCase(TestCase):
     def test_detail_omits_similar_products_when_category_has_no_other_items(self):
         response = self.client.get(self.listing.get_absolute_url())
         self.assertNotContains(response, "Similar products")
+
+    def test_public_detail_promotes_the_delivery_service(self):
+        response = self.client.get(self.listing.get_absolute_url())
+
+        self.assertContains(response, "Delivery available")
+        self.assertContains(response, "Know more")
+        self.assertContains(
+            response,
+            reverse(
+                "marketplace:delivery",
+                kwargs={"emirate_slug": self.abu_dhabi.slug},
+            ),
+        )
+
+    def test_buyer_can_request_delivery_from_the_product_page(self):
+        self.client.force_login(self.buyer)
+        request_url = reverse(
+            "catalog:request_delivery",
+            kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+        )
+
+        detail = self.client.get(self.listing.get_absolute_url())
+        self.assertContains(detail, "Ask for delivery")
+        self.assertContains(detail, request_url)
+
+        response = self.client.post(request_url)
+        self.assertRedirects(response, self.listing.get_absolute_url())
+        delivery = DeliveryRequest.objects.get(
+            listing=self.listing, buyer=self.buyer
+        )
+        self.assertEqual(delivery.status, DeliveryRequest.Status.PROCESSING)
+
+        detail = self.client.get(self.listing.get_absolute_url())
+        self.assertContains(detail, "Delivery requested")
+        self.assertContains(detail, "Processing")
+
+    def test_delivery_request_requires_sign_in(self):
+        request_url = reverse(
+            "catalog:request_delivery",
+            kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+        )
+        detail = self.client.get(self.listing.get_absolute_url())
+        self.assertContains(detail, "Sign in to ask for delivery")
+
+        response = self.client.post(request_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response["Location"])
+        self.assertFalse(DeliveryRequest.objects.exists())
+
+    def test_owner_does_not_see_the_delivery_request_action(self):
+        self.client.force_login(self.seller)
+        response = self.client.get(self.listing.get_absolute_url())
+        self.assertContains(response, "Know more")
+        self.assertNotContains(response, "Ask for delivery")
+
+    def test_non_public_listing_cannot_be_requested_for_delivery(self):
+        self.listing.status = Listing.Status.PENDING
+        self.listing.published_at = None
+        self.listing.save(update_fields=["status", "published_at"])
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse(
+                "catalog:request_delivery",
+                kwargs={"emirate_slug": "abu-dhabi", "slug": self.listing.slug},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(DeliveryRequest.objects.exists())
 
     def test_buyer_can_save_and_remove_a_product_from_the_wishlist(self):
         self.client.force_login(self.buyer)

@@ -52,6 +52,11 @@ GOVERNANCE_NAV = [
         "name": _("Deals & disputes"),
         "url_name": "admin:governance_financials",
     },
+    {
+        "name": _("Delivery requests"),
+        "url_name": "admin:governance_delivery_requests",
+        "badge_key": "delivery",
+    },
 ]
 
 SESSION_CHALLENGE_ID = "manzilcart.admin.otp_challenge_id"
@@ -120,6 +125,11 @@ class ManzilcartAdminSite(admin.AdminSite):
                 self.admin_view(admin_views.financials),
                 name="governance_financials",
             ),
+            path(
+                "delivery-requests/",
+                self.admin_view(admin_views.delivery_requests),
+                name="governance_delivery_requests",
+            ),
         ]
         # NOTE: custom URLs must be registered BEFORE the default admin URLs;
         # the default pattern list ends with a globbing app_index fallback that
@@ -161,6 +171,9 @@ class ManzilcartAdminSite(admin.AdminSite):
             context["governance_unread_threads"] = _unread_threads_cached(request)
             context["governance_pending_applications"] = (
                 _pending_applications_cached(request)
+            )
+            context["governance_open_delivery_requests"] = (
+                _open_delivery_requests_cached(request)
             )
         return context
 
@@ -350,5 +363,22 @@ def _unread_threads_cached(request):
 
         value = ListingChatThread.unread_staff_threads()
         cache.set(key, value, 30)
+    assert request is not None  # keep the signature honest
+    return value
+
+
+def _open_delivery_requests_cached(request):
+    """Count requests still waiting on operations for the nav badge."""
+    from django.core.cache import cache
+
+    from deals.models import DeliveryRequest
+    from deals.services import OPEN_DELIVERY_REQUESTS_CACHE_KEY
+
+    value = cache.get(OPEN_DELIVERY_REQUESTS_CACHE_KEY)
+    if value is None:
+        value = DeliveryRequest.objects.exclude(
+            status=DeliveryRequest.Status.DELIVERED
+        ).count()
+        cache.set(OPEN_DELIVERY_REQUESTS_CACHE_KEY, value, 30)
     assert request is not None  # keep the signature honest
     return value

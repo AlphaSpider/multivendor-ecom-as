@@ -805,9 +805,27 @@ input[type="submit"].default:hover,
 }
 
 .governance-queues .governance-panel .governance-table th:last-child,
-.governance-queues .governance-panel .governance-table td:last-child {
+.governance-queues .governance-panel .governance-table td:last-child,
+.governance-delivery-panel .governance-table th:last-child,
+.governance-delivery-panel .governance-table td:last-child {
   position: static;
   box-shadow: none;
+}
+
+.governance-delivery-panel .governance-table,
+.governance-delivery-page .governance-table {
+  min-width: 0;
+}
+
+.governance-delivery-page .governance-table th:last-child,
+.governance-delivery-page .governance-table td:last-child {
+  position: static;
+  box-shadow: none;
+}
+
+.governance-delivery-page .gov-status-form select {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .governance-table .gov-thumb,
@@ -987,6 +1005,50 @@ html[data-theme="dark"] .gov-pill-paused {
 .gov-pill-selected {
   background: var(--gov-sand);
   color: var(--gov-muted);
+}
+
+.gov-pill-processing {
+  background: color-mix(in srgb, var(--gov-warn) 18%, transparent);
+  color: var(--gov-warn);
+}
+
+.gov-pill-pickup {
+  background: color-mix(in srgb, #f97316 18%, transparent);
+  color: #c2410c;
+}
+
+html[data-theme="dark"] .gov-pill-pickup {
+  color: #fdba74;
+}
+
+.gov-pill-in_transit {
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  color: #1d4ed8;
+}
+
+html[data-theme="dark"] .gov-pill-in_transit {
+  color: #93c5fd;
+}
+
+.gov-pill-delivered {
+  background: color-mix(in srgb, var(--gov-ok) 16%, transparent);
+  color: var(--gov-ok);
+}
+
+.gov-status-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gov-status-form select {
+  min-width: 118px;
+  margin: 0;
+}
+
+.gov-status-form .button {
+  margin: 0;
 }
 
 /* ---------------------------------------------------------------------------

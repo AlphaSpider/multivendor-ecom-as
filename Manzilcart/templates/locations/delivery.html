@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Delivery — ManzilCart{% endblock %}
+{% block meta_description %}ManzilCart can collect furniture from the seller and deliver it safely to the buyer. The seller contributes a small transport fee.{% endblock %}
+
+{% block content %}
+<section class="container section delivery-hero">
+  <div class="delivery-hero-copy">
+    <p class="delivery-eyebrow" data-i18n="delivery_eyebrow">ManzilCart service</p>
+    <h1 data-i18n="delivery_title">Furniture delivery, handled with care.</h1>
+    <p class="delivery-lede" data-i18n="delivery_lede">Buying a sofa shouldn't mean solving transport. ManzilCart can collect the item from the seller and bring it safely to your address.</p>
+    <div class="delivery-actions">
+      <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="browse_furniture">Browse furniture</a>
+      <a class="btn btn-quiet" href="{% url 'marketplace:home' emirate_slug=emirate.slug %}" data-i18n="back_to_marketplace">Back to marketplace</a>
+    </div>
+  </div>
+  <div class="delivery-hero-art">
+    <img src="{% static 'images/delivery-cartoon.svg' %}" alt="" width="560" height="380">
+  </div>
+</section>
+
+<section class="container section delivery-section">
+  <div class="section-heading">
+    <h2 data-i18n="delivery_how_title">How it works</h2>
+    <p class="muted" data-i18n="delivery_how_lede">Four simple steps between agreeing the sale and getting the item home.</p>
+  </div>
+  <div class="delivery-steps">
+    <article class="delivery-step">
+      <span class="delivery-step-number" aria-hidden="true">1</span>
+      <h3 data-i18n="delivery_step_one_title">Agree the sale in chat</h3>
+      <p class="muted" data-i18n="delivery_step_one_text">Once you and the seller are ready, agree the details in chat.</p>
+    </article>
+    <article class="delivery-step">
+      <span class="delivery-step-number" aria-hidden="true">2</span>
+      <h3 data-i18n="delivery_step_two_title">Ask for ManzilCart Delivery</h3>
+      <p class="muted" data-i18n="delivery_step_two_text">We confirm the item, address and transport contribution before collection.</p>
+    </article>
+    <article class="delivery-step">
+      <span class="delivery-step-number" aria-hidden="true">3</span>
+      <h3 data-i18n="delivery_step_three_title">We collect from the seller</h3>
+      <p class="muted" data-i18n="delivery_step_three_text">Our team coordinates a suitable collection window with the seller.</p>
+    </article>
+    <article class="delivery-step">
+      <span class="delivery-step-number" aria-hidden="true">4</span>
+      <h3 data-i18n="delivery_step_four_title">We deliver to your address</h3>
+      <p class="muted" data-i18n="delivery_step_four_text">The item is handled carefully and delivered to the agreed location.</p>
+    </article>
+  </div>
+</section>
+
+<section class="container section delivery-section">
+  <div class="delivery-info-grid">
+    <div class="panel delivery-included-panel">
+      <h2 data-i18n="delivery_included_title">What's included</h2>
+      <ul class="delivery-check-list">
+        <li>
+          <span class="delivery-check-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+          </span>
+          <span data-i18n="delivery_included_collection">Collection from the seller's address</span>
+        </li>
+        <li>
+          <span class="delivery-check-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+          </span>
+          <span data-i18n="delivery_included_transport">Safe loading and transport</span>
+        </li>
+        <li>
+          <span class="delivery-check-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+          </span>
+          <span data-i18n="delivery_included_delivery">Delivery to the buyer's address</span>
+        </li>
+        <li>
+          <span class="delivery-check-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+          </span>
+          <span data-i18n="delivery_included_coordination">Coordination through ManzilCart chat</span>
+        </li>
+      </ul>
+    </div>
+
+    <aside class="delivery-cost-card">
+      <span class="delivery-cost-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h11v11H3z"></path>
+          <path d="M14 10h4l3 3v4h-7z"></path>
+          <circle cx="7" cy="18" r="2"></circle>
+          <circle cx="18" cy="18" r="2"></circle>
+        </svg>
+      </span>
+      <p class="delivery-eyebrow" data-i18n="delivery_cost_eyebrow">Seller transport contribution</p>
+      <h2 data-i18n="delivery_cost_title">A small transport fee</h2>
+      <p data-i18n="delivery_cost_text">The seller pays a small transport fee. The final amount depends on the item's size, distance and access, and is confirmed before collection.</p>
+    </aside>
+  </div>
+</section>
+
+<section class="container section delivery-section">
+  <div class="delivery-note">
+    <h2 data-i18n="delivery_good_to_know">Good to know</h2>
+    <p data-i18n="delivery_note_price">Delivery is arranged separately from the furniture price. ManzilCart does not process or hold the purchase price.</p>
+    <p data-i18n="delivery_note_availability">Availability depends on the item, its size and the delivery location. Confirm the details in chat before you agree.</p>
+  </div>
+</section>
+
+<section class="container section delivery-cta">
+  <div>
+    <h2 data-i18n="delivery_ready_title">Ready when you are.</h2>
+    <p class="muted" data-i18n="delivery_ready_text">Find a piece you love, chat with the seller, and ask about delivery.</p>
+  </div>
+  <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" data-i18n="browse_furniture">Browse furniture</a>
+</section>
+{% endblock %}

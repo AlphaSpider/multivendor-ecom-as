@@ -45,7 +45,9 @@ from catalog.selectors import (
     wishlist_items,
     wishlist_listing_ids,
 )
-from core.exceptions import PermissionDeniedError, StateTransitionError
+from core.exceptions import DomainError, PermissionDeniedError, StateTransitionError
+from deals import services as deal_services
+from deals.selectors import delivery_request_for
 from locations.mixins import EmirateRequiredMixin
 
 logger = logging.getLogger("manzilcart.catalog.views")
@@ -225,6 +227,7 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
                 and request.user.pk == listing.seller_id
                 and listing.is_editable_by_owner,
                 "is_wishlisted": is_wishlisted(request.user, listing),
+                "delivery_request": delivery_request_for(request.user, listing),
                 "similar_listings": similar,
                 "wishlist_ids": wishlist_listing_ids(
                     request.user, [item.pk for item in similar]
@@ -495,6 +498,43 @@ class WishlistToggleView(LoginRequiredMixin, EmirateRequiredMixin, View):
         if listing.is_public:
             return redirect(listing.get_absolute_url())
         return redirect("accounts:wishlist")
+
+
+class RequestDeliveryView(LoginRequiredMixin, EmirateRequiredMixin, View):
+    """POST-only product-page action that creates a delivery request."""
+
+    login_url = "accounts:login"
+
+    def post(self, request, *args, **kwargs):
+        listing = get_object_or_404(
+            Listing.objects.select_related("emirate", "seller"),
+            slug=kwargs["slug"],
+            emirate=self.emirate,
+        )
+        if not listing.is_public:
+            raise Http404("Listing not found.")
+
+        try:
+            _delivery, created = deal_services.request_delivery(
+                listing=listing,
+                buyer=request.user,
+                request=request,
+            )
+        except DomainError as exc:
+            messages.error(request, exc.message)
+            listing.refresh_from_db(fields=["status", "published_at"])
+        else:
+            messages.success(
+                request,
+                "Delivery requested. Operations will contact you and the seller."
+                if created
+                else "Delivery request already received.",
+            )
+        if listing.is_public:
+            return redirect(listing.get_absolute_url())
+        return redirect(
+            "catalog:listing_list", emirate_slug=self.emirate.slug
+        )
 
 
 class ListingImageView(LoginRequiredMixin, View):

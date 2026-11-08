@@ -1,5 +1,5 @@
 """
-Offers, accepted deals, cancellations and service selections.
+Offers, accepted deals, cancellations, service selections and delivery requests.
 
 Concurrency model
 -----------------
@@ -379,6 +379,114 @@ class DealServiceSelection(models.Model):
 
     def __str__(self) -> str:
         return f"{self.service_option} for {self.deal_id}"
+
+
+class DeliveryRequest(TimeStampedModel):
+    """
+    A buyer's request for ManzilCart delivery on a fixed-price listing.
+
+    This is deliberately separate from :class:`Deal`: buyers can agree a sale in
+    chat and ask operations to coordinate delivery without creating an offer. The
+    request carries only the facts operations needs to start the conversation;
+    addresses, pricing and scheduling stay manual and are never inferred here.
+    """
+
+    class Status(models.TextChoices):
+        PROCESSING = "processing", "Processing"
+        PICKUP = "pickup", "Pickup"
+        IN_TRANSIT = "in_transit", "In transit"
+        DELIVERED = "delivered", "Delivered"
+
+    listing = models.ForeignKey(
+        "catalog.Listing",
+        on_delete=models.PROTECT,
+        related_name="delivery_requests",
+    )
+    buyer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="delivery_requests",
+    )
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="delivery_sales",
+        help_text="Copied from the listing so operations can contact both parties.",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PROCESSING,
+        db_index=True,
+    )
+    status_updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="delivery_status_updates",
+    )
+    status_updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "delivery request"
+        verbose_name_plural = "delivery requests"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "buyer"],
+                name="deliveryrequest_listing_buyer_uniq",
+            ),
+            models.CheckConstraint(
+                condition=~Q(buyer=F("seller")),
+                name="deliveryrequest_buyer_seller_distinct",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "-created_at"],
+                name="delivery_status_created_idx",
+            ),
+            models.Index(
+                fields=["listing", "status"],
+                name="delivery_listing_status_idx",
+            ),
+            models.Index(
+                fields=["buyer", "status"],
+                name="delivery_buyer_status_idx",
+            ),
+            models.Index(
+                fields=["seller", "status"],
+                name="delivery_seller_status_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.reference} — {self.listing.title}"
+
+    @property
+    def reference(self) -> str:
+        return f"MC-DL-{self.pk:06d}" if self.pk else "MC-DL-new"
+
+    @property
+    def item_title(self) -> str:
+        return self.listing.title
+
+    @property
+    def item_reference(self) -> str:
+        return f"MC-L-{self.listing_id:06d}"
+
+    @property
+    def item_url(self) -> str:
+        return self.listing.get_absolute_url()
+
+    @property
+    def emirate(self):
+        return self.listing.emirate
+
+    @property
+    def is_open(self) -> bool:
+        return self.status != self.Status.DELIVERED
 
 
 class DealEvent(models.Model):

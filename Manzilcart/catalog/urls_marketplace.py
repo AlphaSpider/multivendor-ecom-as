@@ -19,6 +19,11 @@ urlpatterns = [
         views.WishlistToggleView.as_view(),
         name="wishlist_toggle",
     ),
+    path(
+        "<slug:slug>/delivery-request/",
+        views.RequestDeliveryView.as_view(),
+        name="request_delivery",
+    ),
     path("<slug:slug>/", views.ListingDetailView.as_view(), name="listing_detail"),
     path("<slug:slug>/edit/", views.ListingUpdateView.as_view(), name="listing_edit"),
     path("<slug:slug>/action/", views.ListingActionView.as_view(), name="listing_action"),

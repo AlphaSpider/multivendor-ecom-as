@@ -13,6 +13,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -28,6 +29,7 @@ from deals.models import (
     DealEvent,
     DealOffer,
     DealServiceSelection,
+    DeliveryRequest,
 )
 from locations.models import ServiceOption
 from notifications.services import queue_notification
@@ -36,6 +38,7 @@ from notifications.models import Notification
 logger = logging.getLogger("manzilcart.deals")
 
 ACTIVE_DEAL_STATUSES = (Deal.Status.ACCEPTED, Deal.Status.CANCELLATION_REQUESTED)
+OPEN_DELIVERY_REQUESTS_CACHE_KEY = "governance:open_delivery_requests"
 
 
 # ---------------------------------------------------------------------------
@@ -602,6 +605,120 @@ def set_service_selections(deal: Deal, *, actor, option_ids) -> Deal:
         summary=", ".join(option.name for option in options) or "No optional services",
         metadata={"service_option_ids": [option.pk for option in options]},
     )
+    return locked
+
+
+# ---------------------------------------------------------------------------
+# Delivery requests
+# ---------------------------------------------------------------------------
+
+
+@transaction.atomic
+def request_delivery(
+    *, listing: Listing, buyer, request=None
+) -> tuple[DeliveryRequest, bool]:
+    """
+    Record that ``buyer`` wants ManzilCart delivery for ``listing``.
+
+    The operation is idempotent: a buyer can click the product-page action more
+    than once without creating duplicate rows. The listing and existing request
+    are locked so a double submit cannot race the unique constraint.
+    """
+    if buyer is None or not getattr(buyer, "is_authenticated", False):
+        raise PermissionDeniedError("Sign in to ask for delivery.")
+
+    locked_listing = (
+        Listing.objects.select_for_update()
+        .select_related("seller", "emirate", "service_area", "category")
+        .get(pk=listing.pk)
+    )
+    if buyer.pk == locked_listing.seller_id:
+        raise PermissionDeniedError("You cannot request delivery for your own listing.")
+    if not locked_listing.is_public:
+        raise StateTransitionError(
+            "This item is no longer available for delivery requests."
+        )
+
+    existing = (
+        DeliveryRequest.objects.select_for_update()
+        .filter(listing=locked_listing, buyer=buyer)
+        .first()
+    )
+    if existing is not None:
+        return existing, False
+
+    delivery = DeliveryRequest.objects.create(
+        listing=locked_listing,
+        buyer=buyer,
+        seller=locked_listing.seller,
+        status=DeliveryRequest.Status.PROCESSING,
+    )
+    record_audit(
+        action=AuditEvent.Action.DELIVERY_REQUESTED,
+        actor=buyer,
+        entity=delivery,
+        emirate=locked_listing.emirate,
+        summary=f"Delivery requested for {locked_listing.title}",
+        metadata={
+            "listing_id": locked_listing.pk,
+            "buyer_id": buyer.pk,
+            "seller_id": locked_listing.seller_id,
+        },
+        request=request,
+    )
+    cache.delete(OPEN_DELIVERY_REQUESTS_CACHE_KEY)
+    return delivery, True
+
+
+@transaction.atomic
+def update_delivery_status(
+    delivery: DeliveryRequest,
+    *,
+    actor,
+    status: str,
+    request=None,
+) -> DeliveryRequest:
+    """Staff-only status update for a delivery request (audited, append-only trail)."""
+    ensure_staff(actor)
+    if status not in DeliveryRequest.Status.values:
+        raise ValidationError({"status": "Choose a valid delivery status."})
+
+    locked = (
+        DeliveryRequest.objects.select_for_update()
+        .select_related("listing", "listing__emirate", "buyer", "seller")
+        .get(pk=delivery.pk)
+    )
+    previous = locked.status
+    if previous == status:
+        return locked
+
+    locked.status = status
+    locked.status_updated_by = actor
+    locked.status_updated_at = timezone.now()
+    locked.save(
+        update_fields=[
+            "status",
+            "status_updated_by",
+            "status_updated_at",
+            "updated_at",
+        ]
+    )
+    record_audit(
+        action=AuditEvent.Action.DELIVERY_STATUS_UPDATED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.listing.emirate,
+        summary=f"{locked.reference}: {previous} → {status}",
+        metadata={
+            "listing_id": locked.listing_id,
+            "buyer_id": locked.buyer_id,
+            "seller_id": locked.seller_id,
+            "previous_status": previous,
+            "new_status": status,
+        },
+        request=request,
+    )
+    cache.delete(OPEN_DELIVERY_REQUESTS_CACHE_KEY)
     return locked
 
 
