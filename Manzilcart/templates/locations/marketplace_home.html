@@ -18,7 +18,7 @@
       Every listing is reviewed before it goes live.
     </p>
 
-    <form class="search-bar" method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" role="search">
+    <form class="search-bar" method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" role="search" data-search-suggestions data-suggestions-url="{% url 'catalog:search_suggestions' emirate_slug=emirate.slug %}">
       <label class="sr-only" for="market-search" data-i18n="search_furniture">Search furniture</label>
       <input id="market-search" type="search" name="q" placeholder="Search sofas, desks, beds…" autocomplete="off" data-placeholder-i18n="search_placeholder">
       <button class="btn btn-primary" type="submit" data-i18n="btn_search">Search</button>
@@ -85,24 +85,5 @@
       {% endif %}
     </div>
   {% endif %}
-</section>
-
-<section class="container section">
-  <div class="section-heading section-heading-row">
-    <div>
-      <h2><span data-i18n="selling_in">Selling in</span> <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span></h2>
-      <p class="muted"><span data-i18n="operate_neighbourhoods_prefix">We operate in</span> {{ service_areas|length }} <span data-i18n="operate_neighbourhoods_suffix">neighbourhoods here.</span></p>
-    </div>
-    <a class="btn btn-primary" href="{% if user.is_authenticated %}{% url 'catalog:listing_create' emirate_slug=emirate.slug %}{% else %}{% url 'accounts:start' %}{% endif %}" data-i18n="list_an_item">
-      Sell an item
-    </a>
-  </div>
-  <ul class="area-list">
-    {% for area in service_areas %}
-      <li data-area-name="{{ area.name }}">{{ area.name }}</li>
-    {% empty %}
-      <li class="muted" data-i18n="no_active_neighbourhoods">No neighbourhoods are currently active.</li>
-    {% endfor %}
-  </ul>
 </section>
 {% endblock %}

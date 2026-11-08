@@ -105,6 +105,72 @@ class CatalogTestCase(TestCase):
         response = self.client.get(self.listing.get_absolute_url())
         self.assertContains(response, "Edit listing")
 
+    def test_detail_shows_similar_products_from_same_category_and_emirate(self):
+        now = timezone.now()
+        similar = Listing.objects.create(
+            seller=self.seller,
+            title="Matching side table",
+            slug="matching-side-table",
+            description="A matching piece for the same room.",
+            category=self.category,
+            condition=Listing.Condition.GOOD,
+            asking_price=Decimal("250.00"),
+            emirate=self.abu_dhabi,
+            service_area=self.ad_area,
+            status=Listing.Status.APPROVED,
+            submitted_at=now,
+            approved_at=now,
+            published_at=now,
+        )
+        other_category = (
+            Category.objects.filter(is_active=True)
+            .exclude(pk=self.category.pk)
+            .first()
+        )
+        unrelated = Listing.objects.create(
+            seller=self.seller,
+            title="Unrelated bed frame",
+            slug="unrelated-bed-frame",
+            description="A different category.",
+            category=other_category,
+            condition=Listing.Condition.GOOD,
+            asking_price=Decimal("500.00"),
+            emirate=self.abu_dhabi,
+            service_area=self.ad_area,
+            status=Listing.Status.APPROVED,
+            submitted_at=now,
+            approved_at=now,
+            published_at=now,
+        )
+        other_emirate = Listing.objects.create(
+            seller=self.seller,
+            title="Similar item in Ras Al Khaimah",
+            slug="similar-item-in-ras-al-khaimah",
+            description="A matching category in another emirate.",
+            category=self.category,
+            condition=Listing.Condition.GOOD,
+            asking_price=Decimal("300.00"),
+            emirate=self.rak,
+            service_area=self.rak_area,
+            status=Listing.Status.APPROVED,
+            submitted_at=now,
+            approved_at=now,
+            published_at=now,
+        )
+
+        response = self.client.get(self.listing.get_absolute_url())
+
+        self.assertContains(response, "Similar products")
+        self.assertContains(response, similar.title)
+        self.assertContains(response, f"?category={self.category.slug}")
+        self.assertNotContains(response, unrelated.title)
+        self.assertNotContains(response, other_emirate.title)
+        self.assertEqual(response.context["similar_listings"], [similar])
+
+    def test_detail_omits_similar_products_when_category_has_no_other_items(self):
+        response = self.client.get(self.listing.get_absolute_url())
+        self.assertNotContains(response, "Similar products")
+
     def test_buyer_can_save_and_remove_a_product_from_the_wishlist(self):
         self.client.force_login(self.buyer)
         toggle_url = reverse(
@@ -249,6 +315,46 @@ class CatalogTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"/abu-dhabi/listings/")
+        self.assertContains(response, "data-search-suggestions")
+
+    def test_search_suggestions_return_matching_categories_with_images(self):
+        ListingImage.objects.create(
+            listing=self.listing,
+            image="listings/demo/category-sample.jpg",
+            is_cover=True,
+        )
+
+        response = self.client.get(
+            reverse(
+                "catalog:search_suggestions",
+                kwargs={"emirate_slug": "abu-dhabi"},
+            ),
+            {"q": self.category.name[0]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        suggestions = response.json()["suggestions"]
+        self.assertTrue(suggestions)
+        self.assertEqual(suggestions[0]["name"], self.category.name)
+        self.assertTrue(suggestions[0]["image_url"])
+        self.assertIn("category=", suggestions[0]["url"])
+        for suggestion in suggestions:
+            self.assertTrue(
+                suggestion["name"].lower().startswith(
+                    self.category.name[0].lower()
+                )
+            )
+
+    def test_search_suggestions_are_empty_for_unknown_categories(self):
+        response = self.client.get(
+            reverse(
+                "catalog:search_suggestions",
+                kwargs={"emirate_slug": "abu-dhabi"},
+            ),
+            {"q": "zzzz-no-category"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["suggestions"], [])
 
 
 class ListingPhotoMinimumTests(CatalogTestCase):

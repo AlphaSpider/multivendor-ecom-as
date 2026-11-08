@@ -173,4 +173,21 @@
     </aside>
   </div>
 </section>
+
+{% if similar_listings %}
+<section class="container section">
+  <div class="section-heading section-heading-row">
+    <div>
+      <h2 data-i18n="similar_products">Similar products</h2>
+      <p class="muted" data-i18n="similar_products_tagline">More pieces from this category.</p>
+    </div>
+    <a class="btn btn-quiet" href="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}?category={{ listing.category.slug }}" data-i18n="view_all">View all</a>
+  </div>
+  <div class="listing-grid">
+    {% for similar in similar_listings %}
+      {% include "partials/listing_card.html" with listing=similar %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

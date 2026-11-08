@@ -19,9 +19,10 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db.models import Q
-from django.http import Http404
+from django.db.models import OuterRef, Q, Subquery
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -31,7 +32,7 @@ from django.views.generic import TemplateView
 from accounts.eligibility import SellerEligibleMixin
 from catalog import services
 from catalog.forms import ListingForm, ListingSearchForm
-from catalog.models import Listing
+from catalog.models import Category, Listing, ListingImage
 from catalog.selectors import (
     active_categories,
     category_by_slug,
@@ -40,6 +41,7 @@ from catalog.selectors import (
     listing_by_slug,
     search_listings,
     seller_listings,
+    similar_listings,
     wishlist_items,
     wishlist_listing_ids,
 )
@@ -64,6 +66,61 @@ def _attach_category_counts(categories, emirate):
     for category in categories:
         category.listing_count = counts.get(category.pk, 0)
     return categories
+
+
+def _sample_category_image_subquery(emirate=None):
+    """Choose one public listing image to illustrate a category."""
+    images = ListingImage.objects.filter(
+        listing__category=OuterRef("pk"),
+        listing__status=Listing.Status.APPROVED,
+        listing__published_at__isnull=False,
+    ).exclude(image="")
+    if emirate is not None:
+        images = images.filter(listing__emirate=emirate)
+    return images.order_by(
+        "-is_cover", "-listing__published_at", "display_order", "id"
+    ).values("image")[:1]
+
+
+class SearchSuggestionsView(EmirateRequiredMixin, View):
+    """JSON category suggestions for the marketplace search boxes."""
+
+    def get(self, request, *args, **kwargs):
+        query = (request.GET.get("q") or "").strip()[:80]
+        if not query:
+            return JsonResponse({"suggestions": []})
+
+        categories = Category.objects.filter(is_active=True)
+        prefix_matches = categories.filter(name__istartswith=query)
+        if not prefix_matches.exists():
+            prefix_matches = categories.filter(name__icontains=query)
+        categories = (
+            prefix_matches.annotate(
+                sample_image_local=Subquery(
+                    _sample_category_image_subquery(self.emirate)
+                ),
+                sample_image_any=Subquery(_sample_category_image_subquery()),
+            )
+            .order_by("display_order", "name")[:8]
+        )
+
+        suggestions = []
+        list_url = reverse(
+            "catalog:listing_list",
+            kwargs={"emirate_slug": self.emirate.slug},
+        )
+        for category in categories:
+            sample_image = category.sample_image_local or category.sample_image_any
+            suggestions.append(
+                {
+                    "name": category.name,
+                    "url": f"{list_url}?category={category.slug}",
+                    "image_url": (
+                        default_storage.url(sample_image) if sample_image else ""
+                    ),
+                }
+            )
+        return JsonResponse({"suggestions": suggestions})
 
 
 class ListingListView(EmirateRequiredMixin, TemplateView):
@@ -155,6 +212,7 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
                 raise Http404("Listing not found.")
 
         # Owners get edit controls; auctions are standalone items and never appear here.
+        similar = list(similar_listings(listing)) if listing.is_public else []
         return render(
             request,
             self.template_name,
@@ -167,6 +225,10 @@ class ListingDetailView(EmirateRequiredMixin, TemplateView):
                 and request.user.pk == listing.seller_id
                 and listing.is_editable_by_owner,
                 "is_wishlisted": is_wishlisted(request.user, listing),
+                "similar_listings": similar,
+                "wishlist_ids": wishlist_listing_ids(
+                    request.user, [item.pk for item in similar]
+                ),
             },
         )
 

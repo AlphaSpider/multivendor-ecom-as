@@ -10,6 +10,11 @@ urlpatterns = [
     path("", views.ListingListView.as_view(), name="listing_list"),
     path("new/", views.ListingCreateView.as_view(), name="listing_create"),
     path(
+        "search/suggestions/",
+        views.SearchSuggestionsView.as_view(),
+        name="search_suggestions",
+    ),
+    path(
         "<slug:slug>/wishlist/",
         views.WishlistToggleView.as_view(),
         name="wishlist_toggle",

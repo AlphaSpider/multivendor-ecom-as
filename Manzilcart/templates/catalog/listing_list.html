@@ -429,7 +429,7 @@
   <div class="browse-toolbar">
     <div class="browse-toolbar-start">
       <!-- Search option OUTSIDE the filter popup -->
-      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" class="browse-search-bar" role="search" aria-label="Search furniture">
+      <form method="get" action="{% url 'catalog:listing_list' emirate_slug=emirate.slug %}" class="browse-search-bar" role="search" aria-label="Search furniture" data-search-suggestions data-suggestions-url="{% url 'catalog:search_suggestions' emirate_slug=emirate.slug %}">
         {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category.slug }}">{% endif %}
         {% if request.GET.condition %}<input type="hidden" name="condition" value="{{ request.GET.condition }}">{% endif %}
         {% if request.GET.min_price %}<input type="hidden" name="min_price" value="{{ request.GET.min_price }}">{% endif %}

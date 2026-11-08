@@ -236,6 +236,9 @@ var uiPhrases = {
   "Find the piece that finishes the room.": "اعثر على القطعة المثالية لغرفتك.",
   "All listings": "جميع المعروضات",
   "All furniture": "كل الأثاث",
+  "Similar products": "منتجات مشابهة",
+  "More pieces from this category.": "قطع أخرى من هذه الفئة.",
+  "View all": "عرض الكل",
   "Categories are being set up.": "جاري إعداد الفئات.",
   "The newest approved listings.": "أحدث المعروضات المعتمدة.",
   "No listings yet": "لا توجد معروضات حتى الآن",
@@ -964,6 +967,223 @@ var uiPhrases = {
         select.form.submit();
       }
     });
+  });
+
+  // --- Category suggestions under marketplace search boxes ----------------
+  var suggestionSeq = 0;
+
+  document.querySelectorAll("[data-search-suggestions]").forEach(function (form) {
+    var input = form.querySelector('input[type="search"][name="q"]');
+    var endpoint = form.getAttribute("data-suggestions-url");
+    if (!input || !endpoint) return;
+
+    suggestionSeq += 1;
+    var panel = document.createElement("div");
+    panel.className = "search-suggestions";
+    panel.id = "search-suggestions-" + suggestionSeq;
+    panel.setAttribute("role", "listbox");
+    panel.setAttribute("aria-label", "Category suggestions");
+    panel.hidden = true;
+    document.body.appendChild(panel);
+
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", panel.id);
+
+    var items = [];
+    var activeIndex = -1;
+    var debounceTimer = null;
+    var controller = null;
+    var lastQuery = "";
+
+    function setActive(index) {
+      activeIndex = index;
+      Array.prototype.forEach.call(panel.children, function (child, childIndex) {
+        var selected = childIndex === index;
+        child.classList.toggle("is-active", selected);
+        child.setAttribute("aria-selected", selected ? "true" : "false");
+      });
+      if (index >= 0 && panel.children[index]) {
+        input.setAttribute(
+          "aria-activedescendant",
+          panel.id + "-option-" + index
+        );
+        try {
+          panel.children[index].scrollIntoView({ block: "nearest" });
+        } catch (err) {}
+      } else {
+        input.removeAttribute("aria-activedescendant");
+      }
+    }
+
+    function closePanel() {
+      panel.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+    }
+
+    function positionPanel() {
+      if (panel.hidden) return;
+      var rect = form.getBoundingClientRect();
+      var gap = 8;
+      var panelHeight = panel.offsetHeight;
+      var top = rect.bottom + gap;
+      if (
+        top + panelHeight > window.innerHeight - gap &&
+        rect.top - gap - panelHeight > gap
+      ) {
+        top = rect.top - gap - panelHeight;
+      }
+      panel.style.top = (window.pageYOffset + top) + "px";
+      panel.style.left = (window.pageXOffset + rect.left) + "px";
+      panel.style.width = rect.width + "px";
+    }
+
+    function chooseSuggestion(index) {
+      var item = items[index];
+      if (!item || !item.url) return;
+      window.location.assign(item.url);
+    }
+
+    function renderSuggestions(suggestions) {
+      panel.innerHTML = "";
+      items = suggestions || [];
+      activeIndex = -1;
+
+      if (!items.length) {
+        closePanel();
+        return;
+      }
+
+      var isArabic = document.documentElement.getAttribute("lang") === "ar";
+      items.forEach(function (item, index) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "search-suggestion";
+        button.id = panel.id + "-option-" + index;
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", "false");
+
+        var thumb = document.createElement("span");
+        thumb.className = "search-suggestion-thumb";
+        thumb.setAttribute("aria-hidden", "true");
+        var initial = (item.name || "?").charAt(0);
+        if (item.image_url) {
+          var image = document.createElement("img");
+          image.src = item.image_url;
+          image.alt = "";
+          image.loading = "lazy";
+          image.addEventListener("error", function () {
+            image.remove();
+            thumb.textContent = initial;
+          });
+          thumb.appendChild(image);
+        } else {
+          thumb.textContent = initial;
+        }
+
+        var name = document.createElement("span");
+        name.className = "search-suggestion-name";
+        name.textContent = isArabic ? translateString(item.name || "") : item.name || "";
+
+        button.appendChild(thumb);
+        button.appendChild(name);
+        button.addEventListener("pointerdown", function (event) {
+          event.preventDefault();
+          chooseSuggestion(index);
+        });
+        button.addEventListener("mouseenter", function () {
+          setActive(index);
+        });
+        panel.appendChild(button);
+      });
+
+      panel.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      positionPanel();
+    }
+
+    function requestSuggestions(value) {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      fetch(endpoint + "?q=" + encodeURIComponent(value), {
+        headers: { Accept: "application/json" },
+        signal: controller.signal
+      })
+        .then(function (response) {
+          return response.ok ? response.json() : { suggestions: [] };
+        })
+        .then(function (data) {
+          if (input.value.trim() !== value) return;
+          renderSuggestions(data.suggestions || []);
+        })
+        .catch(function (error) {
+          if (!error || error.name !== "AbortError") closePanel();
+        });
+    }
+
+    function queueSuggestions() {
+      var value = input.value.trim();
+      if (!value) {
+        window.clearTimeout(debounceTimer);
+        if (controller) controller.abort();
+        lastQuery = "";
+        items = [];
+        panel.innerHTML = "";
+        closePanel();
+        return;
+      }
+      if (value === lastQuery) return;
+      lastQuery = value;
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(function () {
+        requestSuggestions(value);
+      }, 150);
+    }
+
+    input.addEventListener("input", queueSuggestions);
+    input.addEventListener("focus", function () {
+      if (input.value.trim() && items.length) {
+        panel.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        positionPanel();
+      } else if (input.value.trim()) {
+        lastQuery = "";
+        queueSuggestions();
+      }
+    });
+    input.addEventListener("blur", function () {
+      window.setTimeout(closePanel, 120);
+    });
+    input.addEventListener("keydown", function (event) {
+      if (panel.hidden) {
+        if (event.key === "ArrowDown" && input.value.trim() && items.length) {
+          event.preventDefault();
+          panel.hidden = false;
+          input.setAttribute("aria-expanded", "true");
+          positionPanel();
+          setActive(0);
+        }
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActive((activeIndex + 1) % items.length);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActive((activeIndex - 1 + items.length) % items.length);
+      } else if (event.key === "Enter" && activeIndex >= 0) {
+        event.preventDefault();
+        chooseSuggestion(activeIndex);
+      } else if (event.key === "Escape") {
+        closePanel();
+      }
+    });
+    form.addEventListener("submit", closePanel);
+    window.addEventListener("resize", positionPanel);
+    window.addEventListener("scroll", positionPanel, true);
   });
 
   // --- Dismissible messages ----------------------------------------------

@@ -723,6 +723,7 @@ a:hover { color: var(--brand-strong); }
 .hero-landing .hero-inner { padding-block: clamp(3.5rem, 9vw, 7rem); }
 
 .search-bar {
+  position: relative;
   display: flex;
   gap: 0.5rem;
   background: var(--surface);
@@ -744,6 +745,73 @@ a:hover { color: var(--brand-strong); }
 }
 
 .search-bar input:focus { outline: none; }
+
+.search-suggestions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.search-suggestions[hidden] {
+  display: none;
+}
+
+.search-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.search-suggestion:hover,
+.search-suggestion.is-active {
+  background: var(--brand-soft);
+}
+
+.search-suggestion-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--sand);
+  color: var(--brand);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.search-suggestion-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-suggestion-name {
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
 
 /* --------------------------------------------------------------------------
    Sections
@@ -1135,6 +1203,7 @@ a:hover { color: var(--brand-strong); }
 }
 
 .browse-search-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.45rem;

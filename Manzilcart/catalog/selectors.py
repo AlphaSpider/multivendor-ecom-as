@@ -110,6 +110,19 @@ def listing_by_slug(slug: str):
     )
 
 
+def similar_listings(listing, *, limit: int = 4):
+    """Other public items in the same category, or its children for a parent category."""
+    return (
+        public_listings(listing.emirate)
+        .filter(
+            Q(category=listing.category)
+            | Q(category__parent=listing.category)
+        )
+        .exclude(pk=listing.pk)
+        .order_by("-published_at", "-id")[:limit]
+    )
+
+
 def seller_listings(user):
     """Everything the member has listed, including drafts and rejected items."""
     return (
