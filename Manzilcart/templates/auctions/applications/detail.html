@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ application.reference }} — Auction application — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.5">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'accounts:dashboard' %}">My account</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'auctions:applications' %}">Applications</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ application.reference }}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction application · {{ application.reference }}</p>
+      <h1>{{ application.title }}</h1>
+      <p class="muted">
+        {{ application.category.name }} · {{ application.service_area.name }}, {{ application.emirate.name }}
+        · <span class="status-pill status-moderation-{{ application.status }}">{{ application.get_status_display }}</span>
+      </p>
+    </div>
+    <div class="page-actions">
+      {% if can_edit %}
+        <a class="btn btn-primary" href="{% url 'auctions:application_edit' application.pk %}">Edit and submit</a>
+      {% elif application.status == "listed" and application.auction %}
+        <a class="btn btn-primary" href="{{ application.auction.get_absolute_url }}">Open live auction</a>
+      {% endif %}
+      <a class="btn btn-quiet" href="{% url 'auctions:applications' %}">All applications</a>
+    </div>
+  </div>
+
+  {% if application.applicant_message %}
+    <div class="form-alert" role="status">
+      <p><strong>Message from ManzilCart:</strong> {{ application.applicant_message }}</p>
+    </div>
+  {% endif %}
+
+  <div class="auction-layout">
+    <div class="auction-main">
+      <section class="panel">
+        <h2>Photos</h2>
+        {% if images %}
+          <div class="application-gallery">
+            {% for image in images %}
+              <a href="{{ image.image.url }}" target="_blank" rel="noopener" class="application-gallery-item{% if image.is_cover %} is-cover{% endif %}">
+                <img src="{{ image.image.url }}" alt="{{ application.title }} photo {{ forloop.counter }}" loading="lazy">
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No photos uploaded yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>What you told us</h2>
+        <p>{{ application.description|linebreaksbr }}</p>
+        <div class="application-facts">
+          <div><span>Condition</span><strong>{{ application.get_condition_display }}</strong></div>
+          <div><span>Proposed starting / minimum bid</span><strong>AED {{ application.proposed_starting_bid|floatformat:0|intcomma }}</strong></div>
+          {% if application.preferred_start_at %}
+            <div><span>Preferred start</span><strong>{{ application.preferred_start_at|date:"j M Y, H:i" }}</strong></div>
+            <div><span>Preferred end</span><strong>{{ application.preferred_end_at|date:"j M Y, H:i" }}</strong></div>
+          {% endif %}
+          <div><span>Submitted</span><strong>{{ application.submitted_at|date:"j M Y, H:i"|default:"Not yet submitted" }}</strong></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Review history</h2>
+        <ol class="auction-events">
+          {% for event in history %}
+            <li>
+              <span class="auction-event-date">{{ event.created_at|date:"j M Y, H:i" }}</span>
+              <strong>{{ event.get_action_display }}</strong>
+              {% if event.summary %}<span class="muted">— {{ event.summary }}</span>{% endif %}
+            </li>
+          {% empty %}
+            <li class="muted">No review activity yet.</li>
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+
+    <aside class="panel auction-sidebar">
+      <h2>Application</h2>
+      <dl class="detail-list">
+        <div><dt>Reference</dt><dd>{{ application.reference }}</dd></div>
+        <div><dt>Status</dt><dd>{{ application.get_status_display }}</dd></div>
+        <div><dt>Category</dt><dd>{{ application.category.name }}</dd></div>
+        <div><dt>Location</dt><dd>{{ application.service_area.name }}, {{ application.emirate.name }}</dd></div>
+        <div><dt>Proposed bid</dt><dd>AED {{ application.proposed_starting_bid|floatformat:0|intcomma }}</dd></div>
+        {% if application.listed_at %}<div><dt>Listed</dt><dd>{{ application.listed_at|date:"j M Y, H:i" }}</dd></div>{% endif %}
+      </dl>
+
+      <p class="safety-note">
+        <strong>What happens next?</strong> Our team checks the photos, description and
+        proposed starting bid. We may ask for changes, then create the auction and set
+        the final schedule. Nothing is listed until we publish it.
+      </p>
+
+      {% if can_withdraw %}
+        <form method="post" action="{% url 'auctions:application_withdraw' application.pk %}" onsubmit="return confirm('Withdraw this application? This cannot be undone.');">
+          {% csrf_token %}
+          <button class="btn btn-quiet btn-small" type="submit">Withdraw application</button>
+        </form>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

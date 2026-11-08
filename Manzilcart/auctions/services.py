@@ -23,7 +23,15 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from auctions.models import Auction, AuctionEvent, AuctionImage, AuctionSelection, Bid
+from auctions.models import (
+    Auction,
+    AuctionApplication,
+    AuctionApplicationImage,
+    AuctionEvent,
+    AuctionImage,
+    AuctionSelection,
+    Bid,
+)
 from catalog.models import Category
 from core.audit import record_audit
 from core.exceptions import PermissionDeniedError, StateTransitionError
@@ -120,6 +128,94 @@ def _ensure_owner(auction: Auction, actor) -> None:
         raise PermissionDeniedError("Please sign in to manage this auction.")
     if auction.seller_id != actor.pk:
         raise PermissionDeniedError("You cannot change this auction.")
+
+
+def _ensure_owner_or_staff(auction: Auction, actor) -> bool:
+    """Allow the seller or an operations user; return whether the actor is staff."""
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        raise PermissionDeniedError("Please sign in to manage this auction.")
+    is_staff = bool(getattr(actor, "is_staff", False))
+    if auction.seller_id != actor.pk and not is_staff:
+        raise PermissionDeniedError("You cannot change this auction.")
+    return is_staff
+
+
+def _notify_application(
+    application: AuctionApplication,
+    *,
+    kind,
+    subject: str,
+    body: str,
+    key: str,
+) -> None:
+    """Queue an application update without letting a provider failure roll it back."""
+    applicant = application.applicant
+    channel = (
+        Notification.Channel.EMAIL if applicant.email else Notification.Channel.SMS
+    )
+    recipient = applicant.email or applicant.phone
+    if not recipient:
+        return
+    try:
+        queue_notification(
+            channel=channel,
+            kind=kind,
+            recipient=recipient,
+            subject=subject if channel == Notification.Channel.EMAIL else "",
+            body=body,
+            user=applicant,
+            emirate=application.emirate,
+            entity=application,
+            idempotency_key=key,
+        )
+    except Exception:  # noqa: BLE001 - notifications must never undo a workflow step
+        logger.exception("Could not queue %s for application %s", kind, application.pk)
+
+
+def _validate_preferred_schedule(start_at, end_at) -> tuple:
+    """Optional applicant preference; it is not an auction schedule yet."""
+    if start_at is None and end_at is None:
+        return None, None
+    if start_at is None or end_at is None:
+        raise ValidationError(
+            {"preferred_end_at": "Provide both a preferred start and end time, or neither."}
+        )
+    if end_at <= start_at:
+        raise ValidationError(
+            {"preferred_end_at": "The preferred end time must be after the start time."}
+        )
+    return start_at, end_at
+
+
+def _proposed_bid(value) -> Decimal:
+    if value in (None, ""):
+        raise ValidationError(
+            {"proposed_starting_bid": "Enter your proposed starting / minimum bid."}
+        )
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValidationError(
+            {"proposed_starting_bid": "Enter a valid starting / minimum bid."}
+        ) from exc
+    if amount < Decimal("1.00"):
+        raise ValidationError(
+            {"proposed_starting_bid": "The proposed starting bid must be at least AED 1.00."}
+        )
+    return amount.quantize(Decimal("0.01"))
+
+
+def _ensure_applicant_can_sell(applicant) -> None:
+    if not getattr(applicant, "is_authenticated", False):
+        raise PermissionDeniedError("Please sign in to apply to auction an item.")
+    if not getattr(applicant, "is_active", False):
+        raise PermissionDeniedError("This account is not active.")
+    if not getattr(applicant, "is_mobile_verified", False):
+        raise PermissionDeniedError("Verify your mobile number before applying.")
+    if getattr(applicant, "seller_status", "") == "suspended":
+        raise PermissionDeniedError(
+            "Your seller account is suspended. Contact support before applying."
+        )
 
 
 def _validate_schedule(start_at, end_at, *, now=None) -> tuple:
@@ -274,9 +370,16 @@ def create_auction(
     reserve_price=None,
     agree_fallback: bool = False,
     submit_for_review: bool = True,
+    approved_by=None,
     request=None,
 ) -> Auction:
-    """Create a standalone auction item. No catalog listing is created."""
+    """
+    Create a standalone auction item. No catalog listing is created.
+
+    Members no longer call this directly. Staff call it either for a direct listing
+    (``approved_by`` set) or from an approved auction application. ``approved_by``
+    records the staff member who made the item public in the same transaction.
+    """
     if not agree_fallback:
         raise ValidationError(
             {"agree_fallback": "You must accept the fallback rules before starting."}
@@ -289,6 +392,7 @@ def create_auction(
     minimum_amount = _minimum_amount(reserve_price)
 
     now = timezone.now()
+    is_staff_listing = approved_by is not None
     auction = Auction(
         seller=seller,
         title=title.strip(),
@@ -303,11 +407,15 @@ def create_auction(
         # Approval is required before the worker may open this auction.
         status=Auction.Status.SCHEDULED,
         moderation_status=(
-            Auction.ModerationStatus.PENDING
+            Auction.ModerationStatus.APPROVED
+            if is_staff_listing
+            else Auction.ModerationStatus.PENDING
             if submit_for_review
             else Auction.ModerationStatus.DRAFT
         ),
-        submitted_at=now if submit_for_review else None,
+        submitted_at=now if (submit_for_review or is_staff_listing) else None,
+        approved_at=now if is_staff_listing else None,
+        approved_by=approved_by if is_staff_listing else None,
         seller_agreed_fallback=True,
     )
     auction.full_clean(exclude=["approved_by"])
@@ -316,35 +424,44 @@ def create_auction(
     _record_event(
         auction,
         AuctionEvent.Type.CREATED,
-        actor=seller,
+        actor=approved_by or seller,
         summary=f"Auction {auction.reference} created",
         metadata={
             "start_at": start_at.isoformat(),
             "end_at": end_at.isoformat(),
             "minimum_amount": str(minimum_amount),
+            "created_by_staff": is_staff_listing,
         },
     )
-    if submit_for_review:
+    if is_staff_listing:
+        _record_event(
+            auction,
+            AuctionEvent.Type.APPROVED,
+            actor=approved_by,
+            summary="Created and listed by staff",
+        )
+    elif submit_for_review:
         _record_event(
             auction,
             AuctionEvent.Type.SUBMITTED,
             actor=seller,
             summary="Submitted for moderation",
         )
+    if is_staff_listing:
+        action = AuditEvent.Action.AUCTION_LISTED_BY_STAFF
+        summary = f"Auction {auction.reference} created and listed by staff"
+    elif submit_for_review:
+        action = AuditEvent.Action.AUCTION_SUBMITTED
+        summary = f"Auction {auction.reference} submitted for review"
+    else:
+        action = AuditEvent.Action.ADMIN_ACTION
+        summary = f"Auction {auction.reference} saved as draft"
     record_audit(
-        action=(
-            AuditEvent.Action.AUCTION_SUBMITTED
-            if submit_for_review
-            else AuditEvent.Action.ADMIN_ACTION
-        ),
-        actor=seller,
+        action=action,
+        actor=approved_by or seller,
         entity=auction,
         emirate=auction.emirate,
-        summary=(
-            f"Auction {auction.reference} submitted for review"
-            if submit_for_review
-            else f"Auction {auction.reference} saved as draft"
-        ),
+        summary=summary,
         request=request,
     )
     return auction
@@ -365,16 +482,18 @@ def update_auction(
     reserve_price=None,
     agree_fallback: bool = False,
     submit_for_review: bool = True,
+    staff_publish: bool | None = None,
     request=None,
 ) -> Auction:
     """
     Edit an auction.
 
-    Drafts and rejected auctions can be edited freely. An approved auction may only be
-    edited before its first bid; doing so puts it back into moderation. Once bidding has
-    started, content is frozen.
+    Staff may edit any auction before its first bid (content freezes once bidding
+    starts). A member edit is retained for backwards-compatible service callers and
+    still sends the item back through moderation. ``staff_publish`` lets the staff
+    editor choose publish (True), draft (False) or preserve the current state (None).
     """
-    _ensure_owner(auction, actor)
+    is_staff_actor = _ensure_owner_or_staff(auction, actor)
     locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
     if not locked.is_editable_by_owner:
         raise StateTransitionError(
@@ -403,19 +522,57 @@ def update_auction(
     locked.seller_agreed_fallback = True
 
     was_approved = locked.moderation_status == Auction.ModerationStatus.APPROVED
-    if was_approved or submit_for_review:
-        locked.moderation_status = Auction.ModerationStatus.PENDING
-        locked.submitted_at = timezone.now()
-        locked.moderation_note = ""
-        # Content is no longer public until a moderator approves it again.
-        locked.status = Auction.Status.SCHEDULED
-    elif locked.moderation_status == Auction.ModerationStatus.DRAFT:
-        locked.status = Auction.Status.SCHEDULED
+    if is_staff_actor:
+        if staff_publish is True:
+            if not was_approved:
+                locked.approved_at = timezone.now()
+                locked.approved_by = actor
+            locked.moderation_status = Auction.ModerationStatus.APPROVED
+            locked.submitted_at = locked.submitted_at or timezone.now()
+            locked.moderation_note = ""
+            if locked.status == Auction.Status.PAUSED:
+                locked.status = Auction.Status.LIVE
+        elif staff_publish is False:
+            locked.moderation_status = Auction.ModerationStatus.DRAFT
+            locked.status = Auction.Status.SCHEDULED
+            locked.approved_at = None
+            locked.approved_by = None
+        # None preserves the existing moderation/status state.
+    else:
+        if was_approved or submit_for_review:
+            locked.moderation_status = Auction.ModerationStatus.PENDING
+            locked.submitted_at = timezone.now()
+            locked.moderation_note = ""
+            # Content is no longer public until a moderator approves it again.
+            locked.status = Auction.Status.SCHEDULED
+        elif locked.moderation_status == Auction.ModerationStatus.DRAFT:
+            locked.status = Auction.Status.SCHEDULED
 
     locked.full_clean(exclude=["approved_by"])
     locked.save()
 
-    if locked.moderation_status == Auction.ModerationStatus.PENDING:
+    if is_staff_actor:
+        if locked.moderation_status == Auction.ModerationStatus.APPROVED:
+            _record_event(
+                locked,
+                AuctionEvent.Type.APPROVED,
+                actor=actor,
+                summary="Edited and published by staff",
+            )
+            audit_action = AuditEvent.Action.AUCTION_LISTED_BY_STAFF
+            audit_summary = f"Auction {locked.reference} edited and published by staff"
+        else:
+            audit_action = AuditEvent.Action.ADMIN_ACTION
+            audit_summary = f"Auction {locked.reference} edited by staff"
+        record_audit(
+            action=audit_action,
+            actor=actor,
+            entity=locked,
+            emirate=emirate,
+            summary=audit_summary,
+            request=request,
+        )
+    elif locked.moderation_status == Auction.ModerationStatus.PENDING:
         _record_event(
             locked,
             AuctionEvent.Type.SUBMITTED,
@@ -736,7 +893,7 @@ def void_bid(auction: Auction, bid: Bid, *, reviewer, request=None) -> Bid:
 @transaction.atomic
 def add_auction_image(auction: Auction, uploaded_file, *, actor, caption: str = "") -> AuctionImage:
     """Validate, sanitise and store one auction image using ``core.images``."""
-    _ensure_owner(auction, actor)
+    _ensure_owner_or_staff(auction, actor)
     locked = Auction.objects.select_for_update().get(pk=auction.pk)
     if locked.moderation_status == Auction.ModerationStatus.APPROVED and locked.bids.exists():
         raise StateTransitionError("Photos cannot be changed once bidding has started.")
@@ -775,6 +932,747 @@ def add_auction_image(auction: Auction, uploaded_file, *, actor, caption: str = 
         image.save()
 
     return image
+
+
+@transaction.atomic
+def delete_auction_image(auction: Auction, image: AuctionImage, *, actor) -> None:
+    """Remove a photo before bidding starts; staff may use this during review."""
+    _ensure_owner_or_staff(auction, actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.moderation_status == Auction.ModerationStatus.APPROVED and locked.bids.exists():
+        raise StateTransitionError("Photos cannot be changed once bidding has started.")
+    image = getattr(image, "pk", None) and AuctionImage.objects.filter(
+        pk=image.pk, auction=locked
+    ).first()
+    if image is None:
+        return
+    was_cover = image.is_cover
+    image.delete()
+    if was_cover:
+        replacement = locked.images.order_by("display_order", "id").first()
+        if replacement is not None:
+            replacement.is_cover = True
+            replacement.save(update_fields=["is_cover"])
+
+
+@transaction.atomic
+def set_auction_cover(auction: Auction, image: AuctionImage, *, actor) -> AuctionImage:
+    _ensure_owner_or_staff(auction, actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.moderation_status == Auction.ModerationStatus.APPROVED and locked.bids.exists():
+        raise StateTransitionError("Photos cannot be changed once bidding has started.")
+    image = AuctionImage.objects.filter(pk=image.pk, auction=locked).first()
+    if image is None:
+        raise ValidationError("That photo does not belong to this auction.")
+    AuctionImage.objects.filter(auction=locked, is_cover=True).update(is_cover=False)
+    image.is_cover = True
+    image.save(update_fields=["is_cover"])
+    return image
+
+
+@transaction.atomic
+def reorder_auction_images(auction: Auction, ordered_ids: list[int], *, actor) -> None:
+    _ensure_owner_or_staff(auction, actor)
+    locked = Auction.objects.select_for_update().get(pk=auction.pk)
+    if locked.moderation_status == Auction.ModerationStatus.APPROVED and locked.bids.exists():
+        raise StateTransitionError("Photos cannot be changed once bidding has started.")
+    valid_ids = set(locked.images.values_list("pk", flat=True))
+    for order, image_id in enumerate(ordered_ids):
+        if image_id in valid_ids:
+            AuctionImage.objects.filter(pk=image_id, auction=locked).update(
+                display_order=order
+            )
+
+
+# ---------------------------------------------------------------------------
+# Auction applications: member request -> staff review -> auction listing
+# ---------------------------------------------------------------------------
+
+
+EDITABLE_APPLICATION_STATUSES = (
+    AuctionApplication.Status.DRAFT,
+    AuctionApplication.Status.CHANGES_REQUESTED,
+)
+REVIEWABLE_APPLICATION_STATUSES = (
+    AuctionApplication.Status.SUBMITTED,
+    AuctionApplication.Status.IN_REVIEW,
+    AuctionApplication.Status.CHANGES_REQUESTED,
+)
+
+
+@transaction.atomic
+def create_application(
+    *,
+    applicant,
+    emirate,
+    title: str,
+    description: str,
+    category: Category,
+    condition: str,
+    service_area,
+    proposed_starting_bid,
+    preferred_start_at=None,
+    preferred_end_at=None,
+    request=None,
+) -> AuctionApplication:
+    """Create a *draft* application. Submission is a separate, validated step."""
+    _ensure_applicant_can_sell(applicant)
+    emirate, service_area = validate_emirate_service_area(emirate, service_area)
+    _validate_content(
+        title=title, description=description, category=category, condition=condition
+    )
+    preferred_start_at, preferred_end_at = _validate_preferred_schedule(
+        preferred_start_at, preferred_end_at
+    )
+    proposed_bid = _proposed_bid(proposed_starting_bid)
+
+    application = AuctionApplication(
+        applicant=applicant,
+        title=title.strip(),
+        description=description.strip(),
+        category=category,
+        condition=condition,
+        emirate=emirate,
+        service_area=service_area,
+        proposed_starting_bid=proposed_bid,
+        preferred_start_at=preferred_start_at,
+        preferred_end_at=preferred_end_at,
+        status=AuctionApplication.Status.DRAFT,
+    )
+    application.full_clean()
+    application.save()
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=applicant,
+        entity=application,
+        emirate=emirate,
+        summary=f"Auction application {application.reference} drafted",
+        request=request,
+    )
+    return application
+
+
+@transaction.atomic
+def update_application(
+    application: AuctionApplication,
+    *,
+    actor,
+    title: str,
+    description: str,
+    category: Category,
+    condition: str,
+    service_area,
+    proposed_starting_bid,
+    preferred_start_at=None,
+    preferred_end_at=None,
+    request=None,
+) -> AuctionApplication:
+    """Edit a draft or a changes-requested application (or staff corrections)."""
+    locked = AuctionApplication.objects.select_for_update().select_related(
+        "applicant", "emirate"
+    ).get(pk=application.pk)
+    is_staff_actor = bool(getattr(actor, "is_staff", False))
+    if locked.applicant_id != getattr(actor, "pk", None) and not is_staff_actor:
+        raise PermissionDeniedError("You cannot change this application.")
+    if not is_staff_actor and locked.status not in EDITABLE_APPLICATION_STATUSES:
+        raise StateTransitionError(
+            "This application can no longer be edited. Contact support if you need help."
+        )
+
+    emirate, service_area = validate_emirate_service_area(locked.emirate, service_area)
+    _validate_content(
+        title=title, description=description, category=category, condition=condition
+    )
+    preferred_start_at, preferred_end_at = _validate_preferred_schedule(
+        preferred_start_at, preferred_end_at
+    )
+    proposed_bid = _proposed_bid(proposed_starting_bid)
+
+    locked.title = title.strip()
+    locked.description = description.strip()
+    locked.category = category
+    locked.condition = condition
+    locked.service_area = service_area
+    locked.proposed_starting_bid = proposed_bid
+    locked.preferred_start_at = preferred_start_at
+    locked.preferred_end_at = preferred_end_at
+    locked.full_clean()
+    locked.save()
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=actor,
+        entity=locked,
+        emirate=emirate,
+        summary=f"Auction application {locked.reference} updated",
+        request=request,
+    )
+    return locked
+
+
+@transaction.atomic
+def submit_application(
+    application: AuctionApplication, *, actor, request=None
+) -> AuctionApplication:
+    """Submit a complete draft / resubmit requested changes."""
+    locked = AuctionApplication.objects.select_for_update().select_related(
+        "applicant", "emirate"
+    ).get(pk=application.pk)
+    if locked.applicant_id != getattr(actor, "pk", None):
+        raise PermissionDeniedError("Only the applicant can submit this application.")
+    if locked.status not in EDITABLE_APPLICATION_STATUSES:
+        raise StateTransitionError("This application has already been submitted.")
+    _ensure_applicant_can_sell(actor)
+    image_count = locked.images.count()
+    if image_count < settings.MIN_IMAGES_PER_LISTING:
+        raise ValidationError(
+            f"Add at least {settings.MIN_IMAGES_PER_LISTING} photos before submitting."
+        )
+    if image_count > settings.MAX_IMAGES_PER_LISTING:
+        raise ValidationError(
+            f"An application can have at most {settings.MAX_IMAGES_PER_LISTING} photos."
+        )
+    locked.full_clean()
+
+    now = timezone.now()
+    locked.status = AuctionApplication.Status.SUBMITTED
+    locked.submitted_at = now
+    locked.applicant_message = ""
+    locked.reviewed_by = None
+    locked.reviewed_at = None
+    locked.save(
+        update_fields=[
+            "status",
+            "submitted_at",
+            "applicant_message",
+            "reviewed_by",
+            "reviewed_at",
+            "updated_at",
+        ]
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPLICATION_SUBMITTED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction application {locked.reference} submitted",
+        request=request,
+    )
+    _notify_application(
+        locked,
+        kind=Notification.Kind.AUCTION_APPLICATION_UPDATE,
+        subject=f"We received your auction application — {locked.reference}",
+        body=(
+            f"Thanks for applying to auction “{locked.title}”. Our team is reviewing "
+            "your photos and proposed starting bid. We will message you when there is "
+            "an update. You can follow the status in My auctions."
+        ),
+        key=f"application:{locked.pk}:submitted",
+    )
+    return locked
+
+
+@transaction.atomic
+def start_application_review(
+    application: AuctionApplication, *, actor, request=None
+) -> AuctionApplication:
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can review auction applications.")
+    locked = AuctionApplication.objects.select_for_update().select_related("emirate").get(
+        pk=application.pk
+    )
+    if locked.status == AuctionApplication.Status.IN_REVIEW:
+        return locked
+    if locked.status != AuctionApplication.Status.SUBMITTED:
+        raise StateTransitionError("Only a newly submitted application can be opened.")
+    locked.status = AuctionApplication.Status.IN_REVIEW
+    locked.reviewed_by = actor
+    locked.reviewed_at = timezone.now()
+    locked.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPLICATION_REVIEWED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction application {locked.reference} opened for review",
+        request=request,
+    )
+    return locked
+
+
+def _review_note(note: str) -> str:
+    note = (note or "").strip()
+    if len(note) < 5:
+        raise ValidationError({"note": "Write a short reason (at least 5 characters)."})
+    return note
+
+
+@transaction.atomic
+def request_application_changes(
+    application: AuctionApplication, *, actor, note: str, request=None
+) -> AuctionApplication:
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can decide auction applications.")
+    locked = AuctionApplication.objects.select_for_update().select_related(
+        "applicant", "emirate"
+    ).get(pk=application.pk)
+    if locked.status not in (
+        AuctionApplication.Status.SUBMITTED,
+        AuctionApplication.Status.IN_REVIEW,
+    ):
+        raise StateTransitionError("This application is not awaiting a decision.")
+    if locked.auction_id:
+        raise StateTransitionError(
+            "A draft auction already exists for this application. Edit or publish "
+            "that auction instead."
+        )
+    message = _review_note(note)
+    locked.status = AuctionApplication.Status.CHANGES_REQUESTED
+    locked.applicant_message = message
+    locked.reviewed_by = actor
+    locked.reviewed_at = timezone.now()
+    locked.save(
+        update_fields=[
+            "status",
+            "applicant_message",
+            "reviewed_by",
+            "reviewed_at",
+            "updated_at",
+        ]
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPLICATION_CHANGES_REQUESTED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Changes requested for application {locked.reference}",
+        metadata={"note": message},
+        request=request,
+    )
+    _notify_application(
+        locked,
+        kind=Notification.Kind.AUCTION_APPLICATION_UPDATE,
+        subject=f"Changes needed on your auction application — {locked.reference}",
+        body=(
+            f"We reviewed your application for “{locked.title}”.\n\n"
+            f"{message}\n\nUpdate your application in My auctions, then submit it again."
+        ),
+        key=f"application:{locked.pk}:changes:{locked.updated_at.timestamp():.0f}",
+    )
+    return locked
+
+
+@transaction.atomic
+def reject_application(
+    application: AuctionApplication, *, actor, note: str, request=None
+) -> AuctionApplication:
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can decide auction applications.")
+    locked = AuctionApplication.objects.select_for_update().select_related(
+        "applicant", "emirate"
+    ).get(pk=application.pk)
+    if locked.status not in (
+        AuctionApplication.Status.SUBMITTED,
+        AuctionApplication.Status.IN_REVIEW,
+        AuctionApplication.Status.CHANGES_REQUESTED,
+    ):
+        raise StateTransitionError("This application is not awaiting a decision.")
+    if locked.auction_id:
+        raise StateTransitionError(
+            "A draft auction already exists for this application. Edit or publish "
+            "that auction instead."
+        )
+    message = _review_note(note)
+    locked.status = AuctionApplication.Status.REJECTED
+    locked.applicant_message = message
+    locked.reviewed_by = actor
+    locked.reviewed_at = timezone.now()
+    locked.save(
+        update_fields=[
+            "status",
+            "applicant_message",
+            "reviewed_by",
+            "reviewed_at",
+            "updated_at",
+        ]
+    )
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPLICATION_REJECTED,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction application {locked.reference} rejected",
+        metadata={"note": message},
+        request=request,
+    )
+    _notify_application(
+        locked,
+        kind=Notification.Kind.AUCTION_APPLICATION_UPDATE,
+        subject=f"Update on your auction application — {locked.reference}",
+        body=(
+            f"We reviewed your application for “{locked.title}”. We are not able to "
+            f"list it at this time.\n\n{message}\n\n"
+            "You can contact support if you would like to discuss the decision."
+        ),
+        key=f"application:{locked.pk}:rejected",
+    )
+    return locked
+
+
+@transaction.atomic
+def withdraw_application(
+    application: AuctionApplication, *, actor, request=None
+) -> AuctionApplication:
+    locked = AuctionApplication.objects.select_for_update().select_related("emirate").get(
+        pk=application.pk
+    )
+    if locked.applicant_id != getattr(actor, "pk", None):
+        raise PermissionDeniedError("Only the applicant can withdraw this application.")
+    if locked.status in (
+        AuctionApplication.Status.LISTED,
+        AuctionApplication.Status.REJECTED,
+        AuctionApplication.Status.WITHDRAWN,
+    ):
+        raise StateTransitionError("This application cannot be withdrawn.")
+    if locked.auction_id:
+        raise StateTransitionError(
+            "An auction has already been prepared for this application. Contact "
+            "support if you need to withdraw it."
+        )
+    locked.status = AuctionApplication.Status.WITHDRAWN
+    locked.save(update_fields=["status", "updated_at"])
+    record_audit(
+        action=AuditEvent.Action.AUCTION_APPLICATION_WITHDRAWN,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Auction application {locked.reference} withdrawn",
+        request=request,
+    )
+    return locked
+
+
+@transaction.atomic
+def save_application_notes(
+    application: AuctionApplication, *, actor, notes: str, request=None
+) -> AuctionApplication:
+    """Save internal staff notes without changing the application status."""
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can edit internal notes.")
+    locked = AuctionApplication.objects.select_for_update().get(pk=application.pk)
+    locked.admin_notes = notes or ""
+    locked.save(update_fields=["admin_notes", "updated_at"])
+    record_audit(
+        action=AuditEvent.Action.ADMIN_ACTION,
+        actor=actor,
+        entity=locked,
+        emirate=locked.emirate,
+        summary=f"Internal notes updated for application {locked.reference}",
+        request=request,
+    )
+    return locked
+
+
+def _application_images_editable(application: AuctionApplication, actor) -> bool:
+    is_staff_actor = bool(getattr(actor, "is_staff", False))
+    # Reviewing staff may correct photos on a submitted application even when the
+    # staff account also happens to be the applicant (for example in a dev account).
+    if is_staff_actor:
+        return True
+    if application.applicant_id != getattr(actor, "pk", None):
+        raise PermissionDeniedError("You cannot change these application photos.")
+    if application.status not in EDITABLE_APPLICATION_STATUSES:
+        raise StateTransitionError(
+            "Photos cannot be changed after the application is submitted."
+        )
+    return False
+
+
+@transaction.atomic
+def add_application_image(
+    application: AuctionApplication,
+    uploaded_file,
+    *,
+    actor,
+    caption: str = "",
+    is_cover: bool | None = None,
+) -> AuctionApplicationImage:
+    locked = AuctionApplication.objects.select_for_update().get(pk=application.pk)
+    _application_images_editable(locked, actor)
+    existing_count = locked.images.count()
+    if existing_count >= settings.MAX_IMAGES_PER_LISTING:
+        raise ValidationError(
+            f"An application can have at most {settings.MAX_IMAGES_PER_LISTING} images."
+        )
+    validate_image_upload(uploaded_file)
+    uploaded_file.seek(0)
+    payload = uploaded_file.read()
+    data, extension = sanitise_image(payload)
+
+    make_cover = existing_count == 0 if is_cover is None else bool(is_cover)
+    if make_cover:
+        AuctionApplicationImage.objects.filter(
+            application=locked, is_cover=True
+        ).update(is_cover=False)
+    image = AuctionApplicationImage(
+        application=locked,
+        caption=caption[:140],
+        is_cover=make_cover,
+        display_order=existing_count,
+    )
+    image.image.save(f"{uuid.uuid4().hex}.{extension}", ContentFile(data), save=False)
+    with Image.open(BytesIO(data)) as probe:
+        image.width, image.height = probe.size
+    image.byte_size = len(data)
+    try:
+        with transaction.atomic():
+            image.save()
+    except IntegrityError:
+        image.is_cover = False
+        image.save()
+    return image
+
+
+@transaction.atomic
+def delete_application_image(
+    application: AuctionApplication, image: AuctionApplicationImage, *, actor
+) -> None:
+    locked = AuctionApplication.objects.select_for_update().get(pk=application.pk)
+    _application_images_editable(locked, actor)
+    image = AuctionApplicationImage.objects.filter(
+        pk=image.pk, application=locked
+    ).first()
+    if image is None:
+        return
+    was_cover = image.is_cover
+    image.delete()
+    if was_cover:
+        replacement = locked.images.order_by("display_order", "id").first()
+        if replacement is not None:
+            replacement.is_cover = True
+            replacement.save(update_fields=["is_cover"])
+
+
+@transaction.atomic
+def set_application_cover(
+    application: AuctionApplication, image: AuctionApplicationImage, *, actor
+) -> AuctionApplicationImage:
+    locked = AuctionApplication.objects.select_for_update().get(pk=application.pk)
+    _application_images_editable(locked, actor)
+    image = AuctionApplicationImage.objects.filter(
+        pk=image.pk, application=locked
+    ).first()
+    if image is None:
+        raise ValidationError("That photo does not belong to this application.")
+    AuctionApplicationImage.objects.filter(application=locked, is_cover=True).update(
+        is_cover=False
+    )
+    image.is_cover = True
+    image.save(update_fields=["is_cover"])
+    return image
+
+
+@transaction.atomic
+def reorder_application_images(
+    application: AuctionApplication, ordered_ids: list[int], *, actor
+) -> None:
+    locked = AuctionApplication.objects.select_for_update().get(pk=application.pk)
+    _application_images_editable(locked, actor)
+    valid_ids = set(locked.images.values_list("pk", flat=True))
+    for order, image_id in enumerate(ordered_ids):
+        if image_id in valid_ids:
+            AuctionApplicationImage.objects.filter(
+                pk=image_id, application=locked
+            ).update(display_order=order)
+
+
+def _copy_application_images(
+    application: AuctionApplication, auction: Auction, *, actor
+) -> None:
+    """Copy reviewed photos into the auction's own storage (no shared files)."""
+    for source in application.images.order_by("display_order", "id"):
+        with source.image.open("rb") as handle:
+            payload = handle.read()
+        data, extension = sanitise_image(payload)
+        existing_count = auction.images.count()
+        target = AuctionImage(
+            auction=auction,
+            caption=source.caption[:140],
+            is_cover=source.is_cover or existing_count == 0,
+            display_order=existing_count,
+        )
+        if target.is_cover:
+            AuctionImage.objects.filter(auction=auction, is_cover=True).update(
+                is_cover=False
+            )
+        target.image.save(
+            f"{uuid.uuid4().hex}.{extension}", ContentFile(data), save=False
+        )
+        with Image.open(BytesIO(data)) as probe:
+            target.width, target.height = probe.size
+        target.byte_size = len(data)
+        with transaction.atomic():
+            target.save()
+
+
+@transaction.atomic
+def create_auction_from_application(
+    application: AuctionApplication,
+    *,
+    actor,
+    title: str,
+    description: str,
+    category: Category,
+    condition: str,
+    service_area,
+    start_at,
+    end_at,
+    reserve_price,
+    publish: bool = True,
+    allow_suspended: bool = False,
+    request=None,
+) -> Auction:
+    """
+    Create (or update) the one auction for this application.
+
+    Saving a draft creates the linked auction in draft moderation and leaves the
+    application in review. Publishing approves and lists it, links it to the
+    application and notifies the applicant. Repeated calls are idempotent.
+    """
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can list auction applications.")
+    locked = AuctionApplication.objects.select_for_update().select_related(
+        "applicant", "emirate", "service_area", "category"
+    ).get(pk=application.pk)
+
+    if locked.status == AuctionApplication.Status.LISTED and locked.auction_id:
+        return locked.auction
+    if locked.status in (
+        AuctionApplication.Status.REJECTED,
+        AuctionApplication.Status.WITHDRAWN,
+    ):
+        raise StateTransitionError("This application is closed and cannot be listed.")
+    if locked.status not in REVIEWABLE_APPLICATION_STATUSES:
+        raise StateTransitionError("Only a submitted application can be listed.")
+
+    applicant = locked.applicant
+    if not applicant.is_active or not applicant.is_mobile_verified:
+        raise PermissionDeniedError(
+            "The applicant's account is not eligible to sell. Restore or verify it first."
+        )
+    if applicant.seller_status == "suspended" and not allow_suspended:
+        raise PermissionDeniedError(
+            "The applicant is suspended. Confirm the explicit override to list anyway."
+        )
+
+    emirate, service_area = validate_emirate_service_area(locked.emirate, service_area)
+    if locked.auction_id:
+        auction = update_auction(
+            locked.auction,
+            actor=actor,
+            title=title,
+            description=description,
+            category=category,
+            condition=condition,
+            service_area=service_area,
+            start_at=start_at,
+            end_at=end_at,
+            reserve_price=reserve_price,
+            agree_fallback=True,
+            staff_publish=publish,
+            request=request,
+        )
+    else:
+        auction = create_auction(
+            seller=applicant,
+            emirate=emirate,
+            title=title,
+            description=description,
+            category=category,
+            condition=condition,
+            service_area=service_area,
+            start_at=start_at,
+            end_at=end_at,
+            reserve_price=reserve_price,
+            agree_fallback=True,
+            submit_for_review=False,
+            approved_by=actor if publish else None,
+            request=request,
+        )
+        _copy_application_images(locked, auction, actor=actor)
+
+    now = timezone.now()
+    locked.auction = auction
+    locked.reviewed_by = actor
+    locked.reviewed_at = now
+    if publish:
+        if auction.images.count() < settings.MIN_IMAGES_PER_LISTING:
+            raise ValidationError(
+                f"Add at least {settings.MIN_IMAGES_PER_LISTING} auction photos before publishing."
+            )
+        locked.status = AuctionApplication.Status.LISTED
+        locked.listed_at = now
+        locked.applicant_message = (
+            "Your item is now listed as an auction. We will notify you when bidding "
+            "starts and when a bid is selected."
+        )
+        locked.save(
+            update_fields=[
+                "auction",
+                "status",
+                "listed_at",
+                "applicant_message",
+                "reviewed_by",
+                "reviewed_at",
+                "updated_at",
+            ]
+        )
+        record_audit(
+            action=AuditEvent.Action.AUCTION_LISTED_BY_STAFF,
+            actor=actor,
+            entity=locked,
+            emirate=locked.emirate,
+            summary=(
+                f"Auction application {locked.reference} listed as {auction.reference}"
+            ),
+            metadata={"auction_id": auction.pk, "allow_suspended": allow_suspended},
+            request=request,
+        )
+        _notify_application(
+            locked,
+            kind=Notification.Kind.AUCTION_APPLICATION_UPDATE,
+            subject=f"Your item is live — {auction.reference}",
+            body=(
+                f"Good news: “{auction.title}” is now listed as an auction with a "
+                f"starting bid of AED {auction.starting_price}. Bidding runs until "
+                f"{timezone.localtime(auction.end_at):%d %b %Y %H:%M}. "
+                "We will let you know when there is a winning bid to review."
+            ),
+            key=f"application:{locked.pk}:listed",
+        )
+    else:
+        locked.status = AuctionApplication.Status.IN_REVIEW
+        locked.save(
+            update_fields=[
+                "auction",
+                "status",
+                "reviewed_by",
+                "reviewed_at",
+                "updated_at",
+            ]
+        )
+        record_audit(
+            action=AuditEvent.Action.AUCTION_CREATED_FROM_APPLICATION,
+            actor=actor,
+            entity=locked,
+            emirate=locked.emirate,
+            summary=(
+                f"Draft auction {auction.reference} prepared from "
+                f"application {locked.reference}"
+            ),
+            metadata={"auction_id": auction.pk},
+            request=request,
+        )
+    return auction
 
 
 # ---------------------------------------------------------------------------
@@ -908,14 +1806,33 @@ def place_bid(
 
 
 @transaction.atomic
+def staff_lock_bid(
+    auction: Auction, *, actor, bid_id: int, request=None
+) -> AuctionSelection:
+    """Staff action: lock the highest eligible bid on behalf of the seller."""
+    if not getattr(actor, "is_staff", False):
+        raise PermissionDeniedError("Only staff can lock a bid from the back office.")
+    return _lock_bid(auction, actor=actor, bid_id=bid_id, request=request)
+
+
+@transaction.atomic
 def lock_bid(auction: Auction, *, seller, bid_id: int, request=None) -> AuctionSelection:
     """
-    Seller action: freeze bidding and ask the highest eligible bidder to confirm.
+    Freeze bidding and ask the highest eligible bidder to confirm.
 
-    Only the current highest eligible bid can be locked, and only before ``end_at``.
+    Kept for existing service callers. The storefront no longer exposes this as a
+    seller action; staff use :func:`staff_lock_bid`.
     """
+    return _lock_bid(auction, actor=seller, bid_id=bid_id, request=request)
+
+
+def _lock_bid(
+    auction: Auction, *, actor, bid_id: int, request=None
+) -> AuctionSelection:
     locked = Auction.objects.select_for_update().select_related("emirate").get(pk=auction.pk)
-    _ensure_owner(locked, seller)
+    # Staff act for the seller; a member may still use the legacy service entry point.
+    if not getattr(actor, "is_staff", False):
+        _ensure_owner(locked, actor)
     if not locked.is_public:
         raise StateTransitionError("This auction is not available for bidding.")
     if locked.status != Auction.Status.LIVE:
@@ -960,13 +1877,13 @@ def lock_bid(auction: Auction, *, seller, bid_id: int, request=None) -> AuctionS
     _record_event(
         locked,
         AuctionEvent.Type.BID_LOCKED,
-        actor=seller,
+        actor=actor,
         summary=f"Bid of AED {highest.amount} locked for confirmation",
         metadata={"bid_id": highest.pk, "selection_id": selection.pk},
     )
     record_audit(
         action=AuditEvent.Action.AUCTION_BID_LOCKED,
-        actor=seller,
+        actor=actor,
         entity=locked,
         emirate=locked.emirate,
         summary=f"Bid locked on auction {locked.reference}",

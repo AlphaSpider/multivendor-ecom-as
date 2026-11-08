@@ -1,15 +1,18 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-<h2>
-  {% if mode == "suspend" %}Suspend {{ listing_count }} item(s){% else %}Request changes for {{ listing_count }} item(s){% endif %}
-</h2>
-<p>
-  The reason you write here is delivered to each seller as a system message in their item's
-  chat thread and (when possible) as a WhatsApp notification.
-</p>
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Bulk moderation</p>
+    <h1>{% if mode == "suspend" %}Suspend {{ listing_count }} item(s){% else %}Request changes for {{ listing_count }} item(s){% endif %}</h1>
+    <p class="gov-subtitle">The reason is delivered to each seller as a system message in their item chat and, when possible, as a WhatsApp notification.</p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="#back">Back</a>
+  </div>
+</div>
 
-<form method="post">
+<form method="post" class="governance-panel">
   {% csrf_token %}
   <input type="hidden" name="mode" value="{{ mode }}">
   <textarea name="note" rows="5" style="width:100%;max-width:640px;"
@@ -19,7 +22,7 @@
     <button type="submit" class="button default">Apply to {{ listing_count }} item(s)</button>
     <a class="button" href="#back">Cancel</a>
   </div>
-  <table class="governance-table">
+  <table class="governance-table" style="margin-top:14px;">
     <thead><tr><th>Item</th><th>Seller</th><th>Status</th></tr></thead>
     <tbody>
       {% for item in listings %}

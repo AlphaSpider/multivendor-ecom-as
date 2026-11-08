@@ -322,7 +322,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["service_area"] = user.service_area
         if emirate is not None and getattr(emirate, "is_active", False):
             context["auction_create_url"] = reverse(
-                "auction_marketplace:create",
+                "auction_marketplace:apply",
                 kwargs={"emirate_slug": emirate.slug},
             )
             context["listing_create_url"] = reverse(
@@ -337,7 +337,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Activity counts. Two-way stats need the union of both roles, so they are
         # summed; every query is a cheap indexed count scoped to one member.
         context["listings_count"] = user.listings.count()
-        context["auctions_count"] = user.auctions.count() + user.bids.count()
+        context["auctions_count"] = (
+            user.auctions.count()
+            + user.bids.count()
+            + user.auction_applications.count()
+        )
         context["conversations_count"] = (
             user.buying_conversations.count() + user.selling_conversations.count()
         )

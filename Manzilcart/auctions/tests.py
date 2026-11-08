@@ -25,7 +25,14 @@ from django.utils import timezone
 from PIL import Image as PILImage
 
 from auctions import services
-from auctions.models import Auction, AuctionEvent, AuctionImage, AuctionSelection
+from auctions.models import (
+    Auction,
+    AuctionApplication,
+    AuctionApplicationImage,
+    AuctionEvent,
+    AuctionImage,
+    AuctionSelection,
+)
 from catalog.models import Category, Listing
 from core.exceptions import LocationError, PermissionDeniedError, StateTransitionError
 from core.models import AuditEvent
@@ -91,6 +98,15 @@ class AuctionTestBase(TestCase):
             service_area=cls.area,
             phone_verified_at=timezone.now(),
             is_staff=True,
+        )
+        cls.admin_user = User.objects.create_user(
+            phone="+971508000007",
+            display_name="Ops Admin",
+            emirate=cls.emirate,
+            service_area=cls.area,
+            phone_verified_at=timezone.now(),
+            is_staff=True,
+            is_superuser=True,
         )
 
     # -- helpers -----------------------------------------------------------
@@ -161,6 +177,58 @@ class AuctionTestBase(TestCase):
             "auction_marketplace:create", kwargs={"emirate_slug": self.emirate.slug}
         )
 
+    def apply_url(self):
+        return reverse(
+            "auction_marketplace:apply", kwargs={"emirate_slug": self.emirate.slug}
+        )
+
+    def create_application(
+        self,
+        *,
+        applicant=None,
+        title="Linen sofa",
+        proposed_starting_bid="250.00",
+        submit=False,
+        status=None,
+    ) -> AuctionApplication:
+        application = services.create_application(
+            applicant=applicant or self.seller,
+            emirate=self.emirate,
+            title=title,
+            description=(
+                "A linen three-seater with a sturdy frame. Minor wear on the arms; "
+                "collection from the lobby."
+            ),
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
+            proposed_starting_bid=proposed_starting_bid,
+        )
+        if submit:
+            self.attach_application_images(application)
+            application = services.submit_application(
+                application, actor=application.applicant
+            )
+        if status is not None:
+            AuctionApplication.objects.filter(pk=application.pk).update(status=status)
+            application.refresh_from_db()
+        return application
+
+    def image_upload(self, name="photo.png") -> SimpleUploadedFile:
+        buffer = BytesIO()
+        PILImage.new("RGB", (320, 240), (180, 160, 140)).save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+    def attach_application_images(self, application, count=None):
+        count = count or settings.MIN_IMAGES_PER_LISTING
+        for index in range(count):
+            services.add_application_image(
+                application,
+                self.image_upload(f"application-{index}.png"),
+                actor=application.applicant,
+            )
+        return application
+
 
 class StandaloneCreationTests(AuctionTestBase):
     def test_condition_choices_exclude_new_items(self):
@@ -206,15 +274,19 @@ class StandaloneCreationTests(AuctionTestBase):
             self.create_auction(reserve=None)
         self.assertIn("reserve_price", ctx.exception.message_dict)
 
-    def test_create_form_requires_a_minimum_starting_price(self):
-        self.client.force_login(self.seller)
+    def test_legacy_create_url_redirects_to_the_application_form(self):
         response = self.client.get(self.create_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.apply_url())
+
+    def test_apply_form_requires_a_minimum_starting_bid(self):
+        self.client.force_login(self.seller)
+        response = self.client.get(self.apply_url())
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Minimum amount (AED)")
-        field = response.context["form"].fields["reserve_price"]
+        self.assertContains(response, "Proposed starting / minimum bid (AED)")
+        field = response.context["form"].fields["proposed_starting_bid"]
         self.assertTrue(field.required)
-        self.assertEqual(field.label, "Minimum amount (AED)")
-        self.assertIn("starting price", field.help_text.lower())
+        self.assertIn("lowest bid", field.help_text.lower())
 
     def test_schedule_duration_is_validated(self):
         now = timezone.now()
@@ -453,7 +525,7 @@ class VisibilityTests(AuctionTestBase):
         response = self.client.get(self.list_url())
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, approved.title)
-        self.assertContains(response, self.create_url())
+        self.assertContains(response, self.apply_url())
         self.assertNotContains(response, "Pending hidden item")
         self.assertNotContains(response, "Draft hidden item")
         self.assertNotContains(response, "Rejected hidden item")
@@ -519,15 +591,15 @@ class VisibilityTests(AuctionTestBase):
             Decimal("1500.00") + Decimal(settings.AUCTION_MIN_BID_INCREMENT),
         )
 
-    def test_logged_out_create_redirects_to_login_with_next(self):
-        response = self.client.get(self.create_url())
+    def test_logged_out_apply_redirects_to_login_with_next(self):
+        response = self.client.get(self.apply_url())
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("accounts:login"), response.url)
-        self.assertIn(self.create_url(), response.url)
+        self.assertIn(self.apply_url(), response.url)
 
     def test_ineligible_seller_sees_the_same_message_as_listing_creation(self):
         self.client.force_login(self.unverified)
-        auction_response = self.client.get(self.create_url())
+        auction_response = self.client.get(self.apply_url())
         listing_response = self.client.get(
             reverse(
                 "catalog:listing_create",
@@ -560,14 +632,363 @@ class VisibilityTests(AuctionTestBase):
         self.assertContains(response, pending.title)
         self.assertContains(response, rejected.title)
         self.assertContains(response, "Please show the damaged corner.")
-        self.assertContains(response, self.create_url())
+        self.assertContains(response, self.apply_url())
 
-    def test_dashboard_offers_a_create_auction_entry_point(self):
+    def test_dashboard_offers_a_apply_auction_entry_point(self):
         self.client.force_login(self.seller)
         response = self.client.get(reverse("accounts:dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.create_url())
-        self.assertContains(response, "Create auction")
+        self.assertContains(response, self.apply_url())
+        self.assertContains(response, "Apply to auction")
+
+
+class AuctionApplicationWorkflowTests(AuctionTestBase):
+    """Member applications, staff decisions and conversion into an auction."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def auction_kwargs(self, application, **overrides):
+        now = timezone.now()
+        data = {
+            "title": application.title,
+            "description": application.description,
+            "category": self.category,
+            "condition": Auction.Condition.GOOD,
+            "service_area": self.area,
+            "start_at": now + timedelta(hours=1),
+            "end_at": now + timedelta(days=3),
+            "reserve_price": application.proposed_starting_bid,
+        }
+        data.update(overrides)
+        return data
+
+    def test_submit_requires_the_minimum_photos_and_notifies_the_applicant(self):
+        application = self.create_application()
+        self.attach_application_images(
+            application, settings.MIN_IMAGES_PER_LISTING - 1
+        )
+        with self.assertRaises(ValidationError):
+            services.submit_application(application, actor=self.seller)
+        application.refresh_from_db()
+        self.assertEqual(application.status, AuctionApplication.Status.DRAFT)
+
+        self.attach_application_images(application, 1)
+        submitted = services.submit_application(application, actor=self.seller)
+        self.assertEqual(submitted.status, AuctionApplication.Status.SUBMITTED)
+        self.assertIsNotNone(submitted.submitted_at)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.AUCTION_APPLICATION_SUBMITTED,
+                entity_type="auctions.auctionapplication",
+                entity_id=str(application.pk),
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                kind=Notification.Kind.AUCTION_APPLICATION_UPDATE,
+                user=self.seller,
+                entity_id=str(application.pk),
+            ).exists()
+        )
+
+    def test_changes_requested_can_be_resubmitted(self):
+        application = self.create_application(submit=True)
+        services.request_application_changes(
+            application, actor=self.admin_user, note="Please add a photo of the base."
+        )
+        application.refresh_from_db()
+        self.assertEqual(
+            application.status, AuctionApplication.Status.CHANGES_REQUESTED
+        )
+        self.assertIn("photo of the base", application.applicant_message)
+        self.assertTrue(application.is_editable_by_applicant)
+
+        updated = services.update_application(
+            application,
+            actor=self.seller,
+            title="Linen sofa with new base photo",
+            description=application.description,
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
+            proposed_starting_bid="275.00",
+            request=None,
+        )
+        updated = services.submit_application(updated, actor=self.seller)
+        self.assertEqual(updated.status, AuctionApplication.Status.SUBMITTED)
+        self.assertEqual(updated.applicant_message, "")
+        self.assertEqual(updated.proposed_starting_bid, Decimal("275.00"))
+
+    def test_only_the_applicant_or_staff_can_change_an_application(self):
+        application = self.create_application()
+        with self.assertRaises(PermissionDeniedError):
+            services.update_application(
+                application,
+                actor=self.stranger,
+                title="Hijacked",
+                description=application.description,
+                category=self.category,
+                condition=Auction.Condition.GOOD,
+                service_area=self.area,
+                proposed_starting_bid="300.00",
+            )
+        with self.assertRaises(PermissionDeniedError):
+            services.submit_application(application, actor=self.stranger)
+        with self.assertRaises(PermissionDeniedError):
+            services.withdraw_application(application, actor=self.stranger)
+
+    def test_submitted_application_cannot_be_withdrawn_after_listing(self):
+        application = self.create_application(submit=True)
+        auction = services.create_auction_from_application(
+            application,
+            actor=self.admin_user,
+            **self.auction_kwargs(application),
+        )
+        application.refresh_from_db()
+        self.assertEqual(application.status, AuctionApplication.Status.LISTED)
+        self.assertEqual(application.auction, auction)
+        with self.assertRaises(StateTransitionError):
+            services.withdraw_application(application, actor=self.seller)
+
+    def test_staff_publish_creates_an_approved_auction_and_copies_photos(self):
+        application = self.create_application(submit=True)
+        auction = services.create_auction_from_application(
+            application,
+            actor=self.admin_user,
+            **self.auction_kwargs(application, reserve_price="315.00"),
+        )
+
+        auction.refresh_from_db()
+        application.refresh_from_db()
+        self.assertEqual(auction.seller, self.seller)
+        self.assertEqual(auction.moderation_status, Auction.ModerationStatus.APPROVED)
+        self.assertEqual(auction.approved_by, self.admin_user)
+        self.assertEqual(auction.reserve_price, Decimal("315.00"))
+        self.assertEqual(
+            auction.images.count(), settings.MIN_IMAGES_PER_LISTING
+        )
+        self.assertEqual(application.status, AuctionApplication.Status.LISTED)
+        self.assertEqual(application.listed_at is not None, True)
+        self.assertEqual(application.auction_id, auction.pk)
+        self.assertTrue(
+            Notification.objects.filter(
+                idempotency_key=f"application:{application.pk}:listed"
+            ).exists()
+        )
+
+    def test_staff_can_save_a_private_draft_before_publishing(self):
+        application = self.create_application(submit=True)
+        auction = services.create_auction_from_application(
+            application,
+            actor=self.admin_user,
+            publish=False,
+            **self.auction_kwargs(application),
+        )
+        auction.refresh_from_db()
+        application.refresh_from_db()
+        self.assertEqual(auction.moderation_status, Auction.ModerationStatus.DRAFT)
+        self.assertEqual(auction.status, Auction.Status.SCHEDULED)
+        self.assertEqual(application.status, AuctionApplication.Status.IN_REVIEW)
+        self.assertEqual(self.client.get(self.detail_url(auction)).status_code, 404)
+
+    def test_non_staff_cannot_create_an_auction_from_an_application(self):
+        application = self.create_application(submit=True)
+        with self.assertRaises(PermissionDeniedError):
+            services.create_auction_from_application(
+                application,
+                actor=self.seller,
+                **self.auction_kwargs(application),
+            )
+
+    def test_staff_lock_is_staff_only_and_creates_a_confirmation_round(self):
+        auction = self.make_live()
+        bid, _created = self.place(auction, self.bidder_one, "450.00")
+        with self.assertRaises(PermissionDeniedError):
+            services.staff_lock_bid(
+                auction, actor=self.seller, bid_id=bid.pk
+            )
+        selection = services.staff_lock_bid(
+            auction, actor=self.admin_user, bid_id=bid.pk
+        )
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.LOCKED)
+        self.assertEqual(auction.selected_bid_id, bid.pk)
+        self.assertEqual(selection.bidder, self.bidder_one)
+        self.assertEqual(selection.status, AuctionSelection.Status.PENDING)
+
+    def test_admin_queue_and_review_are_available_to_ops_staff(self):
+        application = self.create_application(submit=True)
+        self.client.force_login(self.admin_user)
+
+        queue = self.client.get(reverse("admin:governance_auction_applications"))
+        self.assertEqual(queue.status_code, 200)
+        self.assertContains(queue, application.reference)
+
+        review = self.client.get(
+            reverse(
+                "admin:governance_auction_application_review",
+                args=[application.pk],
+            )
+        )
+        self.assertEqual(review.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.status, AuctionApplication.Status.IN_REVIEW)
+
+    def test_admin_can_open_the_direct_staff_auction_form(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.get(reverse("admin:governance_auction_new"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Create an auction")
+
+    def test_admin_review_history_shows_the_submission_event(self):
+        application = self.create_application(submit=True)
+        self.client.force_login(self.admin_user)
+        response = self.client.get(
+            reverse(
+                "admin:governance_auction_application_review",
+                args=[application.pk],
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Auction application submitted")
+
+    def test_admin_bid_monitor_renders_the_auction_and_bids(self):
+        auction = self.make_live()
+        bid, _created = self.place(auction, self.bidder_one, "450.00")
+        self.client.force_login(self.admin_user)
+        response = self.client.get(
+            reverse("admin:governance_bid_auction", args=[auction.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, auction.title)
+        self.assertContains(response, "Lock bid")
+        self.assertContains(response, f"AED {bid.amount:,.2f}")
+
+    def test_admin_form_publishes_the_application_as_an_auction(self):
+        application = self.create_application(submit=True)
+        self.client.force_login(self.admin_user)
+        form_url = reverse(
+            "admin:governance_auction_application_list", args=[application.pk]
+        )
+        response = self.client.get(form_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Publish and list")
+
+        now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+        response = self.client.post(
+            form_url,
+            {
+                "seller": str(self.seller.pk),
+                "emirate": str(self.emirate.pk),
+                "title": "Staff-reviewed linen sofa",
+                "description": application.description,
+                "category": str(self.category.pk),
+                "condition": Auction.Condition.GOOD,
+                "service_area": str(self.area.pk),
+                "start_at": (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
+                "end_at": (now + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+                "reserve_price": "360.00",
+                "cover_image": str(application.images.first().pk),
+                "action": "publish",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.status, AuctionApplication.Status.LISTED)
+        self.assertIsNotNone(application.auction_id)
+        self.assertEqual(application.auction.reserve_price, Decimal("360.00"))
+        self.assertEqual(
+            application.auction.moderation_status, Auction.ModerationStatus.APPROVED
+        )
+
+    def test_staff_can_publish_their_own_application_after_changing_the_cover(self):
+        self.admin_user.seller_status = User.SellerStatus.VERIFIED
+        self.admin_user.save(update_fields=["seller_status"])
+        application = self.create_application(
+            applicant=self.admin_user, submit=True
+        )
+        new_cover = application.images.order_by("-display_order", "-id").first()
+        self.client.force_login(self.admin_user)
+
+        now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+        response = self.client.post(
+            reverse(
+                "admin:governance_auction_application_list",
+                args=[application.pk],
+            ),
+            {
+                "seller": str(self.admin_user.pk),
+                "emirate": str(self.emirate.pk),
+                "title": "Staff-owned linen sofa",
+                "description": application.description,
+                "category": str(self.category.pk),
+                "condition": Auction.Condition.GOOD,
+                "service_area": str(self.area.pk),
+                "start_at": (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
+                "end_at": (now + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+                "reserve_price": "360.00",
+                "cover_image": str(new_cover.pk),
+                "action": "publish",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.status, AuctionApplication.Status.LISTED)
+        self.assertIsNotNone(application.auction_id)
+        self.assertContains(
+            response, f"Application {application.reference} is now listed"
+        )
+
+    def test_draft_auction_blocks_customer_withdrawal_and_late_rejection(self):
+        application = self.create_application(submit=True)
+        now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+        auction = services.create_auction_from_application(
+            application,
+            actor=self.admin_user,
+            title=application.title,
+            description=application.description,
+            category=self.category,
+            condition=Auction.Condition.GOOD,
+            service_area=self.area,
+            start_at=now + timedelta(hours=1),
+            end_at=now + timedelta(days=3),
+            reserve_price=Decimal("300.00"),
+            publish=False,
+        )
+        application.refresh_from_db()
+        self.assertEqual(application.auction, auction)
+        with self.assertRaises(StateTransitionError):
+            services.withdraw_application(application, actor=self.seller)
+        with self.assertRaises(StateTransitionError):
+            services.reject_application(
+                application, actor=self.admin_user, note="No longer suitable."
+            )
+
+    def test_admin_form_requires_a_reason_for_changes(self):
+        application = self.create_application(submit=True)
+        self.client.force_login(self.admin_user)
+        review_url = reverse(
+            "admin:governance_auction_application_review", args=[application.pk]
+        )
+        response = self.client.post(
+            review_url, {"action": "request_changes", "decision_note": ""}
+        )
+        application.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(application.status, AuctionApplication.Status.SUBMITTED)
 
 
 class BiddingTests(AuctionTestBase):
@@ -794,7 +1215,7 @@ class AuctionImageTests(AuctionTestBase):
 
 
 class AuctionPhotoMinimumTests(AuctionTestBase):
-    """Create/edit views must enforce the minimum photo count like fixed-price listings."""
+    """Application create/edit views enforce the minimum photo count."""
 
     @classmethod
     def setUpClass(cls):
@@ -815,16 +1236,14 @@ class AuctionPhotoMinimumTests(AuctionTestBase):
         return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
     def _data(self, names):
-        now = timezone.localtime(timezone.now())
         return {
             "title": "Photo count sofa",
             "description": "A neat sofa, photographed from every important angle.",
             "category": str(self.category.pk),
             "condition": Auction.Condition.GOOD,
             "service_area": str(self.area.pk),
-            "start_at": (now + timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M"),
-            "end_at": (now + timedelta(days=3)).strftime("%Y-%m-%d %H:%M"),
-            "reserve_price": "100",
+            "proposed_starting_bid": "100",
+            "agree_review": "on",
             "agree_fallback": "on",
             "action": "submit",
             "images": [self._upload(name) for name in names],
@@ -834,7 +1253,7 @@ class AuctionPhotoMinimumTests(AuctionTestBase):
         self.client.force_login(self.seller)
 
         response = self.client.post(
-            self.create_url(),
+            self.apply_url(),
             self._data(["front.png", "side.png"]),
             format="multipart",
         )
@@ -843,45 +1262,42 @@ class AuctionPhotoMinimumTests(AuctionTestBase):
         self.assertContains(
             response, f"at least {settings.MIN_IMAGES_PER_LISTING} photos", status_code=400
         )
-        self.assertFalse(Auction.objects.filter(title="Photo count sofa").exists())
+        self.assertFalse(AuctionApplication.objects.filter(title="Photo count sofa").exists())
 
     def test_create_accepts_exactly_the_minimum_photos(self):
         self.client.force_login(self.seller)
 
         response = self.client.post(
-            self.create_url(),
+            self.apply_url(),
             self._data(["front.png", "side.png", "base.png"]),
             format="multipart",
         )
 
         self.assertEqual(response.status_code, 302)
-        auction = Auction.objects.exclude(title="Leather sofa").get()
-        self.assertEqual(
-            auction.images.count(), settings.MIN_IMAGES_PER_LISTING
-        )
+        application = AuctionApplication.objects.get(title="Photo count sofa")
+        self.assertEqual(application.status, AuctionApplication.Status.SUBMITTED)
+        self.assertEqual(application.images.count(), settings.MIN_IMAGES_PER_LISTING)
+        self.assertFalse(Auction.objects.filter(title="Photo count sofa").exists())
 
     def test_submitting_an_edit_with_too_few_photos_is_blocked(self):
-        # A draft with an old, swallowed-to-one-photo history from before the rule.
-        auction = self.create_auction(
-            start_delta=timedelta(hours=2), submit_for_review=False
+        application = self.create_application(title="Draft sofa")
+        AuctionApplicationImage.objects.create(
+            application=application, image=self._upload("front.png")
         )
-        AuctionImage.objects.create(auction=auction, image=self._upload("front.png"))
         self.client.force_login(self.seller)
 
-        edit_url = reverse(
-            "auction_marketplace:edit",
-            kwargs={"emirate_slug": self.emirate.slug, "pk": auction.pk},
-        )
+        edit_url = reverse("auctions:application_edit", args=[application.pk])
         response = self.client.post(
             edit_url, self._data(["side.png"]), format="multipart"
         )
 
         self.assertEqual(response.status_code, 400)
         self.assertContains(
-            response, "before submitting for review", status_code=400
+            response, "at least 3 photos", status_code=400
         )
-        auction.refresh_from_db()
-        self.assertEqual(auction.images.count(), 1)
+        application.refresh_from_db()
+        self.assertEqual(application.images.count(), 1)
+        self.assertEqual(application.status, AuctionApplication.Status.DRAFT)
 
 
 class AuditCommandTests(AuctionTestBase):

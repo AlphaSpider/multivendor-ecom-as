@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if mode == "edit" %}Edit auction application{% else %}Apply to auction{% endif %} — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.5">
+{% endblock %}
+
+{% block content %}
+<section class="container section narrow">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'auctions:applications' %}">Applications</a>
+    <span aria-hidden="true">/</span>
+    <span>{% if mode == "edit" %}{{ application.reference }}{% else %}New application{% endif %}</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction application</p>
+      <h1>{% if mode == "edit" %}Edit your application{% else %}Apply to auction an item{% endif %}</h1>
+      <p class="muted">
+        Tell us about the piece, add clear photos and suggest a starting bid in
+        {{ emirate.name }}. Our team reviews it and creates the final auction.
+      </p>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="form-alert" role="alert">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <form class="panel form" method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    <div class="field">
+      <label class="field-label" for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+      {{ form.title }}
+      {{ form.title.errors }}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+      {{ form.description }}
+      <p class="muted small">At least 20 characters. Mention dimensions, age and any marks.</p>
+      {{ form.description.errors }}
+    </div>
+
+    <div class="form-grid two">
+      <div class="field">
+        <label class="field-label" for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+        {{ form.category }}
+        {{ form.category.errors }}
+      </div>
+      <div class="field">
+        <label class="field-label" for="{{ form.condition.id_for_label }}">{{ form.condition.label }}</label>
+        {{ form.condition }}
+        {{ form.condition.errors }}
+      </div>
+    </div>
+
+    <div class="form-grid two">
+      <div class="field">
+        <span class="field-label">Emirate</span>
+        <p class="input input-static">{{ emirate.name }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="{{ form.service_area.id_for_label }}">{{ form.service_area.label }}</label>
+        {{ form.service_area }}
+        {{ form.service_area.errors }}
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.proposed_starting_bid.id_for_label }}">{{ form.proposed_starting_bid.label }}</label>
+      {{ form.proposed_starting_bid }}
+      <p class="muted small">{{ form.proposed_starting_bid.help_text }}</p>
+      {{ form.proposed_starting_bid.errors }}
+    </div>
+
+    <div class="form-grid two">
+      <div class="field">
+        <label class="field-label" for="{{ form.preferred_start_at.id_for_label }}">{{ form.preferred_start_at.label }}</label>
+        {{ form.preferred_start_at }}
+        {{ form.preferred_start_at.errors }}
+      </div>
+      <div class="field">
+        <label class="field-label" for="{{ form.preferred_end_at.id_for_label }}">{{ form.preferred_end_at.label }}</label>
+        {{ form.preferred_end_at }}
+        {{ form.preferred_end_at.errors }}
+      </div>
+    </div>
+    <p class="muted small">Preferred dates are optional and only guide our team. We confirm the final schedule.</p>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.images.id_for_label }}">Photos</label>
+      <p class="muted small">{{ form.images.help_text }} You need at least {{ min_images }} to submit.</p>
+      {{ form.images }}
+      {{ form.images.errors }}
+      <div class="image-preview" id="image-preview" aria-live="polite"></div>
+    </div>
+
+    {% if images %}
+      <div class="field">
+        <span class="field-label">Your current photos</span>
+        <p class="muted small">Choose a cover photo, or tick photos to remove when you save.</p>
+        <div class="application-gallery application-gallery-editable">
+          {% for image in images %}
+            <div class="application-gallery-edit">
+              <img src="{{ image.image.url }}" alt="Application photo {{ forloop.counter }}">
+              <label class="check">
+                <input type="radio" name="cover_image" value="{{ image.pk }}" {% if image.is_cover %}checked{% endif %}>
+                Cover
+              </label>
+              <label class="check danger">
+                <input type="checkbox" name="remove_images" value="{{ image.pk }}">
+                Remove
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="field checkbox-stack">
+      <label class="check">{{ form.agree_review }} <span>{{ form.agree_review.label }}</span></label>
+      {{ form.agree_review.errors }}
+      <label class="check">{{ form.agree_fallback }} <span>{{ form.agree_fallback.label }}</span></label>
+      {{ form.agree_fallback.errors }}
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-quiet" type="submit" name="action" value="draft">Save draft</button>
+      <button class="btn btn-primary" type="submit" name="action" value="submit">
+        {% if mode == "edit" %}Save and submit for review{% else %}Submit application{% endif %}
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}

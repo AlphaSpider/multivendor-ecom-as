@@ -59,6 +59,10 @@ class Notification(TimeStampedModel):
         DEAL_CANCELLATION = "deal_cancellation", "Cancellation update"
         OPS_SERVICE_REQUEST = "ops_service_request", "Operations: service request"
         MODERATION = "moderation", "Moderation update"
+        AUCTION_APPLICATION_UPDATE = (
+            "auction_application_update",
+            "Auction application update",
+        )
         ACCOUNT = "account", "Account notice"
 
     class Status(models.TextChoices):

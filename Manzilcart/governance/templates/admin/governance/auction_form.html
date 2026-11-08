@@ -1,0 +1,194 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  {% if application %}
+    &rsaquo; <a href="{% url 'admin:governance_auction_applications' %}">Auction applications</a>
+    &rsaquo; <a href="{% url 'admin:governance_auction_application_review' application.pk %}">{{ application.reference }}</a>
+  {% elif auction %}
+    &rsaquo; <a href="{% url 'admin:auctions_auction_changelist' %}">Auctions</a>
+  {% endif %}
+  &rsaquo; {% if application %}List auction{% elif auction %}Edit auction{% else %}New auction{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">{% if application %}Application {{ application.reference }}{% else %}Staff listing{% endif %}</p>
+    <h1>{% if application %}Create the auction{% elif auction %}Edit {{ auction.reference }}{% else %}Create an auction{% endif %}</h1>
+    <p class="gov-subtitle">
+      {% if application %}
+        Check and adjust the applicant's details. Publishing makes the auction public immediately.
+      {% else %}
+        Create an auction directly for a member. Drafts stay private until published.
+      {% endif %}
+    </p>
+  </div>
+  <div class="gov-page-actions">
+    {% if application %}
+      <a class="button" href="{% url 'admin:governance_auction_application_review' application.pk %}">Back to application</a>
+    {% elif auction %}
+      <a class="button" href="{% url 'admin:moderation_auction_review' auction.pk %}">Back to auction review</a>
+    {% else %}
+      <a class="button" href="{% url 'admin:governance_auction_applications' %}">Back to applications</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+  <div class="gov-form-errors">{{ form.non_field_errors }}</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="gov-auction-form" novalidate>
+  {% csrf_token %}
+  {{ form.seller }}
+  {{ form.emirate }}
+
+  <div class="governance-review">
+    <div>
+      <div class="governance-panel">
+        <h2>Item</h2>
+        {% if not form.seller.is_hidden %}
+          <div class="gov-field">
+            <label for="{{ form.seller.id_for_label }}">Seller</label>
+            {{ form.seller }}{{ form.seller.errors }}
+          </div>
+        {% else %}
+          <p class="gov-static-line">
+            <strong>Seller</strong>
+            {% if application %}{{ application.applicant }} <span class="gov-meta">{{ application.applicant.phone }}</span>
+            {% else %}{{ auction.seller }} <span class="gov-meta">{{ auction.seller.phone }}</span>{% endif %}
+          </p>
+        {% endif %}
+        {% if not form.emirate.is_hidden %}
+          <div class="gov-field">
+            <label for="{{ form.emirate.id_for_label }}">Emirate</label>
+            {{ form.emirate }}{{ form.emirate.errors }}
+          </div>
+        {% else %}
+          <p class="gov-static-line">
+            <strong>Emirate</strong>
+            {% if application %}{{ application.emirate.name }}{% else %}{{ auction.emirate.name }}{% endif %}
+          </p>
+        {% endif %}
+
+        <div class="gov-field">
+          <label for="{{ form.title.id_for_label }}">Title</label>
+          {{ form.title }}{{ form.title.errors }}
+        </div>
+        <div class="gov-field">
+          <label for="{{ form.description.id_for_label }}">Description</label>
+          {{ form.description }}{{ form.description.errors }}
+        </div>
+        <div class="gov-form-grid two">
+          <div class="gov-field">
+            <label for="{{ form.category.id_for_label }}">Category</label>
+            {{ form.category }}{{ form.category.errors }}
+          </div>
+          <div class="gov-field">
+            <label for="{{ form.condition.id_for_label }}">Condition</label>
+            {{ form.condition }}{{ form.condition.errors }}
+          </div>
+        </div>
+        <div class="gov-field">
+          <label for="{{ form.service_area.id_for_label }}">Area</label>
+          {{ form.service_area }}{{ form.service_area.errors }}
+        </div>
+      </div>
+
+      <div class="governance-panel">
+        <h2>Schedule and bid</h2>
+        <div class="gov-form-grid two">
+          <div class="gov-field">
+            <label for="{{ form.start_at.id_for_label }}">Bidding starts</label>
+            {{ form.start_at }}{{ form.start_at.errors }}
+          </div>
+          <div class="gov-field">
+            <label for="{{ form.end_at.id_for_label }}">Bidding ends</label>
+            {{ form.end_at }}{{ form.end_at.errors }}
+          </div>
+        </div>
+        <div class="gov-field">
+          <label for="{{ form.reserve_price.id_for_label }}">Starting / minimum bid (AED)</label>
+          {{ form.reserve_price }}{{ form.reserve_price.errors }}
+          <p class="gov-hint">Applicant proposed AED {{ application.proposed_starting_bid|floatformat:2|default:"—" }}{% if not application %} — set the auction's starting price{% endif %}.</p>
+        </div>
+        {% if application and application.applicant.seller_status == "suspended" %}
+          <div class="gov-warning-box">
+            <p>This applicant is suspended. Publishing requires the explicit override below.</p>
+            <label class="gov-check">{{ form.allow_suspended }} {{ form.allow_suspended.label }}</label>
+            {{ form.allow_suspended.errors }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="governance-panel">
+        <h2>Photos</h2>
+        {% if gallery_images %}
+          <p class="gov-hint">
+            {% if image_source == "auction" %}These photos belong to the auction.{% else %}These photos belong to the application and will be copied to the auction on publish.{% endif %}
+            Choose a cover or tick photos to remove.
+          </p>
+          <div class="gov-photo-edit-grid">
+            {% for image in gallery_images %}
+              <div class="gov-photo-edit">
+                <img src="{{ image.image.url }}" alt="Photo {{ forloop.counter }}">
+                <label class="gov-check"><input type="radio" name="cover_image" value="{{ image.pk }}" {% if image.is_cover %}checked{% endif %}> Cover</label>
+                <label class="gov-check danger"><input type="checkbox" name="remove_images" value="{{ image.pk }}"> Remove</label>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="gov-field">
+          <label for="{{ form.images.id_for_label }}">Add photos</label>
+          {{ form.images }}{{ form.images.errors }}
+          <p class="gov-hint">At least {{ min_images }} photos are required to publish. Maximum {{ max_images }}.</p>
+          <div class="gov-image-preview" id="image-preview"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="governance-panel">
+        <h2>Publish</h2>
+        <p class="gov-hint">
+          Saving a draft creates or keeps the auction private. Publishing approves it,
+          links it to the application, and notifies the applicant.
+        </p>
+        <div class="gov-publish-actions">
+          <button class="button" type="submit" name="action" value="draft">Save draft</button>
+          <button class="button default" type="submit" name="action" value="publish">Publish and list</button>
+        </div>
+      </div>
+
+      {% if application %}
+        <div class="governance-panel">
+          <h2>Applicant</h2>
+          <table class="governance-facts">
+            <tr><th>Name</th><td>{{ application.applicant.display_name|default:"—" }}</td></tr>
+            <tr><th>Phone</th><td>{{ application.applicant.phone }}</td></tr>
+            <tr><th>Status</th><td><span class="governance-pill gov-pill-{{ application.status }}">{{ application.get_status_display }}</span></td></tr>
+            <tr><th>Proposed</th><td>AED {{ application.proposed_starting_bid|floatformat:2 }}</td></tr>
+          </table>
+        </div>
+      {% elif auction %}
+        <div class="governance-panel">
+          <h2>Auction state</h2>
+          <table class="governance-facts">
+            <tr><th>Reference</th><td>{{ auction.reference }}</td></tr>
+            <tr><th>Status</th><td>{{ auction.get_status_display }}</td></tr>
+            <tr><th>Moderation</th><td>{{ auction.get_moderation_status_display }}</td></tr>
+            <tr><th>Bids</th><td>{{ auction.bids.count }}</td></tr>
+          </table>
+          {% if auction.bids.exists %}
+            <p class="gov-warning">Bidding has started; auction content is frozen.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}

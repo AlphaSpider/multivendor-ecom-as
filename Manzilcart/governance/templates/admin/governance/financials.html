@@ -1,6 +1,17 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Deals and trust</p>
+    <h1>Deals &amp; disputes</h1>
+    <p class="gov-subtitle">Agreed value, accepted deals and the cancellation requests that need an operations decision.</p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="{% url 'admin:deals_deal_changelist' %}">All deals</a>
+  </div>
+</div>
+
 <div class="governance-kpi-grid">
   <div class="governance-kpi">
     <div class="governance-kpi-value">AED {{ gmv }}</div>

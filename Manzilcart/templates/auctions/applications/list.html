@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My auction applications — ManzilCart{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.5">
+{% endblock %}
+
+{% block content %}
+<section class="container section">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href="{% url 'accounts:dashboard' %}">My account</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'auctions:mine' %}">My auctions</a>
+    <span aria-hidden="true">/</span>
+    <span>Applications</span>
+  </nav>
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Auction applications</p>
+      <h1>Your auction applications</h1>
+      <p class="muted">Apply with photos and a proposed starting bid. Staff review every request and create the actual auction.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-primary" href="{% url 'auctions:mine' %}">Back to my auctions</a>
+    </div>
+  </div>
+
+  {% if applications %}
+    <div class="deal-list">
+      {% for application in applications %}
+        <article class="panel deal-row auction-mine-row">
+          <div class="deal-thumb">
+            {% with cover=application.cover_image %}
+              {% if cover %}
+                <img src="{{ cover.image.url }}" alt="" loading="lazy">
+              {% else %}
+                <span class="muted small">No photo</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+          <div class="deal-row-body">
+            <div class="deal-row-head">
+              <div>
+                <h2><a href="{% url 'auctions:application_detail' application.pk %}">{{ application.title }}</a></h2>
+                <p class="muted small">{{ application.reference }} · {{ application.category.name }} · {{ application.emirate.name }}</p>
+              </div>
+              <span class="status-pill status-moderation-{{ application.status }}">{{ application.get_status_display }}</span>
+            </div>
+            <p class="deal-row-price">
+              Proposed bid <strong>AED {{ application.proposed_starting_bid|floatformat:0|intcomma }}</strong>
+              <span class="muted small">· {{ application.created_at|date:"j M Y" }}</span>
+            </p>
+            {% if application.applicant_message %}
+              <p class="muted small">{{ application.applicant_message|truncatechars:140 }}</p>
+            {% endif %}
+          </div>
+          <div class="deal-row-actions">
+            {% if application.is_editable_by_applicant %}
+              <a class="btn btn-primary btn-small" href="{% url 'auctions:application_edit' application.pk %}">Edit</a>
+            {% endif %}
+            <a class="btn btn-quiet btn-small" href="{% url 'auctions:application_detail' application.pk %}">Details</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="panel empty-state">
+      <h2>No applications yet</h2>
+      <p class="muted">Start an application from the auctions page in your emirate. You can save a draft and finish it later.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

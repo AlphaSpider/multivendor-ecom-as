@@ -1,64 +1,89 @@
 {% extends "admin/base_site.html" %}
+{% load humanize %}
 
 {% block content %}
-<h2>{{ auction.reference }} — {{ auction.title }}</h2>
-<p>
-  <span class="governance-pill gov-pill-{{ auction.status }}">{{ auction.get_status_display }}</span>
-  <span class="governance-pill gov-pill-{{ auction.moderation_status }}">{{ auction.get_moderation_status_display }}</span>
-  Seller: {{ auction.seller }} · Ends {{ auction.end_at|date:"j M Y H:i" }}
-  {% if flags %} · {% for flag in flags %}<span class="governance-flag">⚠ {{ flag }}</span> {% endfor %}{% endif %}
-  · <a href="{% url 'admin:auctions_auction_change' auction.pk %}">Open item admin</a>
-</p>
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Bid monitor · {{ auction.reference }}</p>
+    <h1>{{ auction.title }}</h1>
+    <p class="gov-subtitle">
+      <span class="governance-pill gov-pill-{{ auction.status }}">{{ auction.get_status_display }}</span>
+      <span class="governance-pill gov-pill-{{ auction.moderation_status }}">{{ auction.get_moderation_status_display }}</span>
+      Seller: {{ auction.seller }} · Ends {{ auction.end_at|date:"j M Y H:i" }}
+    </p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="{% url 'admin:governance_bid_monitor' %}">Back to monitor</a>
+    <a class="button" href="{% url 'admin:governance_auction_edit' auction.pk %}">Edit auction details</a>
+    <a class="button" href="{% url 'admin:auctions_auction_change' auction.pk %}">Raw admin record</a>
+  </div>
+</div>
+
+{% if flags %}
+  <div class="governance-panel gov-warning-box">
+    {% for flag in flags %}<p>⚠ {{ flag }}</p>{% endfor %}
+  </div>
+{% endif %}
 
 <div class="governance-queues">
   <div class="governance-panel">
     <h2>Admin controls</h2>
-    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <form method="post" class="gov-publish-actions">
       {% csrf_token %}
       {% if auction.status == "live" %}
-        <button type="submit" class="button" name="action" value="pause">⏸ Emergency pause</button>
+        <button type="submit" class="button" name="action" value="pause">Pause bidding</button>
       {% endif %}
       {% if auction.status == "paused" %}
-        <button type="submit" class="button default" name="action" value="resume">▶ Resume</button>
+        <button type="submit" class="button default" name="action" value="resume">Resume bidding</button>
       {% endif %}
       {% if auction.status == "live" or auction.status == "paused" %}
-        <label>Extend by
-          <select name="hours" style="width:auto;">
-            <option value="1">1 hour</option>
-            <option value="6">6 hours</option>
-            <option value="24" selected>24 hours</option>
-            <option value="72">3 days</option>
-          </select>
-        </label>
+        <label class="gov-static-line">Extend by</label>
+        <select name="hours" style="width:auto;">
+          <option value="1">1 hour</option>
+          <option value="6">6 hours</option>
+          <option value="24" selected>24 hours</option>
+          <option value="72">3 days</option>
+        </select>
         <button type="submit" class="button" name="action" value="extend">Extend</button>
       {% endif %}
       <input type="hidden" name="reason" value="Cancelled from the bid monitor by staff.">
-      <button type="submit" class="button deletelink" name="action" value="cancel">Cancel auction</button>
+      <button type="submit" class="button deletelink" name="action" value="cancel" onclick="return confirm('Cancel this auction? This ends the auction and notifies participants.');">Cancel auction</button>
     </form>
   </div>
 
   <div class="governance-panel">
     <h2>Bid history (newest first)</h2>
+    <p class="gov-hint">Locking is only possible on the current highest eligible bid. The bidder is then asked to confirm or decline.</p>
     <table class="governance-table">
-      <thead><tr><th>#</th><th>Bidder</th><th>Amount</th><th>Date</th><th>State</th><th>Action</th></tr></thead>
+      <thead><tr><th>#</th><th>Bidder</th><th>Amount</th><th>Date</th><th>State</th><th>Actions</th></tr></thead>
       <tbody>
         {% for bid in bids %}
           <tr {% if bid.voided_at %}style="opacity:.55;text-decoration:line-through;"{% endif %}>
             <td>{{ bid.pk }}</td>
             <td>{{ bid.bidder }}</td>
-            <td>AED {{ bid.amount }}</td>
+            <td>AED {{ bid.amount|intcomma }}</td>
             <td>{{ bid.created_at|date:"j M H:i" }}</td>
             <td>
               {% if bid.voided_at %}<span class="governance-flag">voided {{ bid.voided_at|date:"j M H:i" }}</span>
-              {% elif auction.selected_bid_id == bid.pk %}<span class="governance-pill gov-pill-locked">locked/selected</span>
-              {% else %}<span class="governance-kpi-label">eligible</span>{% endif %}
+              {% elif auction.selected_bid_id == bid.pk %}<span class="governance-pill gov-pill-locked">locked / selected</span>
+              {% else %}<span class="governance-pill gov-pill-approved">eligible</span>{% endif %}
             </td>
             <td>
               {% if not bid.voided_at and auction.selected_bid_id != bid.pk %}
-                <form method="post" style="display:inline;">{% csrf_token %}
-                  <button type="submit" class="button deletelink" name="action" value="void_bid"
-                          onclick="return confirm('Void bid #{{ bid.pk }} of AED {{ bid.amount }}?')">Void</button>
-                </form>
+                <div class="gov-decision-actions" style="margin-top:0">
+                  {% if auction.status == "live" %}
+                    <form method="post" style="display:inline;">{% csrf_token %}
+                      <button type="submit" class="button default" name="action" value="lock_bid"
+                              onclick="return confirm('Lock bid #{{ bid.pk }} of AED {{ bid.amount }} and ask the bidder to confirm?')">Lock bid</button>
+                      <input type="hidden" name="bid_id" value="{{ bid.pk }}">
+                    </form>
+                  {% endif %}
+                  <form method="post" style="display:inline;">{% csrf_token %}
+                    <button type="submit" class="button deletelink" name="action" value="void_bid"
+                            onclick="return confirm('Void bid #{{ bid.pk }} of AED {{ bid.amount }}?')">Void</button>
+                    <input type="hidden" name="bid_id" value="{{ bid.pk }}">
+                  </form>
+                </div>
               {% else %}—{% endif %}
             </td>
           </tr>

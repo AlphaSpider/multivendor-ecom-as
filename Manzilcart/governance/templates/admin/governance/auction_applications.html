@@ -1,0 +1,98 @@
+{% extends "admin/base_site.html" %}
+{% load i18n humanize %}
+
+{% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Auction workflow</p>
+    <h1>Applications</h1>
+    <p class="gov-subtitle">Review member requests, ask for changes, and publish the final auction.</p>
+  </div>
+  <div class="gov-page-actions">
+    {% if perms.auctions.add_auction %}
+      <a class="button default" href="{% url 'admin:governance_auction_new' %}">Create auction directly</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="gov-toolbar">
+  <nav class="gov-tabs" aria-label="Application status">
+    <a class="{% if status == 'queue' %}is-active{% endif %}" href="?status=queue">Needs review <span>{{ counts.queue }}</span></a>
+    <a class="{% if status == 'changes_requested' %}is-active{% endif %}" href="?status=changes_requested">Changes requested <span>{{ counts.changes_requested }}</span></a>
+    <a class="{% if status == 'listed' %}is-active{% endif %}" href="?status=listed">Listed <span>{{ counts.listed }}</span></a>
+    <a class="{% if status == 'rejected' %}is-active{% endif %}" href="?status=rejected">Rejected <span>{{ counts.rejected }}</span></a>
+    <a class="{% if status == 'all' %}is-active{% endif %}" href="?status=all">All</a>
+  </nav>
+  <form class="gov-filter" method="get">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search title, member, phone…">
+    <select name="emirate" onchange="this.form.submit()">
+      <option value="">All emirates</option>
+      {% for emirate in emirates %}
+        <option value="{{ emirate.pk }}" {% if emirate_id == emirate.pk|stringformat:"s" %}selected{% endif %}>{{ emirate.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="button" type="submit">Filter</button>
+  </form>
+</div>
+
+{% if page_obj.object_list %}
+  <div class="gov-card-list">
+    {% for application in page_obj %}
+      <article class="gov-application-card">
+        <div class="gov-application-cover">
+          {% with cover=application.cover_image %}
+            {% if cover %}
+              <img src="{{ cover.image.url }}" alt="{{ application.title }}" loading="lazy">
+            {% else %}
+              <span class="gov-empty-thumb">No photo</span>
+            {% endif %}
+          {% endwith %}
+        </div>
+        <div class="gov-application-main">
+          <div class="gov-row-between">
+            <div>
+              <h2><a href="{% url 'admin:governance_auction_application_review' application.pk %}">{{ application.title }}</a></h2>
+              <p class="gov-meta">
+                {{ application.reference }} · {{ application.category.name }} ·
+                {{ application.service_area.name }}, {{ application.emirate.name }}
+              </p>
+            </div>
+            <span class="governance-pill gov-pill-{{ application.status }}">{{ application.get_status_display }}</span>
+          </div>
+          <div class="gov-application-stats">
+            <span><strong>AED {{ application.proposed_starting_bid|floatformat:0|intcomma }}</strong> proposed bid</span>
+            <span>{{ application.images.count }} photo{{ application.images.count|pluralize }}</span>
+            <span>By {{ application.applicant.display_name|default:application.applicant.phone }}</span>
+            <span>Waiting since {{ application.submitted_at|naturaltime|default:"—" }}</span>
+          </div>
+          {% if application.applicant.seller_status == "suspended" %}
+            <p class="gov-warning">Vendor suspended: listing requires an explicit override.</p>
+          {% endif %}
+        </div>
+        <div class="gov-application-actions">
+          <a class="button default" href="{% url 'admin:governance_auction_application_review' application.pk %}">
+            {% if application.status == "changes_requested" %}View thread{% else %}Review application{% endif %}
+          </a>
+          {% if application.auction %}
+            <a class="button" href="{% url 'admin:governance_auction_edit' application.auction.pk %}">Edit auction</a>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <nav class="gov-pagination" aria-label="Application pages">
+      {% if page_obj.has_previous %}<a class="button" href="?status={{ status }}&page={{ page_obj.previous_page_number }}&q={{ search|urlencode }}">Previous</a>{% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="button" href="?status={{ status }}&page={{ page_obj.next_page_number }}&q={{ search|urlencode }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  <div class="governance-panel gov-empty-state">
+    <h2>Queue clear</h2>
+    <p>There are no applications in this view.</p>
+  </div>
+{% endif %}
+{% endblock %}

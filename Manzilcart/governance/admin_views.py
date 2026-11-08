@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum, TextField, Value
@@ -27,11 +28,26 @@ from django.utils import timezone
 
 from accounts.models import User
 from auctions import services as auction_services
-from auctions.models import Auction, Bid
+from auctions.forms import StaffAuctionForm
+from auctions.models import Auction, AuctionApplication, AuctionApplicationImage, AuctionImage, Bid
 from catalog.models import Listing
+from core.exceptions import DomainError
+from core.images import validate_image_upload
+from core.models import AuditEvent
 from deals.models import Deal, DealCancellation
 from governance import services as governance_services
 from governance.models import ListingChatMessage, ListingChatThread
+from locations.models import Emirate
+
+APPLICATION_QUEUE_STATUSES = (
+    AuctionApplication.Status.SUBMITTED,
+    AuctionApplication.Status.IN_REVIEW,
+)
+
+
+def _require_perm(request, perm: str) -> None:
+    if not request.user.has_perm(perm):
+        raise PermissionDenied("You do not have permission for this action.")
 
 PAGE_SIZE = 30
 
@@ -209,6 +225,9 @@ def dashboard(request):
             "pending_auctions": Auction.objects.filter(
                 moderation_status=Auction.ModerationStatus.PENDING
             ).count(),
+            "pending_applications": AuctionApplication.objects.filter(
+                status__in=APPLICATION_QUEUE_STATUSES
+            ).count(),
             "unread_threads": ListingChatThread.unread_staff_threads(),
             "ending_soon": Auction.objects.filter(
                 status=Auction.Status.LIVE,
@@ -238,6 +257,12 @@ def dashboard(request):
         )
         .select_related("seller", "category", "emirate")
         .order_by("-submitted_at", "-id")[:10],
+        "pending_applications": AuctionApplication.objects.filter(
+            status__in=APPLICATION_QUEUE_STATUSES
+        )
+        .select_related("applicant", "category", "emirate", "service_area")
+        .prefetch_related("images")
+        .order_by("submitted_at", "id")[:10],
         "recent_chats": _recent_chat_rows(),
         "escalated": DealCancellation.objects.filter(
             status__in=[
@@ -256,7 +281,582 @@ def dashboard(request):
 
 
 # ---------------------------------------------------------------------------
-# 2. Centralised moderation inbox
+# 2. Auction application queue and staff listing workflow
+# ---------------------------------------------------------------------------
+
+
+def _application_history(application):
+    return AuditEvent.objects.filter(
+        entity_type="auctions.auctionapplication", entity_id=str(application.pk)
+    ).select_related("actor")[:40]
+
+
+def auction_applications(request):
+    _require_perm(request, "auctions.change_auctionapplication")
+    queryset = AuctionApplication.objects.select_related(
+        "applicant", "emirate", "service_area", "category", "auction", "reviewed_by"
+    ).prefetch_related("images")
+
+    status = (request.GET.get("status") or "queue").strip()
+    if status == "queue":
+        queryset = queryset.filter(
+            status__in=[
+                AuctionApplication.Status.SUBMITTED,
+                AuctionApplication.Status.IN_REVIEW,
+            ]
+        )
+    elif status == "changes_requested":
+        queryset = queryset.filter(
+            status=AuctionApplication.Status.CHANGES_REQUESTED
+        )
+    elif status == "listed":
+        queryset = queryset.filter(status=AuctionApplication.Status.LISTED)
+    elif status == "rejected":
+        queryset = queryset.filter(status=AuctionApplication.Status.REJECTED)
+    elif status != "all":
+        status = "queue"
+        queryset = queryset.filter(
+            status__in=[
+                AuctionApplication.Status.SUBMITTED,
+                AuctionApplication.Status.IN_REVIEW,
+            ]
+        )
+
+    search = (request.GET.get("q") or "").strip()
+    if search:
+        queryset = queryset.filter(
+            Q(title__icontains=search)
+            | Q(applicant__phone__icontains=search.replace(" ", ""))
+            | Q(applicant__display_name__icontains=search)
+            | Q(pk__in=[int(search)] if search.isdigit() else [])
+        )
+    emirate_id = request.GET.get("emirate")
+    if emirate_id and str(emirate_id).isdigit():
+        queryset = queryset.filter(emirate_id=int(emirate_id))
+
+    queryset = queryset.order_by("submitted_at", "id")
+    paginator = Paginator(queryset, PAGE_SIZE)
+    page = paginator.get_page(request.GET.get("page"))
+    counts = {
+        "queue": AuctionApplication.objects.filter(
+            status__in=[
+                AuctionApplication.Status.SUBMITTED,
+                AuctionApplication.Status.IN_REVIEW,
+            ]
+        ).count(),
+        "changes_requested": AuctionApplication.objects.filter(
+            status=AuctionApplication.Status.CHANGES_REQUESTED
+        ).count(),
+        "listed": AuctionApplication.objects.filter(
+            status=AuctionApplication.Status.LISTED
+        ).count(),
+        "rejected": AuctionApplication.objects.filter(
+            status=AuctionApplication.Status.REJECTED
+        ).count(),
+    }
+    return render(
+        request,
+        "admin/governance/auction_applications.html",
+        _each_context(
+            request,
+            title="Auction applications",
+            applications=page,
+            page_obj=page,
+            status=status,
+            counts=counts,
+            search=search,
+            emirates=Emirate.objects.order_by("display_order", "name"),
+            emirate_id=emirate_id or "",
+        ),
+    )
+
+
+def auction_application_review(request, application_id: int):
+    _require_perm(request, "auctions.change_auctionapplication")
+    application = get_object_or_404(
+        AuctionApplication.objects.select_related(
+            "applicant", "emirate", "service_area", "category", "auction", "reviewed_by"
+        ).prefetch_related("images"),
+        pk=application_id,
+    )
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        note = (request.POST.get("decision_note") or "").strip()
+        try:
+            with transaction.atomic():
+                if action == "start_review":
+                    auction_services.start_application_review(
+                        application, actor=request.user, request=request
+                    )
+                    messages.success(request, "Application marked as in review.")
+                elif action == "request_changes":
+                    auction_services.request_application_changes(
+                        application,
+                        actor=request.user,
+                        note=note,
+                        request=request,
+                    )
+                    messages.success(request, "Changes requested from the applicant.")
+                elif action == "reject":
+                    auction_services.reject_application(
+                        application,
+                        actor=request.user,
+                        note=note,
+                        request=request,
+                    )
+                    messages.success(request, "Application rejected.")
+                elif action == "save_notes":
+                    auction_services.save_application_notes(
+                        application,
+                        actor=request.user,
+                        notes=request.POST.get("admin_notes", ""),
+                        request=request,
+                    )
+                    messages.success(request, "Internal notes saved.")
+                else:
+                    raise PermissionDenied("Unknown action.")
+        except (ValidationError, DomainError) as exc:
+            if hasattr(exc, "message_dict"):
+                messages.error(
+                    request,
+                    " ".join(
+                        error
+                        for errors in exc.message_dict.values()
+                        for error in errors
+                    ),
+                )
+            else:
+                messages.error(
+                    request,
+                    getattr(exc, "message", None) or " ".join(exc.messages),
+                )
+        return redirect(
+            "admin:governance_auction_application_review", application_id=application.pk
+        )
+
+    # Opening a submitted application puts it into the explicit in-review state.
+    if application.status == AuctionApplication.Status.SUBMITTED:
+        try:
+            with transaction.atomic():
+                application = auction_services.start_application_review(
+                    application, actor=request.user, request=request
+                )
+        except (ValidationError, DomainError):
+            messages.warning(
+                request, "The application could not be marked as in review."
+            )
+
+    return render(
+        request,
+        "admin/governance/auction_application_review.html",
+        _each_context(
+            request,
+            title=f"Application {application.reference}",
+            application=application,
+            images=application.images.all(),
+            history=_application_history(application),
+            can_list=request.user.has_perm("auctions.add_auction")
+            and application.status
+            in (
+                AuctionApplication.Status.SUBMITTED,
+                AuctionApplication.Status.IN_REVIEW,
+                AuctionApplication.Status.CHANGES_REQUESTED,
+            ),
+        ),
+    )
+
+
+def _application_form_initial(application, auction) -> dict:
+    now = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+    initial = {
+        "start_at": now,
+        "end_at": now + timedelta(days=3),
+    }
+    if auction is not None:
+        initial.update(
+            {
+                "seller": auction.seller_id,
+                "title": auction.title,
+                "description": auction.description,
+                "category": auction.category_id,
+                "condition": auction.condition,
+                "emirate": auction.emirate_id,
+                "service_area": auction.service_area_id,
+                "start_at": timezone.localtime(auction.start_at).replace(
+                    second=0, microsecond=0
+                ),
+                "end_at": timezone.localtime(auction.end_at).replace(
+                    second=0, microsecond=0
+                ),
+                "reserve_price": auction.reserve_price,
+            }
+        )
+    elif application is not None:
+        initial.update(
+            {
+                "seller": application.applicant_id,
+                "title": application.title,
+                "description": application.description,
+                "category": application.category_id,
+                "condition": application.condition,
+                "emirate": application.emirate_id,
+                "service_area": application.service_area_id,
+                "reserve_price": application.proposed_starting_bid,
+            }
+        )
+        if application.preferred_start_at and application.preferred_end_at:
+            initial["start_at"] = timezone.localtime(
+                application.preferred_start_at
+            ).replace(second=0, microsecond=0)
+            initial["end_at"] = timezone.localtime(
+                application.preferred_end_at
+            ).replace(second=0, microsecond=0)
+    return initial
+
+
+def _image_ids_from_post(request) -> list[int]:
+    ids = []
+    for raw in request.POST.getlist("remove_images"):
+        if str(raw).isdigit():
+            ids.append(int(raw))
+    return ids
+
+
+def _apply_staff_image_changes(
+    *, request, auction=None, application=None, uploads=()
+):
+    """Apply cover/remove/upload operations for the relevant image collection."""
+    remove_ids = _image_ids_from_post(request)
+    if auction is not None:
+        if remove_ids:
+            for image in auction.images.filter(pk__in=remove_ids):
+                auction_services.delete_auction_image(
+                    auction, image, actor=request.user
+                )
+        for uploaded in uploads:
+            auction_services.add_auction_image(
+                auction, uploaded, actor=request.user
+            )
+        cover_id = request.POST.get("cover_image", "")
+        if cover_id.isdigit():
+            cover = auction.images.filter(pk=int(cover_id)).first()
+            if cover is not None and not cover.is_cover:
+                auction_services.set_auction_cover(auction, cover, actor=request.user)
+    elif application is not None:
+        if remove_ids:
+            for image in application.images.filter(pk__in=remove_ids):
+                auction_services.delete_application_image(
+                    application, image, actor=request.user
+                )
+        for uploaded in uploads:
+            auction_services.add_application_image(
+                application, uploaded, actor=request.user
+            )
+        cover_id = request.POST.get("cover_image", "")
+        if cover_id.isdigit():
+            cover = application.images.filter(pk=int(cover_id)).first()
+            if cover is not None and not cover.is_cover:
+                auction_services.set_application_cover(
+                    application, cover, actor=request.user
+                )
+
+
+def _count_remaining_images(collection, request) -> int:
+    remove_ids = set(_image_ids_from_post(request))
+    return sum(1 for image in collection if image.pk not in remove_ids)
+
+
+def staff_auction_form(request, application_id=None, auction_id=None):
+    _require_perm(
+        request,
+        "auctions.change_auction" if auction_id is not None else "auctions.add_auction",
+    )
+    application = None
+    auction = None
+    if application_id is not None:
+        application = get_object_or_404(
+            AuctionApplication.objects.select_related(
+                "applicant", "emirate", "service_area", "category", "auction"
+            ).prefetch_related("images"),
+            pk=application_id,
+        )
+        if application.status in (
+            AuctionApplication.Status.REJECTED,
+            AuctionApplication.Status.WITHDRAWN,
+        ):
+            messages.error(request, "This application is closed.")
+            return redirect(
+                "admin:governance_auction_application_review",
+                application_id=application.pk,
+            )
+        if (
+            application.status == AuctionApplication.Status.LISTED
+            and application.auction_id
+        ):
+            return redirect(
+                "admin:governance_auction_edit", auction_id=application.auction_id
+            )
+        auction = application.auction
+    elif auction_id is not None:
+        auction = get_object_or_404(
+            Auction.objects.select_related(
+                "seller", "emirate", "service_area", "category"
+            ).prefetch_related("images"),
+            pk=auction_id,
+        )
+    else:
+        _require_perm(request, "auctions.add_auction")
+
+    fixed_emirate = (
+        application.emirate
+        if application is not None
+        else auction.emirate
+        if auction is not None
+        else None
+    )
+    fixed_seller = (
+        application.applicant
+        if application is not None
+        else auction.seller
+        if auction is not None
+        else None
+    )
+    initial = _application_form_initial(application, auction)
+
+    if request.method == "POST":
+        form = StaffAuctionForm(
+            request.POST,
+            request.FILES,
+            fixed_emirate=fixed_emirate,
+            fixed_seller=fixed_seller,
+        )
+        uploads = request.FILES.getlist("images")
+        image_errors = []
+        for index, uploaded in enumerate(uploads, start=1):
+            try:
+                validate_image_upload(uploaded)
+            except ValidationError as exc:
+                image_errors.append(f"Photo {index}: {' '.join(exc.messages)}")
+        for error in image_errors:
+            form.add_error("images", error)
+
+        action = request.POST.get("action", "publish")
+        publish = action != "draft"
+
+        if form.is_valid() and not image_errors:
+            try:
+                with transaction.atomic():
+                    if application is not None:
+                        if auction is None:
+                            # Manage the application image set first; the publishing
+                            # service copies the final set to the new auction.
+                            _apply_staff_image_changes(
+                                request=request,
+                                application=application,
+                                uploads=uploads,
+                            )
+                            if (
+                                publish
+                                and application.images.count()
+                                < settings.MIN_IMAGES_PER_LISTING
+                            ):
+                                raise ValidationError(
+                                    {
+                                        "images": (
+                                            f"Add at least "
+                                            f"{settings.MIN_IMAGES_PER_LISTING} photos "
+                                            "before publishing."
+                                        )
+                                    }
+                                )
+                            auction = auction_services.create_auction_from_application(
+                                application,
+                                actor=request.user,
+                                title=form.cleaned_data["title"],
+                                description=form.cleaned_data["description"],
+                                category=form.cleaned_data["category"],
+                                condition=form.cleaned_data["condition"],
+                                service_area=form.cleaned_data["service_area"],
+                                start_at=form.cleaned_data["start_at"],
+                                end_at=form.cleaned_data["end_at"],
+                                reserve_price=form.cleaned_data["reserve_price"],
+                                publish=publish,
+                                allow_suspended=form.cleaned_data.get(
+                                    "allow_suspended", False
+                                ),
+                                request=request,
+                            )
+                        else:
+                            _apply_staff_image_changes(
+                                request=request,
+                                auction=auction,
+                                uploads=uploads,
+                            )
+                            if (
+                                publish
+                                and auction.images.count()
+                                < settings.MIN_IMAGES_PER_LISTING
+                            ):
+                                raise ValidationError(
+                                    {
+                                        "images": (
+                                            f"Add at least "
+                                            f"{settings.MIN_IMAGES_PER_LISTING} photos "
+                                            "before publishing."
+                                        )
+                                    }
+                                )
+                            auction = auction_services.create_auction_from_application(
+                                application,
+                                actor=request.user,
+                                title=form.cleaned_data["title"],
+                                description=form.cleaned_data["description"],
+                                category=form.cleaned_data["category"],
+                                condition=form.cleaned_data["condition"],
+                                service_area=form.cleaned_data["service_area"],
+                                start_at=form.cleaned_data["start_at"],
+                                end_at=form.cleaned_data["end_at"],
+                                reserve_price=form.cleaned_data["reserve_price"],
+                                publish=publish,
+                                allow_suspended=form.cleaned_data.get(
+                                    "allow_suspended", False
+                                ),
+                                request=request,
+                            )
+                    elif auction is not None:
+                        _apply_staff_image_changes(
+                            request=request, auction=auction, uploads=uploads
+                        )
+                        if (
+                            publish
+                            and auction.images.count()
+                            < settings.MIN_IMAGES_PER_LISTING
+                        ):
+                            raise ValidationError(
+                                {
+                                    "images": (
+                                        f"Add at least "
+                                        f"{settings.MIN_IMAGES_PER_LISTING} photos "
+                                        "before publishing."
+                                    )
+                                }
+                            )
+                        auction = auction_services.update_auction(
+                            auction,
+                            actor=request.user,
+                            title=form.cleaned_data["title"],
+                            description=form.cleaned_data["description"],
+                            category=form.cleaned_data["category"],
+                            condition=form.cleaned_data["condition"],
+                            service_area=form.cleaned_data["service_area"],
+                            start_at=form.cleaned_data["start_at"],
+                            end_at=form.cleaned_data["end_at"],
+                            reserve_price=form.cleaned_data["reserve_price"],
+                            agree_fallback=True,
+                            staff_publish=True if publish else False,
+                            request=request,
+                        )
+                    else:
+                        if publish and len(uploads) < settings.MIN_IMAGES_PER_LISTING:
+                            raise ValidationError(
+                                {
+                                    "images": (
+                                        f"Add at least "
+                                        f"{settings.MIN_IMAGES_PER_LISTING} photos "
+                                        "before publishing."
+                                    )
+                                }
+                            )
+                        auction = auction_services.create_auction(
+                            seller=form.cleaned_data["seller"],
+                            emirate=form.cleaned_data["emirate"],
+                            title=form.cleaned_data["title"],
+                            description=form.cleaned_data["description"],
+                            category=form.cleaned_data["category"],
+                            condition=form.cleaned_data["condition"],
+                            service_area=form.cleaned_data["service_area"],
+                            start_at=form.cleaned_data["start_at"],
+                            end_at=form.cleaned_data["end_at"],
+                            reserve_price=form.cleaned_data["reserve_price"],
+                            agree_fallback=True,
+                            submit_for_review=False,
+                            approved_by=request.user if publish else None,
+                            request=request,
+                        )
+                        _apply_staff_image_changes(
+                            request=request, auction=auction, uploads=uploads
+                        )
+            except ValidationError as exc:
+                if hasattr(exc, "message_dict"):
+                    for field, errors in exc.message_dict.items():
+                        form.add_error(field if field in form.fields else None, errors)
+                else:
+                    form.add_error(None, " ".join(exc.messages))
+            except DomainError as exc:
+                form.add_error(None, exc.message)
+            else:
+                if publish:
+                    messages.success(
+                        request,
+                        f"{auction.reference} is listed and public."
+                        if application is None
+                        else f"Application {application.reference} is now listed as {auction.reference}.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Draft auction {auction.reference} saved. It is not public yet.",
+                    )
+                if application is not None:
+                    return redirect(
+                        "admin:governance_auction_application_review",
+                        application_id=application.pk,
+                    )
+                return redirect(
+                    "admin:moderation_auction_review", auction_id=auction.pk
+                )
+    else:
+        form = StaffAuctionForm(
+            initial=initial,
+            fixed_emirate=fixed_emirate,
+            fixed_seller=fixed_seller,
+        )
+
+    if auction is not None:
+        image_source = "auction"
+        gallery_images = list(auction.images.all())
+    elif application is not None:
+        image_source = "application"
+        gallery_images = list(application.images.all())
+    else:
+        image_source = ""
+        gallery_images = []
+    return render(
+        request,
+        "admin/governance/auction_form.html",
+        _each_context(
+            request,
+            title=(
+                f"List application {application.reference}"
+                if application is not None
+                else f"Edit {auction.reference}"
+                if auction is not None
+                else "Create auction"
+            ),
+            form=form,
+            application=application,
+            auction=auction,
+            gallery_images=gallery_images,
+            image_source=image_source,
+            min_images=settings.MIN_IMAGES_PER_LISTING,
+            max_images=settings.MAX_IMAGES_PER_LISTING,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 3. Centralised moderation inbox
 # ---------------------------------------------------------------------------
 
 
@@ -373,6 +973,7 @@ def bid_monitor(request):
 
 
 def bid_auction(request, auction_id: int):
+    _require_perm(request, "auctions.change_auction")
     auction = get_object_or_404(
         Auction.objects.select_related("seller", "emirate", "service_area", "category"),
         pk=auction_id,
@@ -389,6 +990,22 @@ def bid_auction(request, auction_id: int):
                         auction, bid, reviewer=request.user, request=request
                     )
                     messages.success(request, f"Bid #{bid.pk} voided.")
+                elif action == "lock_bid":
+                    raw_bid_id = request.POST.get("bid_id", "")
+                    if not str(raw_bid_id).isdigit():
+                        raise ValidationError("Choose a valid bid to lock.")
+                    selection = auction_services.staff_lock_bid(
+                        auction,
+                        actor=request.user,
+                        bid_id=int(raw_bid_id),
+                        request=request,
+                    )
+                    messages.success(
+                        request,
+                        f"Bid of AED {selection.bid.amount} locked. The bidder has "
+                        f"until {timezone.localtime(selection.confirmation_deadline):%d %b %H:%M} "
+                        "to confirm.",
+                    )
                 elif action == "pause":
                     auction_services.pause_auction(auction, actor=request.user, request=request)
                     messages.success(request, "Auction paused.")
@@ -411,8 +1028,10 @@ def bid_auction(request, auction_id: int):
                     messages.success(request, "Auction cancelled.")
                 else:
                     raise PermissionDenied("Unknown action.")
-        except (ValueError, PermissionDenied) as exc:
+        except (ValueError, ValidationError, PermissionDenied) as exc:
             messages.error(request, str(exc))
+        except DomainError as exc:
+            messages.error(request, exc.message)
         except Exception as exc:  # noqa: BLE001 - surfaced to staff like admin actions do
             messages.error(request, f"Could not apply the action: {exc}")
         return redirect("admin:governance_bid_auction", auction_id=auction.pk)

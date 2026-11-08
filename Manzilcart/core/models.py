@@ -74,10 +74,39 @@ class AuditEvent(models.Model):
         AUCTION_SUBMITTED = "auction.submitted", "Auction submitted for review"
         AUCTION_APPROVED = "auction.approved", "Auction approved"
         AUCTION_REJECTED = "auction.rejected", "Auction rejected"
-        AUCTION_BID_LOCKED = "auction.bid_locked", "Bid locked by seller"
+        AUCTION_BID_LOCKED = "auction.bid_locked", "Bid locked"
         AUCTION_AWARDED = "auction.awarded", "Auction awarded"
         AUCTION_UNSOLD = "auction.unsold", "Auction closed unsold"
         AUCTION_CANCELLED = "auction.cancelled", "Auction cancelled"
+        # Auction applications (member request -> staff listing)
+        AUCTION_APPLICATION_SUBMITTED = (
+            "auction_application.submitted",
+            "Auction application submitted",
+        )
+        AUCTION_APPLICATION_REVIEWED = (
+            "auction_application.reviewed",
+            "Auction application opened for review",
+        )
+        AUCTION_APPLICATION_CHANGES_REQUESTED = (
+            "auction_application.changes_requested",
+            "Auction application changes requested",
+        )
+        AUCTION_APPLICATION_REJECTED = (
+            "auction_application.rejected",
+            "Auction application rejected",
+        )
+        AUCTION_APPLICATION_WITHDRAWN = (
+            "auction_application.withdrawn",
+            "Auction application withdrawn",
+        )
+        AUCTION_CREATED_FROM_APPLICATION = (
+            "auction.created_from_application",
+            "Auction created from application",
+        )
+        AUCTION_LISTED_BY_STAFF = (
+            "auction.listed_by_staff",
+            "Auction listed by staff",
+        )
         # Notifications / operations
         NOTIFICATION_FAILED = "notification.failed", "Notification failed"
         NOTIFICATION_RETRIED = "notification.retried", "Notification retried"

@@ -500,6 +500,7 @@ class AuctionAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
         "end_at",
         "top_bid_display",
         "review_link",
+        "staff_edit_link",
         "chat_badge",
     )
     list_filter = (
@@ -710,6 +711,14 @@ class AuctionAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
             return "Save first"
         url = reverse("admin:moderation_auction_review", args=[obj.pk])
         return format_html('<a class="button" href="{}">Open review screen</a>', url)
+
+    @admin.display(description="Edit")
+    def staff_edit_link(self, obj):
+        if obj is None or obj.pk is None:
+            return "—"
+        url = reverse("admin:governance_auction_edit", args=[obj.pk])
+        return format_html('<a class="button" href="{}">Edit details</a>', url)
+
     def has_add_permission(self, request):
         return False
 
@@ -909,6 +918,10 @@ class AuctionAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
             "description": auction.description,
             "reviews": auction.reviews.select_related("reviewer")[:10],
             "changelist_url": reverse("admin:auctions_auction_changelist"),
+            "edit_url": reverse("admin:governance_auction_edit", args=[auction.pk]),
+            "bid_monitor_url": reverse(
+                "admin:governance_bid_auction", args=[auction.pk]
+            ),
             "form": form,
             "opts": self.model._meta,
             "governance_chat": self._chat_context(auction),
@@ -919,7 +932,7 @@ class AuctionAdmin(CustomerChatAdminMixin, admin.ModelAdmin):
     def _auction_facts(auction) -> list[dict]:
         from django.utils import timezone
 
-        top_bidder_stats = auction.bids.filter(voided_at__isnull=False).aggregate(
+        top_bidder_stats = auction.bids.filter(voided_at__isnull=True).aggregate(
             count=Count("id"),
             top=Max("amount"),
         )

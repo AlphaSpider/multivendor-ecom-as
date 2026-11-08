@@ -4,7 +4,7 @@
 {% block title %}Auctions in {{ emirate.name }} — ManzilCart{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.2">
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.5">
 {% endblock %}
 
 {% block content %}
@@ -20,16 +20,16 @@
       <p class="eyebrow"><span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span> <span data-i18n="marketplace_label">marketplace</span></p>
       <h1 data-i18n="furniture_auctions">Furniture auctions</h1>
       <p class="muted">
-        {{ total_active }} <span data-i18n="auctions_active_suffix">auctions open or scheduled. Sellers lock the highest eligible bid; the selected bidder then confirms.</span>
+        {{ total_active }} <span data-i18n="auctions_active_suffix">auctions open or scheduled. The ManzilCart team locks the highest eligible bid; the selected bidder then confirms.</span>
       </p>
     </div>
     <div class="page-actions">
       {% if create_url %}
-        <a class="btn btn-primary btn-lg" href="{{ create_url }}">Create Auction</a>
+        <a class="btn btn-primary btn-lg" href="{{ create_url }}">Apply to auction</a>
       {% elif request.user.is_authenticated %}
-        <a class="btn btn-primary btn-lg" href="{% url 'accounts:dashboard' %}">Create Auction</a>
+        <a class="btn btn-primary btn-lg" href="{% url 'accounts:dashboard' %}">Apply to auction</a>
       {% else %}
-        <a class="btn btn-primary btn-lg" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Sign in to create an auction</a>
+        <a class="btn btn-primary btn-lg" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Sign in to apply</a>
       {% endif %}
     </div>
   </div>
@@ -55,9 +55,9 @@
   {% else %}
     <div class="panel empty-state">
       <h2>No live auctions yet</h2>
-      <p class="muted">Be the first to auction a piece in {{ emirate.name }}.</p>
+      <p class="muted">Be the first to apply to auction a piece in {{ emirate.name }}.</p>
       {% if create_url %}
-        <a class="btn btn-primary" href="{{ create_url }}">Create Auction</a>
+        <a class="btn btn-primary" href="{{ create_url }}">Apply to auction</a>
       {% endif %}
     </div>
   {% endif %}

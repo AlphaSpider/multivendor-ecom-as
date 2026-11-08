@@ -2,7 +2,23 @@
 {% load humanize %}
 
 {% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Operations</p>
+    <h1>Command centre</h1>
+    <p class="gov-subtitle">Review applications, moderate items and keep every auction moving.</p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button default" href="{% url 'admin:governance_auction_applications' %}">Open application queue</a>
+    <a class="button" href="{% url 'admin:governance_bid_monitor' %}">Bid monitor</a>
+  </div>
+</div>
+
 <div class="governance-kpi-grid">
+  <a class="governance-kpi" href="{% url 'admin:governance_auction_applications' %}">
+    <div class="governance-kpi-value">{{ kpis.pending_applications }}</div>
+    <div class="governance-kpi-label">Auction applications to review</div>
+  </a>
   <a class="governance-kpi" href="{% url 'admin:catalog_listing_changelist' %}">
     <div class="governance-kpi-value">{{ kpis.total_listings }}</div>
     <div class="governance-kpi-label">Total fixed-price products</div>
@@ -42,6 +58,35 @@
 </div>
 
 <div class="governance-queues">
+  <div class="governance-panel">
+    <h2>New auction applications</h2>
+    <table class="governance-table">
+      <thead><tr><th></th><th>Application</th><th>Applicant</th><th>Waiting</th><th></th></tr></thead>
+      <tbody>
+        {% for application in pending_applications %}
+          <tr>
+            <td>
+              {% with cover=application.cover_image %}
+                {% if cover %}
+                  <a href="{% url 'admin:governance_auction_application_review' application.pk %}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ application.title }}"></a>
+                {% else %}—{% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              <strong>{{ application.title|truncatechars:44 }}</strong><br>
+              <span class="governance-kpi-label">{{ application.reference }} · AED {{ application.proposed_starting_bid|intcomma }}</span>
+            </td>
+            <td>{{ application.applicant.display_name|default:application.applicant.phone }}</td>
+            <td>{{ application.submitted_at|naturaltime|default:"—" }}</td>
+            <td><a class="button default" href="{% url 'admin:governance_auction_application_review' application.pk %}">Review</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">Queue clear — every application has been reviewed.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <div class="governance-panel">
     <h2>Fixed-price posts waiting for review</h2>
     <table class="governance-table">

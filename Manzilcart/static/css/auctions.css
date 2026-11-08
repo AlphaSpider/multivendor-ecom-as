@@ -1,5 +1,147 @@
 /* Auctions: board cards, bidding panel, confirmation rounds and selection page. */
 
+/* Application review workflow ------------------------------------------------ */
+
+.form-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.input-static {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  background: var(--sand);
+  color: var(--muted);
+}
+
+.checkbox-stack {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  line-height: 1.45;
+}
+
+.check input {
+  margin-top: 0.2rem;
+}
+
+.check.danger {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.application-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.6rem;
+}
+
+.application-gallery-item {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--sand);
+}
+
+.application-gallery-item.is-cover {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.application-gallery-item img,
+.application-gallery-edit img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.application-gallery-editable {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.application-gallery-edit {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.application-gallery-edit img {
+  aspect-ratio: 4 / 3;
+}
+
+.application-gallery-edit .check {
+  padding: 0.3rem 0.5rem;
+}
+
+.application-facts {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.application-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+}
+
+.application-facts span {
+  color: var(--muted);
+}
+
+.status-moderation-submitted,
+.status-moderation-in_review,
+.status-moderation-changes_requested,
+.status-moderation-draft,
+.status-moderation-listed,
+.status-moderation-rejected,
+.status-moderation-withdrawn {
+  background: var(--sand);
+  color: var(--ink-soft);
+}
+
+.status-moderation-listed {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.status-moderation-changes_requested {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+[data-theme="dark"] .status-moderation-changes_requested {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+}
+
+.status-moderation-rejected,
+.status-moderation-withdrawn {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .auction-no-photo {
   display: grid;
   place-items: center;

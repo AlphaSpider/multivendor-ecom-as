@@ -4,7 +4,7 @@
 {% block title %}{{ auction.reference }} — {{ auction.title }} auction — ManzilCart{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.2">
+<link rel="stylesheet" href="{% static 'css/auctions.css' %}?v=1.5">
 {% endblock %}
 
 {% block content %}
@@ -212,7 +212,10 @@
             <a class="btn btn-primary" href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Sign in to bid</a>
             <p class="muted small">Only verified members can bid.</p>
           {% elif is_seller %}
-            <p class="muted small">You cannot bid on your own auction. Lock the highest eligible bid below when you are ready.</p>
+            <p class="muted small">
+              You cannot bid on your own auction. The ManzilCart team locks the
+              highest eligible bid when bidding closes.
+            </p>
           {% elif not user.is_mobile_verified %}
             <a class="btn btn-quiet" href="{% url 'accounts:profile' %}">Verify your mobile number to bid</a>
           {% elif viewer_bid_count >= bid_limit %}
@@ -225,7 +228,7 @@
         {% endif %}
 
         {% if can_lock %}
-          <div class="auction-lock-panel">
+          <div class="auction-lock-panel" hidden>
             <h3>Lock the highest eligible bid</h3>
             <p class="muted small">
               Locking freezes bidding immediately. The bidder is asked to confirm within

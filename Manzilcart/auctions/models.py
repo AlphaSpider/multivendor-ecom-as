@@ -1,9 +1,11 @@
 """
-Auctions: standalone items with seller-controlled bid locking and fallback.
+Auctions: standalone items listed by staff and locked by operations.
 
 An auction is its own marketplace item. It has its own title, description, category,
-condition, location and photos and is never backed by a ``catalog.Listing``. Moderation
-is a separate axis from the lifecycle:
+condition, location and photos and is never backed by a ``catalog.Listing``. Members
+request an auction through an :class:`AuctionApplication`; staff review the photos and
+proposed starting bid, create the auction and manage the lifecycle. Moderation is a
+separate axis from the lifecycle:
 
 * ``moderation_status`` decides whether the item may be seen or acted on at all;
 * ``status`` tracks the bidding lifecycle (scheduled -> live -> locked -> awarded/...).
@@ -12,11 +14,11 @@ Only an ``approved`` auction can be public, receive bids, be opened by the deadl
 worker or have a bid locked. A draft, pending or rejected auction remains visible only
 to its seller and staff.
 
-The seller never gets an automatic winner. They explicitly lock the highest eligible
-bid before the scheduled end. After that the selected bidder confirms or declines
-within a configurable window; declining or timing out offers the auction to the next
-highest eligible bidder (each bidder at most once). When nobody confirms, the auction
-is unsold. Every round is recorded, and the eventual award creates exactly one deal
+There is no automatic winner. Operations lock the highest eligible bid before the
+scheduled end. After that the selected bidder confirms or declines within a
+configurable window; declining or timing out offers the auction to the next highest
+eligible bidder (each bidder at most once). When nobody confirms, the auction is
+unsold. Every round is recorded, and the eventual award creates exactly one deal
 linked to the auction by a unique foreign key.
 
 Bidding ties are resolved by the earliest bid at the tied amount. The bid list is
@@ -262,6 +264,182 @@ class Auction(ModerationGovernanceMixin, TimeStampedModel):
             if image.is_cover:
                 return image
         return images[0] if images else None
+
+
+class AuctionApplication(ModerationGovernanceMixin, TimeStampedModel):
+    """
+    A member's request to auction an item.
+
+    Applications are the only member-facing entry point into auctions. Staff review
+    the request, may ask for changes or reject it, and create the actual
+    :class:`Auction` from the reviewed application. Existing auctions therefore stay
+    valid; an application links to its auction exactly once when staff publish it.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        IN_REVIEW = "in_review", "In review"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+        LISTED = "listed", "Listed as an auction"
+        REJECTED = "rejected", "Not accepted"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    applicant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="auction_applications",
+    )
+    title = models.CharField(max_length=140)
+    description = models.TextField(max_length=4000)
+    category = models.ForeignKey(
+        "catalog.Category",
+        on_delete=models.PROTECT,
+        related_name="auction_applications",
+    )
+    condition = models.CharField(
+        max_length=16, choices=Auction.Condition.choices, db_index=True
+    )
+    emirate = models.ForeignKey(
+        "locations.Emirate",
+        on_delete=models.PROTECT,
+        related_name="auction_applications",
+    )
+    service_area = models.ForeignKey(
+        "locations.ServiceArea",
+        on_delete=models.PROTECT,
+        related_name="auction_applications",
+    )
+    proposed_starting_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("1.00"))],
+        verbose_name="proposed starting / minimum bid",
+    )
+    preferred_start_at = models.DateTimeField(null=True, blank=True)
+    preferred_end_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    applicant_message = models.TextField(
+        blank=True,
+        help_text="Staff message shown to the applicant (changes requested / decision).",
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    listed_at = models.DateTimeField(null=True, blank=True)
+    auction = models.OneToOneField(
+        "auctions.Auction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="application",
+        help_text="Created once when staff publish the application.",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "auction application"
+        verbose_name_plural = "auction applications"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(proposed_starting_bid__gte=Decimal("1.00")),
+                name="auctionapplication_starting_bid_min",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(preferred_start_at__isnull=True, preferred_end_at__isnull=True)
+                    | (
+                        Q(preferred_start_at__isnull=False)
+                        & Q(preferred_end_at__isnull=False)
+                        & Q(preferred_end_at__gt=models.F("preferred_start_at"))
+                    )
+                ),
+                name="auctionapplication_preferred_schedule",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "submitted_at"], name="auctionapp_status_sub_idx"
+            ),
+            models.Index(
+                fields=["applicant", "-created_at"], name="auctionapp_applicant_idx"
+            ),
+            models.Index(
+                fields=["emirate", "status"], name="auctionapp_emirate_status_idx"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.reference} — {self.title}"
+
+    @property
+    def reference(self) -> str:
+        return f"MC-APP-{self.pk:06d}" if self.pk else "MC-APP-new"
+
+    @property
+    def is_editable_by_applicant(self) -> bool:
+        return self.status in {
+            self.Status.DRAFT,
+            self.Status.CHANGES_REQUESTED,
+        }
+
+    @property
+    def cover_image(self):
+        images = list(self.images.all())
+        for image in images:
+            if image.is_cover:
+                return image
+        return images[0] if images else None
+
+
+def auction_application_image_upload_to(
+    instance: "AuctionApplicationImage", filename: str
+) -> str:
+    """Opaque storage path; never trusts the uploader's filename."""
+    extension = "jpg"
+    if "." in filename:
+        extension = filename.rsplit(".", 1)[-1].lower()[:8]
+    return f"auction-applications/{instance.application_id}/{uuid.uuid4().hex}.{extension}"
+
+
+class AuctionApplicationImage(models.Model):
+    application = models.ForeignKey(
+        AuctionApplication, on_delete=models.CASCADE, related_name="images"
+    )
+    image = models.ImageField(
+        upload_to=auction_application_image_upload_to, max_length=255
+    )
+    caption = models.CharField(max_length=140, blank=True)
+    is_cover = models.BooleanField(default=False)
+    display_order = models.PositiveSmallIntegerField(default=0)
+    width = models.PositiveIntegerField(default=0, editable=False)
+    height = models.PositiveIntegerField(default=0, editable=False)
+    byte_size = models.PositiveIntegerField(default=0, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+        verbose_name = "auction application image"
+        verbose_name_plural = "auction application images"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["application"],
+                condition=Q(is_cover=True),
+                name="auctionappimage_one_cover_per_application",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Image for application {self.application_id}"
+
+    @property
+    def aspect_ratio(self) -> float:
+        if not self.height:
+            return 4 / 3
+        return round(self.width / self.height, 4)
 
 
 def auction_image_upload_to(instance: "AuctionImage", filename: str) -> str:

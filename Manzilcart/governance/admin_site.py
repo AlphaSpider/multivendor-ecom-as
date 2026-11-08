@@ -30,8 +30,15 @@ GOVERNANCE_NAV = [
         "url_name": "admin:governance_dashboard",
     },
     {
+        "name": _("Auction applications"),
+        "url_name": "admin:governance_auction_applications",
+        "active_prefixes": ("governance_auction_application", "governance_auction_new"),
+        "badge_key": "applications",
+    },
+    {
         "name": _("Moderation inbox"),
         "url_name": "admin:governance_moderation_inbox",
+        "badge_key": "unread",
     },
     {
         "name": _("Bid monitor"),
@@ -63,6 +70,31 @@ class ManzilcartAdminSite(admin.AdminSite):
 
         governance = [
             path("", self.admin_view(admin_views.dashboard), name="governance_dashboard"),
+            path(
+                "auction-applications/",
+                self.admin_view(admin_views.auction_applications),
+                name="governance_auction_applications",
+            ),
+            path(
+                "auction-applications/<int:application_id>/",
+                self.admin_view(admin_views.auction_application_review),
+                name="governance_auction_application_review",
+            ),
+            path(
+                "auction-applications/<int:application_id>/auction/",
+                self.admin_view(admin_views.staff_auction_form),
+                name="governance_auction_application_list",
+            ),
+            path(
+                "auctions/new/",
+                self.admin_view(admin_views.staff_auction_form),
+                name="governance_auction_new",
+            ),
+            path(
+                "auctions/<int:auction_id>/edit/",
+                self.admin_view(admin_views.staff_auction_form),
+                name="governance_auction_edit",
+            ),
             path(
                 "moderation-inbox/",
                 self.admin_view(admin_views.moderation_inbox),
@@ -106,14 +138,30 @@ class ManzilcartAdminSite(admin.AdminSite):
         from django.urls import reverse_lazy
 
         context = super().each_context(request)
-        context["governance_nav"] = [
-            {**item, "url": reverse_lazy(item["url_name"])} for item in GOVERNANCE_NAV
-        ]
+        resolver = getattr(request, "resolver_match", None)
+        current_name = getattr(resolver, "url_name", "") or ""
+        nav = []
+        for item in GOVERNANCE_NAV:
+            prefixes = item.get("active_prefixes", ())
+            is_active = current_name == item["url_name"].removeprefix("admin:") or any(
+                current_name.startswith(prefix) for prefix in prefixes
+            )
+            nav.append(
+                {
+                    **item,
+                    "url": reverse_lazy(item["url_name"]),
+                    "is_active": is_active,
+                }
+            )
+        context["governance_nav"] = nav
         context["site_header"] = self.site_header
         context["site_title"] = self.site_title
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
             context["governance_unread_threads"] = _unread_threads_cached(request)
+            context["governance_pending_applications"] = (
+                _pending_applications_cached(request)
+            )
         return context
 
     # -- OTP-first authentication --------------------------------------------
@@ -269,6 +317,26 @@ class ManzilcartAdminSite(admin.AdminSite):
     def _is_signed_in(self, request) -> bool:
         user = getattr(request, "user", None)
         return bool(user and user.is_authenticated and user.is_active and user.is_staff)
+
+
+def _pending_applications_cached(request):
+    """Memo the application queue count for the admin navigation badge."""
+    from django.core.cache import cache
+
+    key = "governance:pending_applications"
+    value = cache.get(key)
+    if value is None:
+        from auctions.models import AuctionApplication
+
+        value = AuctionApplication.objects.filter(
+            status__in=[
+                AuctionApplication.Status.SUBMITTED,
+                AuctionApplication.Status.IN_REVIEW,
+            ]
+        ).count()
+        cache.set(key, value, 30)
+    assert request is not None  # keep the signature honest
+    return value
 
 
 def _unread_threads_cached(request):

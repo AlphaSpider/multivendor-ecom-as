@@ -8,6 +8,8 @@ app_name = "auction_marketplace"
 
 urlpatterns = [
     path("", views.AuctionListView.as_view(), name="list"),
+    path("apply/", views.AuctionApplyView.as_view(), name="apply"),
+    # Legacy URL kept as a redirect so bookmarks and old links stay useful.
     path("new/", views.AuctionCreateView.as_view(), name="create"),
     path("<int:pk>/", views.AuctionDetailView.as_view(), name="detail"),
     path("<int:pk>/edit/", views.AuctionUpdateView.as_view(), name="edit"),

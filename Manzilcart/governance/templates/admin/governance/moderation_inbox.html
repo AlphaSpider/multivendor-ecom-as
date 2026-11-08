@@ -9,13 +9,23 @@
 {% load i18n %}
 
 {% block content %}
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-  <a class="button {% if chosen_view == 'attention' %}default{% endif %}" href="?view=attention">Needs attention</a>
-  <a class="button {% if chosen_view == 'needs_reply' %}default{% endif %}" href="?view=needs_reply">Waiting for a reply</a>
-  <a class="button {% if chosen_view == 'open' %}default{% endif %}" href="?view=open">Open</a>
-  <a class="button {% if chosen_view == 'resolved' %}default{% endif %}" href="?view=resolved">Resolved</a>
-  <a class="button {% if chosen_view == 'all' %}default{% endif %}" href="?view=all">All threads</a>
-  <form method="get" style="display:inline;">
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Member support</p>
+    <h1>Moderation inbox</h1>
+    <p class="gov-subtitle">One thread per seller conversation. Reply without leaving the item review screen.</p>
+  </div>
+</div>
+
+<div class="gov-toolbar">
+  <div class="gov-tabs">
+    <a class="{% if chosen_view == 'attention' %}is-active{% endif %}" href="?view=attention">Needs attention</a>
+    <a class="{% if chosen_view == 'needs_reply' %}is-active{% endif %}" href="?view=needs_reply">Waiting for a reply</a>
+    <a class="{% if chosen_view == 'open' %}is-active{% endif %}" href="?view=open">Open</a>
+    <a class="{% if chosen_view == 'resolved' %}is-active{% endif %}" href="?view=resolved">Resolved</a>
+    <a class="{% if chosen_view == 'all' %}is-active{% endif %}" href="?view=all">All threads</a>
+  </div>
+  <form method="get" class="gov-filter">
     {% if chosen_view %}<input type="hidden" name="view" value="{{ chosen_view }}">{% endif %}
     <select name="item_type" onchange="this.form.submit()">
       <option value="">All item types</option>

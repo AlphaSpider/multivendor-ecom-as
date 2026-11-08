@@ -1,13 +1,24 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-<div style="display:flex;gap:8px;margin-bottom:12px;">
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Members and trust</p>
+    <h1>Vendors</h1>
+    <p class="gov-subtitle">Check verification, review selling activity, and freeze accounts that break marketplace rules.</p>
+  </div>
+</div>
+
+<div class="gov-toolbar">
+  <div class="gov-tabs">
   <a class="button {% if not status %}default{% endif %}" href="?">All vendors</a>
   <a class="button {% if status == 'verified' %}default{% endif %}" href="?status=verified">Verified</a>
   <a class="button {% if status == 'pending' %}default{% endif %}" href="?status=pending">Pending</a>
   <a class="button {% if status == 'suspended' %}default{% endif %}" href="?status=suspended">Suspended</a>
+  </div>
 </div>
 
+<div class="governance-panel" style="overflow-x:auto;">
 <table class="governance-table">
   <thead>
     <tr><th>Vendor</th><th>Phone</th><th>Status</th><th>Active listings</th><th>Active auctions</th><th>KYB</th><th>Chats</th><th>Actions</th></tr>
@@ -41,6 +52,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 {% if vendors.paginator.count > 30 %}
   <p>

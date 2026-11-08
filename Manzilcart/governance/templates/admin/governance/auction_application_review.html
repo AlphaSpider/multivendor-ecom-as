@@ -1,0 +1,157 @@
+{% extends "admin/base_site.html" %}
+{% load i18n humanize %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:governance_auction_applications' %}">Auction applications</a>
+  &rsaquo; {{ application.reference }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Auction application · {{ application.reference }}</p>
+    <h1>{{ application.title }}</h1>
+    <p class="gov-subtitle">
+      {{ application.category.name }} · {{ application.service_area.name }}, {{ application.emirate.name }}
+      · <span class="governance-pill gov-pill-{{ application.status }}">{{ application.get_status_display }}</span>
+    </p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="{% url 'admin:governance_auction_applications' %}">Back to queue</a>
+    {% if can_list %}
+      <a class="button default" href="{% url 'admin:governance_auction_application_list' application.pk %}">
+        {% if application.auction %}Open draft auction{% else %}Create auction from application{% endif %}
+      </a>
+    {% endif %}
+    {% if application.auction %}
+      <a class="button" href="{% url 'admin:governance_auction_edit' application.auction.pk %}">Edit auction</a>
+      {% if application.auction.moderation_status == "approved" %}
+        <a class="button" href="{{ application.auction.get_absolute_url }}" target="_blank" rel="noopener">View public page</a>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if application.applicant_message %}
+  <div class="governance-panel gov-message-panel">
+    <h2>Message sent to applicant</h2>
+    <p>{{ application.applicant_message|linebreaksbr }}</p>
+  </div>
+{% endif %}
+
+<div class="governance-review">
+  <div>
+    <div class="governance-panel">
+      <h2>Photos</h2>
+      {% if images %}
+        <div class="gov-photo-grid">
+          {% for image in images %}
+            <a href="{{ image.image.url }}" target="_blank" rel="noopener" class="{% if image.is_cover %}is-cover{% endif %}">
+              <img src="{{ image.image.url }}" alt="{{ application.title }} photo {{ forloop.counter }}">
+              {% if image.is_cover %}<span>Cover</span>{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="governance-empty">No photos uploaded.</p>
+      {% endif %}
+    </div>
+
+    <div class="governance-panel">
+      <h2>Applicant proposal</h2>
+      <table class="governance-facts">
+        <tr><th>Description</th><td class="gov-description">{{ application.description|linebreaksbr }}</td></tr>
+        <tr><th>Condition</th><td>{{ application.get_condition_display }}</td></tr>
+        <tr><th>Proposed starting / minimum bid</th><td><strong>AED {{ application.proposed_starting_bid|floatformat:2|intcomma }}</strong></td></tr>
+        <tr><th>Preferred schedule</th><td>{% if application.preferred_start_at %}{{ application.preferred_start_at|date:"j M Y H:i" }} → {{ application.preferred_end_at|date:"j M Y H:i" }}{% else %}No preference given{% endif %}</td></tr>
+        <tr><th>Submitted</th><td>{{ application.submitted_at|date:"j M Y H:i"|default:"—" }}</td></tr>
+        <tr><th>Last reviewed</th><td>{{ application.reviewed_at|date:"j M Y H:i"|default:"—" }}{% if application.reviewed_by %} · {{ application.reviewed_by }}{% endif %}</td></tr>
+      </table>
+    </div>
+
+    <div class="governance-panel">
+      <h2>Status history</h2>
+      <ol class="governance-timeline">
+        {% for event in history %}
+          <li>
+            <strong>{{ event.get_action_display }}</strong>
+            <div>{{ event.summary|default:"—" }}</div>
+            <small>{{ event.created_at|date:"j M Y H:i" }} · {{ event.actor|default:"System" }}</small>
+          </li>
+        {% empty %}
+          <li class="governance-empty">No audit events yet.</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+
+  <div>
+    <div class="governance-panel">
+      <h2>Applicant</h2>
+      <table class="governance-facts">
+        <tr>
+          <th>Name</th>
+          <td>
+            {% if application.applicant.seller_status == "suspended" %}<span class="governance-pill gov-pill-suspended">Suspended</span> {% endif %}
+            {{ application.applicant.display_name|default:"(no name yet)" }}
+          </td>
+        </tr>
+        <tr><th>Phone</th><td>{{ application.applicant.phone }}</td></tr>
+        <tr><th>Mobile verified</th><td>{% if application.applicant.is_mobile_verified %}Yes{% else %}<span class="gov-warning">No</span>{% endif %}</td></tr>
+        {% if application.applicant.email %}<tr><th>Email</th><td>{{ application.applicant.email }}</td></tr>{% endif %}
+        <tr><th>Member since</th><td>{{ application.applicant.date_joined|date:"M Y" }}</td></tr>
+        <tr><th>Member page</th><td><a class="button" href="{% url 'admin:accounts_user_change' application.applicant.pk %}">Open member</a></td></tr>
+      </table>
+    </div>
+
+    {% if not application.auction and application.status == "submitted" %}
+      <div class="governance-panel">
+        <h2>Review</h2>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="start_review">
+          <button class="button default" type="submit">Mark as in review</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if application.auction and application.status == "in_review" %}
+      <div class="governance-panel">
+        <h2>Draft auction prepared</h2>
+        <p class="gov-hint">A private draft exists. Use “Open draft auction” to adjust the bid, photos and schedule, then publish or keep it as a draft.</p>
+      </div>
+    {% endif %}
+
+    {% if not application.auction and application.status == "submitted" or not application.auction and application.status == "in_review" %}
+      <div class="governance-panel">
+        <h2>Decision</h2>
+        <form method="post" class="gov-decision-form">
+          {% csrf_token %}
+          <label for="decision_note">Reason shown to the applicant</label>
+          <textarea id="decision_note" name="decision_note" rows="5" placeholder="Explain what is needed or why the application cannot be listed."></textarea>
+          <p class="gov-hint">A short reason is required for both actions.</p>
+          <div class="gov-decision-actions">
+            <button class="button" type="submit" name="action" value="request_changes">Request changes</button>
+            <button class="button deletelink" type="submit" name="action" value="reject">Reject application</button>
+          </div>
+        </form>
+      </div>
+    {% endif %}
+
+    <div class="governance-panel">
+      <h2>Internal notes</h2>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_notes">
+        <textarea name="admin_notes" rows="6" placeholder="Only staff can see these notes.">{{ application.admin_notes }}</textarea>
+        <div class="governance-save-row">
+          <button class="button default" type="submit">Save notes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

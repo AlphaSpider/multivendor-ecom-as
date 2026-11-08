@@ -1,6 +1,18 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
+<div class="gov-page-head">
+  <div>
+    <p class="gov-eyebrow">Auction operations</p>
+    <h1>Bid monitor</h1>
+    <p class="gov-subtitle">Watch live activity, pause bidding, extend a deadline, or audit a suspicious run of bids.</p>
+  </div>
+  <div class="gov-page-actions">
+    <a class="button" href="{% url 'admin:governance_auction_applications' %}">Application queue</a>
+    <a class="button" href="{% url 'admin:auctions_auction_changelist' %}">All auctions</a>
+  </div>
+</div>
+
 <div class="governance-queues">
   <div class="governance-panel">
     <h2>Active auctions: bid audit summary</h2>

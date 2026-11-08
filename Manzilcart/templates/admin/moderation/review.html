@@ -111,6 +111,17 @@
       </form>
     </div>
 
+    {% if object_kind == "auction" %}
+      <div class="governance-panel">
+        <h2>{% translate "Auction controls" %}</h2>
+        <p class="gov-hint">Manage the public details, schedule and photos, or open the bid monitor to lock and audit bids.</p>
+        <div class="governance-actions">
+          <a class="button" href="{{ edit_url }}">{% translate "Edit auction details" %}</a>
+          <a class="button" href="{{ bid_monitor_url }}">{% translate "Open bid monitor" %}</a>
+        </div>
+      </div>
+    {% endif %}
+
     <div class="governance-panel">
       <h2>{% translate "Seller" %}</h2>
       <table class="governance-facts">

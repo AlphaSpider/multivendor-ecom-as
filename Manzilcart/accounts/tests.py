@@ -649,7 +649,7 @@ class ProfileAndAccessTests(AccountTestBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("accounts:settings"))
-        self.assertContains(response, "Create auction")
+        self.assertContains(response, "Apply to auction")
         self.assertEqual(response.context["listings_count"], 0)
         self.assertEqual(response.context["deals_count"], 0)
 

@@ -1,32 +1,43 @@
-{# ManzilCart admin chrome: governance navigation on every admin page. #}
+{# ManzilCart admin chrome: storefront brand, operations navigation, light/dark. #}
 {% extends "admin/base.html" %}
 {% load i18n static %}
 
-{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('ManzilCart admin') }}{% endblock %}
 
 {% block extrastyle %}
   {{ block.super }}
-  <link rel="stylesheet" href="{% static "governance/admin.css" %}?v=9">
+  <link rel="stylesheet" href="{% static "governance/admin.css" %}?v=14">
 {% endblock %}
 
 {% block branding %}
-  <h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></h1>
-  <nav class="governance-nav" aria-label="Governance pages">
+  <div class="mc-admin-brand">
+    <a href="{% url 'admin:index' %}" class="mc-admin-logo" aria-label="ManzilCart operations home">
+      <img src="{% static 'images/logo-mark.png' %}" alt="">
+      <span>
+        <strong>ManzilCart</strong>
+        <small>Operations</small>
+      </span>
+    </a>
+  </div>
+  <nav class="governance-nav" aria-label="Operations pages">
     {% for link in governance_nav %}
-      <a href="{{ link.url }}"{% if link.name == 'Moderation inbox' and governance_unread_threads %} class="governance-nav-unread"{% endif %}>
-        {{ link.name }}{% if link.name == 'Moderation inbox' and governance_unread_threads %} <span class="governance-badge-unread">{{ governance_unread_threads }}</span>{% endif %}
+      <a href="{{ link.url }}"{% if link.is_active %} class="is-active" aria-current="page"{% endif %}>
+        {{ link.name }}
+        {% if link.badge_key == "unread" and governance_unread_threads %}
+          <span class="governance-badge-unread">{{ governance_unread_threads }}</span>
+        {% elif link.badge_key == "applications" and governance_pending_applications %}
+          <span class="governance-badge-unread">{{ governance_pending_applications }}</span>
+        {% endif %}
       </a>
     {% endfor %}
   </nav>
 {% endblock %}
 
-{% comment %}
-  Keep the shipped POST logout form and theme toggle (they live inside
-  userlinks); drop only the app-list / documentation noise. Note: the stock
-  "Change password" link hides itself for OTP-only accounts automatically.
-{% endcomment %}
 {% block userlinks %}
-  {% if site_url %}<a href="{{ site_url }}">{% translate 'View site' %}</a> /{% endif %}
+  {% if site_url %}<a href="{{ site_url }}">{% translate 'View site' %}</a>{% endif %}
+  {% if user.is_authenticated %}
+    <span class="mc-admin-user">{{ user.display_name|default:user.phone }}</span>
+  {% endif %}
   <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
     {% csrf_token %}
     <button type="submit">{% translate 'Log out' %}</button>
