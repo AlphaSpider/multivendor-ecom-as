@@ -1131,3 +1131,244 @@
     transform: scaleX(-1);
   }
 }
+
+/* ==========================================================================
+   Minimalistic Mobile Chats View
+   ========================================================================== */
+
+:root {
+  --wa-red-tick: #dc2626;
+}
+
+.wa-screen-container {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.wa-chat-container {
+  width: 100%;
+}
+
+.wa-chat-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+/* Individual Chat Row */
+.wa-chat-row {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem 0;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wa-chat-row:hover,
+.wa-chat-row:active {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+[data-theme="dark"] .wa-chat-row:hover,
+[data-theme="dark"] .wa-chat-row:active {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+/* Avatar */
+.wa-avatar-wrap {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+
+.wa-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.wa-avatar-initial,
+.wa-avatar-support {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--sand);
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+[data-theme="dark"] .wa-avatar-initial,
+[data-theme="dark"] .wa-avatar-support {
+  background: #1c272e;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e9edef;
+}
+
+/* Content Area with inset border */
+.wa-chat-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-inline-start: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.wa-chat-row:last-child .wa-chat-content {
+  border-bottom: none;
+}
+
+/* Line 1: Contact Name and Time */
+.wa-chat-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wa-contact-name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wa-time {
+  font-size: 0.74rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.wa-time.is-unread {
+  color: var(--brand, #dc2626);
+  font-weight: 600;
+}
+
+/* Line 2: Product Name · Message snippet · Unread badge */
+.wa-chat-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wa-snippet {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Red double tick mark */
+.wa-ticks {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #dc2626 !important;
+}
+
+.wa-ticks svg {
+  color: #dc2626 !important;
+  fill: #dc2626 !important;
+}
+
+.wa-msg-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.wa-chat-row.is-unread .wa-msg-text {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.wa-no-msg {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* Unread Badge */
+.wa-unread-badge {
+  flex-shrink: 0;
+  background: var(--brand, #dc2626);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  line-height: 1;
+}
+
+/* Minimal empty state */
+.wa-empty-state {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--muted);
+}
+
+.wa-empty-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.4rem;
+}
+
+.wa-empty-desc {
+  font-size: 0.88rem;
+  max-width: 300px;
+  margin: 0 auto 1.25rem;
+  line-height: 1.45;
+}
+
+.wa-btn-browse {
+  border-radius: var(--radius);
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+/* Mobile full bleed */
+@media (max-width: 760px) {
+  body.messages-page {
+    background: var(--surface);
+  }
+
+  body.messages-page #main {
+    padding: 0;
+  }
+
+  .wa-screen-container {
+    max-width: 100%;
+    padding-bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+  }
+}
+

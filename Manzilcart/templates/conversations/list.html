@@ -2,73 +2,84 @@
 {% load static humanize %}
 
 {% block title %}Messages — ManzilCart{% endblock %}
+{% block body_class %}messages-page{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/conversations.css' %}">
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}?v=2.2">
 {% endblock %}
 
 {% block content %}
-<section class="container section">
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow" data-i18n="your_account">Your account</p>
-      <h1 data-i18n="messages_title">Messages</h1>
-      <p class="muted" data-i18n="messages_desc">Conversations with buyers, sellers and the marketplace team, newest first.</p>
-    </div>
-  </div>
-
-  {% if inbox %}
-    <ul class="conversation-list">
-      {% for entry in inbox %}
-        <li class="panel conversation-row{% if entry.kind == 'support' %} conversation-row-support{% endif %}">
-          <div class="conversation-thumb">
-            {% if entry.thumb_url %}
-              <img src="{{ entry.thumb_url }}" alt="" loading="lazy">
-            {% else %}
-              <span class="muted small" data-i18n="no_photo">No photo</span>
-            {% endif %}
-          </div>
-
-          <div class="conversation-body">
-            <div class="conversation-head">
-              <a href="{{ entry.url }}">
-                {{ entry.title }}
-              </a>
-              {% if entry.unread %}
-                <span class="badge">{{ entry.unread }} <span data-i18n="new_badge">new</span></span>
+<div class="wa-screen-container">
+  <main class="wa-chat-container">
+    {% if inbox %}
+      <div class="wa-chat-list">
+        {% for entry in inbox %}
+          <a href="{{ entry.url }}" class="wa-chat-row{% if entry.unread %} is-unread{% endif %}{% if entry.kind == 'support' %} is-support{% endif %}">
+            
+            <!-- Circular Avatar -->
+            <div class="wa-avatar-wrap">
+              {% if entry.thumb_url %}
+                <img src="{{ entry.thumb_url }}" alt="" class="wa-avatar" loading="lazy">
+              {% elif entry.kind == 'support' %}
+                <div class="wa-avatar wa-avatar-support" aria-hidden="true">
+                  <span>M</span>
+                </div>
+              {% else %}
+                <div class="wa-avatar wa-avatar-initial" aria-hidden="true">
+                  <span>{{ entry.with_label|slice:":1"|upper }}</span>
+                </div>
               {% endif %}
             </div>
-            <p class="muted small">
-              {% if entry.kind == 'support' %}
-                <strong data-i18n="marketplace_team">Marketplace team</strong> · {{ entry.status_label }}
-              {% else %}
-                <span data-i18n="with_prefix">With</span> {{ entry.with_label }}
-                {% if entry.area_name %}· <span data-area-name="{{ entry.area_name }}">{{ entry.area_name }}</span>, <span data-emirate-name="{{ entry.emirate_name }}">{{ entry.emirate_name }}</span>{% endif %}
-              {% endif %}
-            </p>
-            <p class="muted small">
-              {% if entry.last_message_at %}
-                <span data-i18n="last_message_prefix">Last message</span> {{ entry.last_message_at|naturaltime }}
-              {% else %}
-                <span data-i18n="no_messages_yet">No messages yet</span>
-              {% endif %}
-            </p>
-          </div>
 
-          <div class="conversation-actions">
-            <a class="btn btn-quiet btn-small" href="{{ entry.url }}">Open</a>
-          </div>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <div class="empty-state">
-      <h3>No conversations yet</h3>
-      <p>When you message a seller — or a buyer messages you — the thread appears here.</p>
-      {% if current_emirate %}
-        <a class="btn btn-primary" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}">Browse furniture</a>
-      {% endif %}
-    </div>
-  {% endif %}
-</section>
+            <!-- Content Area -->
+            <div class="wa-chat-content">
+              <div class="wa-chat-top">
+                <span class="wa-contact-name">
+                  {% if entry.kind == 'support' %}
+                    Marketplace Support
+                  {% else %}
+                    {{ entry.with_label }}
+                  {% endif %}
+                </span>
+                <span class="wa-time{% if entry.unread %} is-unread{% endif %}">
+                  {{ entry.time_display|default:entry.last_message_at|naturaltime }}
+                </span>
+              </div>
+
+              <div class="wa-chat-bottom">
+                <p class="wa-snippet">
+                  {% if entry.last_message_body %}
+                    {% if entry.last_message_is_mine %}
+                      <span class="wa-ticks" title="Sent by you" aria-hidden="true">
+                        <svg viewBox="0 0 16 15" width="14" height="13" fill="currentColor">
+                          <path d="M15.01 3.316l-7.39 7.391a.5.5 0 01-.707 0L3.486 7.28a.5.5 0 010-.707l.707-.707a.5.5 0 01.707 0l2.673 2.673 6.73-6.73a.5.5 0 01.707 0l.707.707a.5.5 0 010 .707z"/>
+                          <path d="M11.97 3.316l-7.39 7.391a.5.5 0 01-.707 0L.446 7.28a.5.5 0 010-.707l.707-.707a.5.5 0 01.707 0l2.673 2.673 6.73-6.73a.5.5 0 01.707 0l.707.707a.5.5 0 010 .707z"/>
+                        </svg>
+                      </span>
+                    {% endif %}
+                    <span class="wa-msg-text">{{ entry.last_message_body }}</span>
+                  {% else %}
+                    <span class="wa-no-msg">No messages yet</span>
+                  {% endif %}
+                </p>
+
+                {% if entry.unread %}
+                  <span class="wa-unread-badge">{{ entry.unread }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="wa-empty-state">
+        <p class="wa-empty-title">No messages</p>
+        <p class="wa-empty-desc">When you message a seller or buyer, your conversations appear here.</p>
+        {% if current_emirate %}
+          <a class="btn btn-primary wa-btn-browse" href="{% url 'catalog:listing_list' emirate_slug=current_emirate.slug %}">Browse furniture</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </main>
+</div>
 {% endblock %}

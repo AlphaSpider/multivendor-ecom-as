@@ -26,6 +26,7 @@ from catalog.models import Listing
 from auctions.models import Auction
 from auctions import services as auction_services
 from conversations import services
+from conversations.models import Message
 from conversations.selectors import (
     conversation_for_participant,
     conversations_for,
@@ -46,14 +47,40 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
         Everything is pre-normalised so one template loop renders both kinds.
         """
         entries: list[dict] = []
+        now = timezone.now()
 
-        for conversation in conversations_for(user):
+        def _format_wa_time(dt) -> str:
+            if not dt:
+                return ""
+            local_dt = timezone.localtime(dt)
+            local_now = timezone.localtime(now)
+            days_diff = (local_now.date() - local_dt.date()).days
+            if days_diff == 0:
+                return local_dt.strftime("%I:%M %p").lstrip("0")
+            elif days_diff == 1:
+                return "Yesterday"
+            elif 1 < days_diff < 7:
+                return local_dt.strftime("%a")
+            else:
+                return local_dt.strftime("%d/%m/%y")
+
+        conv_list = list(conversations_for(user))
+        latest_msgs = {}
+        if conv_list:
+            for msg in Message.objects.filter(conversation__in=conv_list).order_by("created_at", "id"):
+                latest_msgs[msg.conversation_id] = msg
+
+        for conversation in conv_list:
             other = (
                 conversation.seller
                 if conversation.buyer_id == user.pk
                 else conversation.buyer
             )
             cover = conversation.cover_image
+            last_msg = latest_msgs.get(conversation.pk)
+            last_body = last_msg.body if last_msg else ""
+            is_mine = (last_msg.sender_id == user.pk) if last_msg else False
+
             entries.append(
                 {
                     "kind": "conversation",
@@ -67,6 +94,9 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
                     "emirate_name": conversation.emirate.name if conversation.emirate else "",
                     "unread": conversation.unread_count,
                     "last_message_at": conversation.last_message_at,
+                    "time_display": _format_wa_time(conversation.last_message_at),
+                    "last_message_body": last_body,
+                    "last_message_is_mine": is_mine,
                     "sort_at": conversation.last_message_at,
                     "sort_id": conversation.pk,
                 }
@@ -83,9 +113,13 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
                     "url": row["url"],
                     "title": row["title"],
                     "thumb_url": row["cover_url"],
+                    "with_label": "Marketplace Support",
                     "status_label": row["status_label"],
                     "unread": row["unread"],
                     "last_message_at": row["last_message_at"],
+                    "time_display": _format_wa_time(row["last_message_at"]),
+                    "last_message_body": row.get("last_message_body", ""),
+                    "last_message_is_mine": row.get("last_message_is_mine", False),
                     "sort_at": row["last_message_at"],
                     "sort_id": row["pk"],
                 }
@@ -99,7 +133,9 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["inbox"] = self._inbox_for(self.request.user)
+        inbox = self._inbox_for(self.request.user)
+        context["inbox"] = inbox
+        context["total_unread"] = sum(e.get("unread", 0) for e in inbox)
         return context
 
 

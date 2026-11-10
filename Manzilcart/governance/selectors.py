@@ -95,6 +95,7 @@ def support_rows_for(user) -> list[dict]:
                 "unread": thread.unread_count,
                 "has_messages": last is not None,
                 "last_message_at": last.created_at if last else thread.last_message_at,
+                "last_message_body": last.message if last else "",
                 "last_message_is_mine": is_from_customer,
             }
         )

@@ -139,7 +139,7 @@
 
   {% if current_emirate and request.resolver_match.namespace != 'locations' %}
     {% with ns=request.resolver_match.namespace un=request.resolver_match.url_name %}
-      {% if un != 'listing_create' %}
+      {% if ns == 'marketplace' and un == 'home' %}
         <a class="mobile-fab" href="{% url 'catalog:listing_create' emirate_slug=current_emirate.slug %}" aria-label="Sell an item" title="Sell an item">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
             <path d="M12 5v14"></path>
