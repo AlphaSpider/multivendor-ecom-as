@@ -1,6 +1,8 @@
 {% extends "admin/base_site.html" %}
 {% load humanize %}
 
+{% block bodyclass %}governance-dashboard-page{% endblock %}
+
 {% block content %}
 <div class="gov-page-head">
   <div>
@@ -65,27 +67,26 @@
   <div class="governance-panel">
     <h2>New auction applications</h2>
     <table class="governance-table">
-      <thead><tr><th></th><th>Application</th><th>Applicant</th><th>Waiting</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Application</th><th></th></tr></thead>
       <tbody>
         {% for application in pending_applications %}
           <tr>
-            <td>
+            <td class="gov-cell-thumb">
               {% with cover=application.cover_image %}
                 {% if cover %}
                   <a href="{% url 'admin:governance_auction_application_review' application.pk %}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ application.title }}"></a>
                 {% else %}—{% endif %}
               {% endwith %}
             </td>
-            <td>
+            <td class="gov-cell-primary">
               <strong>{{ application.title|truncatechars:44 }}</strong><br>
-              <span class="governance-kpi-label">{{ application.reference }} · AED {{ application.proposed_starting_bid|intcomma }}</span>
+              <span class="governance-kpi-label">{{ application.reference }} · AED {{ application.proposed_starting_bid|intcomma }}</span><br>
+              <span class="governance-kpi-label">{{ application.applicant.display_name|default:application.applicant.phone }} · waiting {{ application.submitted_at|naturaltime|default:"—" }}</span>
             </td>
-            <td>{{ application.applicant.display_name|default:application.applicant.phone }}</td>
-            <td>{{ application.submitted_at|naturaltime|default:"—" }}</td>
-            <td><a class="button default" href="{% url 'admin:governance_auction_application_review' application.pk %}">Review</a></td>
+            <td class="gov-cell-action"><a class="button default" href="{% url 'admin:governance_auction_application_review' application.pk %}">Review</a></td>
           </tr>
         {% empty %}
-          <tr><td colspan="5">Queue clear — every application has been reviewed.</td></tr>
+          <tr><td colspan="3">Queue clear — every application has been reviewed.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -94,20 +95,22 @@
   <div class="governance-panel">
     <h2>Fixed-price posts waiting for review</h2>
     <table class="governance-table">
-      <thead><tr><th></th><th>Item</th><th>Seller</th><th>Waiting since</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Item</th><th></th></tr></thead>
       <tbody>
         {% for listing in pending_listings %}
           {% with imgs=listing.images.all %}
           <tr>
-            <td>{% if imgs %}<a href="{% url 'admin:moderation_review' listing.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ listing.title }}"></a>{% else %}—{% endif %}</td>
-            <td><strong>{{ listing.title }}</strong><br><span class="governance-kpi-label">{{ listing.category.name }} · AED {{ listing.asking_price }}</span></td>
-            <td>{{ listing.seller }}</td>
-            <td>{{ listing.submitted_at|naturaltime|default:"—" }}</td>
-            <td><a class="button" href="{% url 'admin:moderation_review' listing.pk %}">Review</a></td>
+            <td class="gov-cell-thumb">{% if imgs %}<a href="{% url 'admin:moderation_review' listing.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ listing.title }}"></a>{% else %}—{% endif %}</td>
+            <td class="gov-cell-primary">
+              <strong>{{ listing.title }}</strong><br>
+              <span class="governance-kpi-label">{{ listing.category.name }} · AED {{ listing.asking_price }}</span><br>
+              <span class="governance-kpi-label">Seller {{ listing.seller }} · waiting {{ listing.submitted_at|naturaltime|default:"—" }}</span>
+            </td>
+            <td class="gov-cell-action"><a class="button" href="{% url 'admin:moderation_review' listing.pk %}">Review</a></td>
           </tr>
           {% endwith %}
         {% empty %}
-          <tr><td colspan="5">Queue clear — every post has been reviewed.</td></tr>
+          <tr><td colspan="3">Queue clear — every post has been reviewed.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -116,19 +119,21 @@
   <div class="governance-panel">
     <h2>Auctions waiting for review</h2>
     <table class="governance-table">
-      <thead><tr><th></th><th>Auction</th><th>Seller</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Auction</th><th></th></tr></thead>
       <tbody>
         {% for auction in pending_auctions %}
           {% with imgs=auction.images.all %}
           <tr>
-            <td>{% if imgs %}<a href="{% url 'admin:moderation_auction_review' auction.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ auction.title }}"></a>{% else %}—{% endif %}</td>
-            <td><strong>{{ auction.title }}</strong><br><span class="governance-kpi-label">{{ auction.reference }}</span></td>
-            <td>{{ auction.seller }}</td>
-            <td><a class="button" href="{% url 'admin:moderation_auction_review' auction.pk %}">Review</a></td>
+            <td class="gov-cell-thumb">{% if imgs %}<a href="{% url 'admin:moderation_auction_review' auction.pk %}"><img class="gov-thumb" src="{{ imgs.0.image.url }}" alt="{{ auction.title }}"></a>{% else %}—{% endif %}</td>
+            <td class="gov-cell-primary">
+              <strong>{{ auction.title }}</strong><br>
+              <span class="governance-kpi-label">{{ auction.reference }} · Seller {{ auction.seller }}</span>
+            </td>
+            <td class="gov-cell-action"><a class="button" href="{% url 'admin:moderation_auction_review' auction.pk %}">Review</a></td>
           </tr>
           {% endwith %}
         {% empty %}
-          <tr><td colspan="4">Queue clear — every auction has been reviewed.</td></tr>
+          <tr><td colspan="3">Queue clear — every auction has been reviewed.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -137,21 +142,21 @@
   <div class="governance-panel">
     <h2>Messages waiting on staff</h2>
     <table class="governance-table">
-      <thead><tr><th></th><th>Item</th><th>Customer</th><th>Last message</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Item</th><th></th></tr></thead>
       <tbody>
         {% for thread in recent_chats %}
           <tr>
-            <td>{% if thread.item_cover_url %}<a href="{{ thread.item_admin_url }}"><img class="gov-thumb" src="{{ thread.item_cover_url }}" alt="{{ thread.item_title }}"></a>{% else %}—{% endif %}</td>
-            <td>
+            <td class="gov-cell-thumb">{% if thread.item_cover_url %}<a href="{{ thread.item_admin_url }}"><img class="gov-thumb" src="{{ thread.item_cover_url }}" alt="{{ thread.item_title }}"></a>{% else %}—{% endif %}</td>
+            <td class="gov-cell-primary">
               <strong>{{ thread.item_title|truncatechars:40 }}</strong>
-              <span class="governance-pill gov-pill-{{ thread.content_type.model }}">{{ thread.content_type.model }}</span>
+              <span class="governance-pill gov-pill-{{ thread.content_type.model }}">{{ thread.content_type.model }}</span><br>
+              <span class="governance-kpi-label">Customer {{ thread.customer }}</span><br>
+              <span class="governance-kpi-label">“{{ thread.last_message|truncatechars:80|default:"—" }}”</span>
             </td>
-            <td>{{ thread.customer }}</td>
-            <td class="governance-flag">{{ thread.last_message|truncatechars:80|default:"—" }}</td>
-            <td><a class="button" href="{{ thread.item_admin_url }}">Reply</a></td>
+            <td class="gov-cell-action"><a class="button" href="{{ thread.item_admin_url }}">Reply</a></td>
           </tr>
         {% empty %}
-          <tr><td colspan="5">No customer is waiting for a reply.</td></tr>
+          <tr><td colspan="3">No customer is waiting for a reply.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -160,17 +165,19 @@
   <div class="governance-panel">
     <h2>Open deal disputes</h2>
     <table class="governance-table">
-      <thead><tr><th>Deal</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Deal</th><th></th></tr></thead>
       <tbody>
         {% for cancellation in escalated %}
           <tr>
-            <td>{{ cancellation.deal.reference }}</td>
-            <td>{{ cancellation.reason|truncatechars:70 }}</td>
-            <td><span class="governance-pill gov-pill-{{ cancellation.status }}">{{ cancellation.get_status_display }}</span></td>
-            <td><a class="button" href="{% url 'admin:governance_financials' %}#disputes">Resolve</a></td>
+            <td class="gov-cell-primary" data-label="Deal">
+              <strong>{{ cancellation.deal.reference }}</strong><br>
+              <span class="governance-pill gov-pill-{{ cancellation.status }}">{{ cancellation.get_status_display }}</span><br>
+              <span class="governance-kpi-label">{{ cancellation.reason|truncatechars:70 }}</span>
+            </td>
+            <td class="gov-cell-action"><a class="button" href="{% url 'admin:governance_financials' %}#disputes">Resolve</a></td>
           </tr>
         {% empty %}
-          <tr><td colspan="4">No open disputes.</td></tr>
+          <tr><td colspan="2">No open disputes.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -180,24 +187,24 @@
 <div class="governance-panel governance-delivery-panel">
   <h2>Delivery requests needing coordination</h2>
   <table class="governance-table">
-    <thead><tr><th></th><th>Product</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th></th><th>Product</th><th class="gov-cell-status">Status</th><th></th></tr></thead>
     <tbody>
       {% for delivery in delivery_requests %}
         <tr>
-          <td>
+          <td class="gov-cell-thumb">
             {% with cover=delivery.listing.cover_image %}
               {% if cover %}
                 <a href="{{ delivery.item_url }}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ delivery.listing.title }}"></a>
               {% else %}—{% endif %}
             {% endwith %}
           </td>
-          <td>
+          <td class="gov-cell-primary">
             <strong><a href="{{ delivery.item_url }}">{{ delivery.listing.title|truncatechars:44 }}</a></strong><br>
             <span class="governance-kpi-label">{{ delivery.item_reference }} · {{ delivery.listing.emirate.name }} · {{ delivery.created_at|naturaltime }}</span><br>
             <span class="governance-kpi-label">Buyer {{ delivery.buyer.display_name|default:delivery.buyer.phone }} · Seller {{ delivery.seller.display_name|default:delivery.seller.phone }}</span>
           </td>
-          <td><span class="governance-pill gov-pill-{{ delivery.status }}">{{ delivery.get_status_display }}</span></td>
-          <td><a class="button" href="{% url 'admin:governance_delivery_requests' %}?status=active#delivery-{{ delivery.pk }}">Manage</a></td>
+          <td class="gov-cell-status" data-label="Status"><span class="governance-pill gov-pill-{{ delivery.status }}">{{ delivery.get_status_display }}</span></td>
+          <td class="gov-cell-action"><a class="button" href="{% url 'admin:governance_delivery_requests' %}?status=active#delivery-{{ delivery.pk }}">Manage</a></td>
         </tr>
       {% empty %}
         <tr><td colspan="4">No delivery requests need coordination.</td></tr>
@@ -209,28 +216,27 @@
 <div class="governance-panel">
   <h2>Top 10 wishlisted products</h2>
   <table class="governance-table">
-    <thead><tr><th></th><th>Product</th><th>Category</th><th>Status</th><th>Wishlist saves</th><th></th></tr></thead>
+    <thead><tr><th></th><th>Product</th><th class="gov-cell-count">Wishlist saves</th><th></th></tr></thead>
     <tbody>
       {% for listing in top_wishlisted %}
         <tr>
-          <td>
+          <td class="gov-cell-thumb">
             {% with cover=listing.cover_image %}
               {% if cover %}
                 <a href="{% url 'admin:catalog_listing_change' listing.pk %}"><img class="gov-thumb" src="{{ cover.image.url }}" alt="{{ listing.title }}"></a>
               {% else %}—{% endif %}
             {% endwith %}
           </td>
-          <td>
+          <td class="gov-cell-primary">
             <strong>{{ listing.title|truncatechars:48 }}</strong><br>
-            <span class="governance-kpi-label">{{ listing.emirate.name }} · AED {{ listing.asking_price|intcomma }}</span>
+            <span class="governance-kpi-label">{{ listing.category.name }} · {{ listing.emirate.name }} · AED {{ listing.asking_price|intcomma }}</span><br>
+            <span class="governance-pill gov-pill-{{ listing.status }}">{{ listing.get_status_display }}</span>
           </td>
-          <td>{{ listing.category.name }}</td>
-          <td><span class="governance-pill gov-pill-{{ listing.status }}">{{ listing.get_status_display }}</span></td>
-          <td><strong>{{ listing.wishlist_total }}</strong></td>
-          <td><a class="button" href="{% url 'admin:catalog_listing_change' listing.pk %}">Open</a></td>
+          <td class="gov-cell-count" data-label="Wishlist saves"><strong>{{ listing.wishlist_total }}</strong></td>
+          <td class="gov-cell-action"><a class="button" href="{% url 'admin:catalog_listing_change' listing.pk %}">Open</a></td>
         </tr>
       {% empty %}
-        <tr><td colspan="6">No products have been wishlisted yet.</td></tr>
+        <tr><td colspan="4">No products have been wishlisted yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

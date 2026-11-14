@@ -1,4 +1,4 @@
-{# Sticky "Customer chat about this post" panel for the item change form. #}
+{# "Customer chat about this post" panel for the item change form. #}
 {% load i18n %}
 <div class="governance-chat-panel"
      id="governance-chat"
@@ -36,13 +36,12 @@
 
 <style>
   .governance-chat-panel {
-    position: sticky;
-    top: 2rem;
+    position: static;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 12px;
     margin-top: 16px;
-    max-width: 420px;
+    max-width: 100%;
     background: var(--body-bg, #fff);
   }
   .governance-chat-header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
@@ -53,15 +52,15 @@
   }
   .governance-chat-msg { border-radius: 10px; padding: 8px 10px; font-size: 13px; max-width: 92%; }
   /* Theme-aware bubble colours (admin vars flip with the light/dark toggle). */
-  .governance-chat-msg-seller { background: var(--darkened-bg, #f1f5f9); color: var(--body-fg); }
-  .governance-chat-msg-staff { background: var(--button-bg, #0f67a5); color: var(--button-fg, #fff); }
-  .governance-chat-msg-system { background: var(--darkened-bg, #fef9c3); color: var(--body-fg); border: 1px solid var(--hairline-color, #e0e0d4); }
-  .governance-chat-meta { display: block; color: var(--body-quiet-color, #64748b); font-size: 11px; margin-top: 4px; }
+  .governance-chat-msg-seller { background: var(--gov-sand, #f4f4f5); color: var(--gov-ink, #111); }
+  .governance-chat-msg-staff { background: var(--gov-ink, #111); color: var(--gov-surface, #fff); }
+  .governance-chat-msg-system { background: var(--gov-sand, #f4f4f5); color: var(--gov-ink, #111); border: 1px solid var(--gov-line, #e5e7eb); }
+  .governance-chat-meta { display: block; color: var(--gov-muted, #6b7280); font-size: 11px; margin-top: 4px; }
   .governance-chat-composer textarea { width: 100%; }
   .governance-chat-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-  .governance-chat-attach { cursor: pointer; color: #0757ba; }
-  .governance-chat-error { color: var(--error-fg, #d00); font-size: 12px; }
-  .governance-badge-unread { background: #dc2626; color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; }
+  .governance-chat-attach { cursor: pointer; color: var(--gov-muted, #6b7280); }
+  .governance-chat-error { color: var(--gov-danger, #374151); font-size: 12px; }
+  .governance-badge-unread { background: var(--gov-ink, #111); color: var(--gov-surface, #fff); border-radius: 999px; padding: 1px 7px; font-size: 11px; }
 </style>
 
 <script>
@@ -146,6 +145,13 @@
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") send();
     });
 
-    setInterval(function () { if (!paused) refresh(); }, pollMs);
+    var pollTimer = setInterval(function () { if (!paused) refresh(); }, pollMs);
+
+    // In-page navigation removes this panel; stop polling the detached list.
+    function teardown() {
+      clearInterval(pollTimer);
+      document.removeEventListener("mc:page-exit", teardown);
+    }
+    document.addEventListener("mc:page-exit", teardown);
   })();
 </script>
