@@ -471,7 +471,9 @@ ol.breadcrumbs {
 
 html, body {
   max-width: 100%;
-  overflow-x: hidden;
+  /* `clip` hides horizontal spill without making the body its own scroll
+     container (which `hidden` does, breaking window scrolling/sticky). */
+  overflow-x: clip;
 }
 
 #container {
@@ -480,7 +482,10 @@ html, body {
   max-width: 100% !important;
   border: 0;
   background: transparent;
-  overflow-x: hidden;
+  /* `clip` hides sideways spill without turning the shell into its own
+     scroll container: the document (not #container) owns the vertical
+     scroll, so `position: sticky` and scroll restoration behave normally. */
+  overflow-x: clip;
   box-sizing: border-box;
 }
 
@@ -854,6 +859,31 @@ fieldset.module {
 
 .module {
   overflow: hidden;
+}
+
+/* App index pages render each app as its own module. The inner table is
+   shrink-to-fit by default, so the card hugged the left edge and left a large
+   empty gutter. Lay the app cards out in a responsive grid and let each table
+   fill its card. */
+.app-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.app-list .module {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.app-list .module table,
+#content-main.app-list .module table {
+  width: 100%;
+}
+
+.app-list .module table th {
+  width: 100%;
 }
 
 fieldset.module {

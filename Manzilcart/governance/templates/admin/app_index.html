@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{#
+  Django's stock app_index.html extends index.html, which deliberately blanks
+  the nav sidebar because the page already lists every app. ManzilCart keeps the
+  docked operations panel on every screen, so this override reuses base_site's
+  sidebar instead of inheriting that empty block.
+#}
+
+{% block bodyclass %}dashboard app-{{ app_label }}{% endblock %}
+
+{% block nav-breadcrumbs %}
+  <nav aria-label="{% translate 'Breadcrumbs' %}">
+    <ol class="breadcrumbs">
+      <li><a href="{% url 'admin:index' %}">{% translate 'Home' %}</a></li>
+      <li aria-current="page">
+        {% for app in app_list %}{{ app.name }}{% endfor %}
+      </li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main" class="app-list">
+    {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+  </div>
+{% endblock %}

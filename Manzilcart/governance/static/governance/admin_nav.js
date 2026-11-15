@@ -23,6 +23,45 @@
     document.documentElement.classList.toggle("mc-nav-loading", loading);
   }
 
+  /* ---------------------------------------------------------------------
+   * Scrolling
+   *
+   * The admin shell is a flex column and older CSS let #container own the
+   * vertical scroll. Prefer whichever element actually scrolls so sticky
+   * navigation, scroll restoration and "go to top" all keep working.
+   * ------------------------------------------------------------------ */
+
+  function scrollHost() {
+    var root = document.scrollingElement || document.documentElement;
+    if (root && root.scrollHeight > root.clientHeight + 1) return root;
+
+    var candidates = [document.getElementById("container"), document.body];
+    for (var i = 0; i < candidates.length; i += 1) {
+      var node = candidates[i];
+      if (!node || node.scrollHeight <= node.clientHeight + 1) continue;
+      var overflow = window.getComputedStyle(node).overflowY;
+      if (overflow === "auto" || overflow === "scroll") return node;
+    }
+    return root;
+  }
+
+  function getScrollTop() {
+    var host = scrollHost();
+    return host ? host.scrollTop || 0 : 0;
+  }
+
+  function setScrollTop(value) {
+    var host = scrollHost();
+    if (host) host.scrollTop = value;
+    if (window.scrollY !== value) {
+      try {
+        window.scrollTo(0, value);
+      } catch (error) {
+        /* Older engines can throw when the document is not scrollable. */
+      }
+    }
+  }
+
   function ensureProgressBar() {
     if (progressEl || !document.body) return;
     progressEl = document.createElement("div");
@@ -125,6 +164,14 @@
   }
 
   function ensureScripts(doc, pageUrl) {
+    // Django's jquery.init.js calls jQuery.noConflict(true), so later media
+    // (select2, calendar, select filters…) cannot find a global jQuery. Point
+    // the globals back at the admin's own copy before loading new scripts.
+    if (window.django && window.django.jQuery) {
+      if (!window.jQuery) window.jQuery = window.django.jQuery;
+      if (!window.$) window.$ = window.jQuery;
+    }
+
     var pending = [];
 
     doc.querySelectorAll("script[src]").forEach(function (script) {
@@ -250,7 +297,7 @@
     });
   }
 
-  function swapContent(nextDoc, pageUrl, options) {
+  function swapContent(nextDoc, pageUrl) {
     // Let page scripts stop timers/listeners before their DOM disappears.
     document.dispatchEvent(new CustomEvent("mc:page-exit"));
 
@@ -265,22 +312,51 @@
     }
 
     currentContent.innerHTML = nextContent.innerHTML;
-    runInlineScripts(currentContent, pageUrl);
     updateNavigationState(nextDoc, pageUrl);
 
     document.title = nextDoc.title;
 
+    forceDockedSidebar();
+
+    return currentContent;
+  }
+
+  /* Widgets that only bootstrap from window's `load` never see a second load
+     during in-page navigation, so start them against the freshly swapped DOM. */
+  function runPageInitializers() {
+    try {
+      if (window.SelectFilter && typeof window.SelectFilter.init === "function") {
+        document
+          .querySelectorAll("select.selectfilter, select.selectfilterstacked")
+          .forEach(function (el) {
+            if (el.dataset.mcFilterReady === "1") return;
+            el.dataset.mcFilterReady = "1";
+            window.SelectFilter.init(el.id, el.dataset.fieldName, parseInt(el.dataset.isStacked, 10));
+          });
+      }
+    } catch (error) {
+      /* Optional enhancement. */
+    }
+
+    try {
+      if (window.DateTimeShortcuts && typeof window.DateTimeShortcuts.init === "function") {
+        window.DateTimeShortcuts.init();
+      }
+    } catch (error) {
+      /* Optional enhancement. */
+    }
+  }
+
+  function applyScroll(options, pageUrl) {
     if (options && typeof options.scrollY === "number") {
-      window.scrollTo(0, options.scrollY);
+      setScrollTop(options.scrollY);
     } else if (pageUrl.hash) {
       var target = document.querySelector(pageUrl.hash);
       if (target) target.scrollIntoView();
-      else window.scrollTo(0, 0);
+      else setScrollTop(0);
     } else {
-      window.scrollTo(0, 0);
+      setScrollTop(0);
     }
-
-    forceDockedSidebar();
   }
 
   function navigate(urlString, options) {
@@ -320,24 +396,30 @@
           return;
         }
 
+        if (options.push !== false) {
+          try {
+            history.replaceState(
+              Object.assign({}, history.state, { mcSpa: true, scrollY: getScrollTop() }),
+              "",
+              location.href
+            );
+          } catch (error) {
+            /* History state is a progressive enhancement. */
+          }
+          history.pushState({ mcSpa: true, scrollY: 0 }, "", url.href);
+        }
+
+        ensureStyles(nextDoc, url.href);
+        // Swap before loading new media: Django's admin scripts read the DOM
+        // when they execute, and the outgoing markup is already detached.
+        var content = swapContent(nextDoc, url.href);
+
         return ensureScripts(nextDoc, url.href).then(function () {
           if (signal.aborted || requestToken !== token) return;
-
-          if (options.push !== false) {
-            try {
-              history.replaceState(
-                Object.assign({}, history.state, { mcSpa: true, scrollY: window.scrollY }),
-                "",
-                location.href
-              );
-            } catch (error) {
-              /* History state is a progressive enhancement. */
-            }
-            history.pushState({ mcSpa: true, scrollY: 0 }, "", url.href);
-          }
-
-          ensureStyles(nextDoc, url.href);
-          swapContent(nextDoc, url.href, options);
+          runInlineScripts(content, url.href);
+          runPageInitializers();
+          applyScroll(options, url.href);
+          forceDockedSidebar();
         });
       })
       .catch(function (error) {
