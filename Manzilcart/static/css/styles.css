@@ -3054,6 +3054,48 @@ select.input { appearance: auto; }
 .field-error { font-size: 0.82rem; color: var(--danger); margin: 0.35rem 0 0; font-weight: 600; }
 .field-invalid .input { border-color: var(--danger); }
 
+.input-with-action { position: relative; }
+.input-with-action.has-password-toggle .input { padding-right: 4.6rem; }
+.input-action {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+}
+.input-action:hover { text-decoration: underline; }
+
+.password-rules { margin-top: 0.75rem; }
+.password-rules-title { margin: 0; font-size: 0.82rem; font-weight: 700; color: var(--ink); }
+.password-rule-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.password-rule-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.password-rule-list li::before {
+  content: "○";
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.password-rule-list li.is-met { color: #15803d; }
+.password-rule-list li.is-met::before { content: "✓"; }
+
 .code-input {
   letter-spacing: 0.45em;
   font-size: 1.35rem;

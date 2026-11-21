@@ -176,7 +176,7 @@
             </form>
             <p class="muted small text-center" data-i18n="handover_note">There is no online payment. You agree handover and payment directly.</p>
           {% else %}
-            <a class="btn btn-primary btn-large detail-msg-btn" href="{% url 'accounts:start' %}" data-i18n="sign_in_to_message">Sign in to message the seller</a>
+            <a class="btn btn-primary btn-large detail-msg-btn" href="{% url 'accounts:login' %}" data-i18n="sign_in_to_message">Sign in to message the seller</a>
             <p class="muted small text-center" data-i18n="chat_verified_only">Chat is available to verified members.</p>
           {% endif %}
         </div>
@@ -213,7 +213,7 @@
                   <button class="btn btn-primary btn-small" type="submit" data-i18n="Ask for delivery">Ask for delivery</button>
                 </form>
               {% else %}
-                <a class="btn btn-primary btn-small" href="{% url 'accounts:start' %}" data-i18n="Sign in to ask for delivery">Sign in to ask for delivery</a>
+                <a class="btn btn-primary btn-small" href="{% url 'accounts:login' %}" data-i18n="Sign in to ask for delivery">Sign in to ask for delivery</a>
               {% endif %}
             {% endif %}
           </div>

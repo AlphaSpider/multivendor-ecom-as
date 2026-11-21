@@ -1,17 +1,18 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Verify your number — ManzilCart{% endblock %}
+{% block title %}Verify your code — ManzilCart{% endblock %}
 
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
 <section class="container auth-layout">
   <div class="auth-card">
-    <p class="eyebrow"><span data-i18n="step_prefix">Step</span> 2 <span data-i18n="of_label">of</span> 3</p>
-    <h1 data-i18n="verify_title">Check your WhatsApp</h1>
+    <p class="eyebrow" data-i18n="sign_in_eyebrow">Sign in</p>
+    <h1 data-i18n="verify_title">Check your messages</h1>
     <p class="muted">
       <span data-i18n="sent_code_notice">We sent a verification code to</span>
-      <strong>{{ masked_phone }}</strong>.
+      <strong>{{ masked_phone }}</strong>{% if has_email %} <span data-i18n="and_label">and</span> <strong>{{ masked_email }}</strong>{% endif %}.
     </p>
 
     <form method="post" novalidate>
@@ -28,32 +29,35 @@
 
       {% include "partials/field.html" with field=form.code %}
 
-      <button class="btn btn-primary btn-block" type="submit" data-i18n="btn_verify_continue">Verify and continue</button>
+      <button class="btn btn-primary btn-block" type="submit" data-i18n="btn_verify_sign_in">Verify and sign in</button>
     </form>
 
     <div class="auth-actions">
       <form method="post" action="{% url 'accounts:resend' %}">
         {% csrf_token %}
-        <button type="submit" class="link-button" data-i18n="btn_resend_code">Send a new code</button>
+        <button class="btn btn-ghost btn-block" type="submit" data-resend-button data-cooldown="{{ resend_cooldown_seconds|default:60 }}" data-i18n-skip>Send a new code</button>
       </form>
-      <a href="{% url 'accounts:start' %}" data-i18n="use_diff_number">Use a different number</a>
+      <a href="{% url 'accounts:password_login' %}" data-i18n="use_password_instead">Use a password instead</a>
+      <a href="{% url 'accounts:login' %}" data-i18n="use_diff_number">Use a different number or email</a>
     </div>
 
-    <p class="field-help" data-code-expiry data-seconds="{{ expires_seconds }}">
-      <span data-i18n="code_expires_prefix">The code expires in about</span> <span data-expiry-label>{{ expires_seconds }}</span> <span data-i18n="seconds_label">seconds</span>.
+    <p class="auth-footnote" data-i18n="verify_footnote">
+      The code expires shortly. Never share it with anyone — including someone who says they are from ManzilCart.
     </p>
   </div>
 
-  <aside class="auth-aside">
-    <h2 data-i18n="didnt_get_it">Didn’t get it?</h2>
-    <p>
-      Check that WhatsApp can receive messages on this number and that you have a
-      connection. You can request a new code after the cooldown.
+  <aside class="auth-aside" aria-label="Verification help">
+    <h2 data-i18n="verify_aside_title">Didn't get the code?</h2>
+    <p data-i18n="verify_aside_desc">
+      Check WhatsApp and your email inbox. If your account has no email, the code is sent to WhatsApp only.
     </p>
-    <p class="muted small">
-      For your security, never share the code with anyone — including someone who says
-      they are from ManzilCart.
+    <p class="muted small" data-i18n="verify_aside_hint">
+      You can still sign in with your password instead.
     </p>
   </aside>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/auth.js' %}?v=1.0" defer></script>
 {% endblock %}

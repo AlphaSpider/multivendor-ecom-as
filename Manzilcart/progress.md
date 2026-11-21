@@ -128,8 +128,9 @@ composite FK (verified: `ForeignKey` to a `CompositePrimaryKey` is rejected). Th
 
 ### Accounts
 - Custom `User` created **before the first migration**; `USERNAME_FIELD = "phone"`.
-- Members have **no password** (`set_unusable_password()`); OTP verification plus
-  server-side sessions is the authentication mechanism. Staff keep passwords for Admin.
+- Members sign in with OTP verification plus server-side sessions; a password is
+  optional and can be set at registration or later in settings. Staff keep passwords
+  for Admin.
 - Pending registrations are `OTPChallenge` rows, not users, so an unverified number
   cannot squat an account.
 - Single entry point for sign-in and registration; the server decides which it is, so the
@@ -156,7 +157,7 @@ composite FK (verified: `ForeignKey` to a `CompositePrimaryKey` is rejected). Th
   `conversations`, `deals`, `auctions`, `notifications`.
 - Env-driven `settings.py` (PostgreSQL, email via `MAILERS`, cache/channel layer,
   security hardening for production, business tunables at the bottom).
-- Custom `User` model + `UserManager` (phone identity, E.164, no member passwords).
+- Custom `User` model + `UserManager` (phone identity, E.164, optional member passwords).
 - `core`: `TimeStampedModel`, `AuditEvent` (append-only), emirate context, middleware,
   context processor, phone normalisation, image validation/sanitisation, throttling,
   OTP HMAC helpers, health check, deploy checks, DB geo helper, unique-slug helper.
@@ -170,8 +171,9 @@ composite FK (verified: `ForeignKey` to a `CompositePrimaryKey` is rejected). Th
   delivery/assembly/disassembly coverage.
 - Landing page, marketplace home, emirate switcher, graceful 404 for unknown/inactive
   emirates, `areas.json` endpoint.
-- Accounts: OTP request → verify → details registration flow, OTP sign-in, resend,
-  logout, dashboard, profile update. Rate limits, attempt limits, expiry and audit rows.
+- Accounts: OTP request → verify → details registration flow, OTP sign-in, optional
+  password sign-in and password settings, resend, logout, dashboard, profile update.
+  Rate limits, attempt limits, expiry and audit rows.
 - `notifications`: queue model, mock/live backend registry, idempotency, retry/backoff,
   `process_notifications` management command + Admin retry console.
 

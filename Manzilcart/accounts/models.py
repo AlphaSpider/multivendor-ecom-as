@@ -8,10 +8,10 @@ Design decisions
 * **Mobile number is the identity.** ``USERNAME_FIELD = "phone"``; the number is stored
   in E.164 form and is unique. There are no usernames, no vendor/business accounts and
   no social logins.
-* **No password for members.** Registration is completed by verifying a WhatsApp OTP,
-  so member accounts are created with an unusable password; sessions are
-  server-managed (``django.contrib.sessions``). Staff/superusers, created with
-  ``createsuperuser``, keep a password so they can use Django Admin.
+* **Password is optional for members.** Registration is completed by verifying a
+  WhatsApp OTP, so an account can be created without a password; sessions are
+  server-managed (``django.contrib.sessions``). Members may set a password to sign in
+  without a code, and staff/superusers keep a password for Django Admin.
 * **Profile data lives on the user.** A separate ``UserProfile`` table would be a
   1:1 row with no independent lifecycle, so it is deliberately omitted.
 * **A pending registration is not a user row.** Verification state lives in
@@ -26,8 +26,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from core.models import TimeStampedModel
@@ -57,7 +59,7 @@ class UserManager(BaseUserManager):
         if password:
             user.set_password(password)
         else:
-            # Members authenticate with an OTP, never with a password.
+            # Members can still sign in with a WhatsApp OTP.
             user.set_unusable_password()
         user.full_clean(exclude=["password", "last_login"])
         user.save(using=self._db)
@@ -209,6 +211,21 @@ class User(AbstractUser, TimeStampedModel):
             return "*" * len(digits)
         return f"{digits[:6]}{'*' * (len(digits) - 6)}"
 
+    @property
+    def primary_email(self) -> str:
+        """The canonical email address, falling back to the legacy user column."""
+        try:
+            return self.member_email.email
+        except MemberEmail.DoesNotExist:
+            return self.email
+
+    @property
+    def is_email_verified(self) -> bool:
+        try:
+            return self.member_email.is_verified
+        except MemberEmail.DoesNotExist:
+            return False
+
     def mark_phone_verified(self, *, when=None) -> None:
         self.phone_verified_at = when or timezone.now()
         self.save(update_fields=["phone_verified_at", "updated_at"])
@@ -221,6 +238,104 @@ class User(AbstractUser, TimeStampedModel):
         self.emirate = emirate
         self.service_area = service_area
         self.save(update_fields=["emirate", "service_area", "updated_at"])
+
+
+class MemberEmail(TimeStampedModel):
+    """
+    One canonical email address per member.
+
+    Email is optional, but when present it is globally unique so that signing in with
+    an email address maps to exactly one account. The address is stored lower-case;
+    the database also enforces case-insensitive uniqueness.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="member_email",
+    )
+    email = models.EmailField(unique=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "member email"
+        verbose_name_plural = "member emails"
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="member_email_unique_ci"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.email} ({self.user_id})"
+
+    @property
+    def is_verified(self) -> bool:
+        return self.verified_at is not None
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
+        # Keep the legacy User.email column in sync for notification code and admin
+        # screens that still read it directly.
+        if self.user_id:
+            User.objects.filter(pk=self.user_id).exclude(email=self.email).update(
+                email=self.email
+            )
+
+    def delete(self, *args, **kwargs):
+        user_id = self.user_id
+        result = super().delete(*args, **kwargs)
+        if user_id:
+            User.objects.filter(pk=user_id).update(email="")
+        return result
+
+
+class EmailSender(TimeStampedModel):
+    """
+    SMTP account used to send verification-code emails.
+
+    Only the connection settings live here. The SMTP password is read from the
+    ``OTP_EMAIL_SMTP_PASSWORD`` environment variable so it is never stored in the
+    database or exposed through the admin. Activating one sender deactivates the rest,
+    which keeps the OTP "from" address unambiguous.
+    """
+
+    sender_email = models.EmailField(
+        "sender email",
+        help_text="The From address used for verification-code emails.",
+    )
+    smtp_host = models.CharField(max_length=255, help_text="SMTP server hostname.")
+    smtp_port = models.PositiveIntegerField(
+        default=587,
+        validators=[MinValueValidator(1), MaxValueValidator(65535)],
+        help_text="SMTP port (usually 587 for STARTTLS).",
+    )
+    use_tls = models.BooleanField(
+        default=True, help_text="Use STARTTLS on the SMTP connection."
+    )
+    smtp_username = models.CharField(
+        max_length=254,
+        blank=True,
+        help_text="SMTP username. The password comes from OTP_EMAIL_SMTP_PASSWORD.",
+    )
+    is_active = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        verbose_name = "email sender"
+        verbose_name_plural = "email senders"
+        ordering = ["-is_active", "sender_email"]
+
+    def __str__(self) -> str:
+        return f"{self.sender_email} ({self.smtp_host}:{self.smtp_port})"
+
+    def save(self, *args, **kwargs):
+        self.sender_email = (self.sender_email or "").strip().lower()
+        self.smtp_username = (self.smtp_username or "").strip()
+        if self.is_active:
+            # A single active account guarantees one canonical OTP From address.
+            EmailSender.objects.exclude(pk=self.pk).filter(is_active=True).update(
+                is_active=False, updated_at=timezone.now()
+            )
+        super().save(*args, **kwargs)
 
 
 class OTPChallenge(TimeStampedModel):

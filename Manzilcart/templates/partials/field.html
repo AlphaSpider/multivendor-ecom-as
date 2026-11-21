@@ -7,7 +7,12 @@ Usage: {% include "partials/field.html" with field=form.phone %}
     <span class="field-label-text">{{ field.label }}</span>
     {% if not field.field.required %}<span class="field-optional" data-i18n="field_optional">optional</span>{% endif %}
   </label>
-  {{ field }}
+  <div class="input-with-action">
+    {{ field }}
+    {% if field.field.widget.input_type == "password" %}
+      <button type="button" class="input-action" data-password-toggle data-password-target="{{ field.id_for_label }}" aria-pressed="false" hidden data-i18n-skip>Show</button>
+    {% endif %}
+  </div>
   {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
   {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
 </div>

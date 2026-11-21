@@ -1,29 +1,30 @@
 """
-Account views: the OTP sign-up / sign-in flow, profile management and the member
+Account views: sign-up, OTP/password sign-in, profile management and the member
 dashboard.
 
 Flow
 ----
-1. ``PhoneEntryView``        POST phone  -> challenge created, identical response whether
-                                             or not the number already has an account.
-2. ``VerifyCodeView``        POST code   -> verified: returning member is signed in,
-                                             new member continues to the details step.
-3. ``RegistrationDetailsView`` POST area -> account created, signed in.
+1. ``RegisterView``          POST phone/email/password -> account created immediately.
+2. ``LoginStartView``        POST phone/email -> OTP challenge sent to WhatsApp and email.
+3. ``VerifyCodeView``        POST code -> signed in; phone/email marked verified.
+4. ``PasswordLoginView``     POST phone/email + password -> signed in.
 
-All three steps keep their state in the server-side session; the challenge id is never
-accepted from the browser, so a visitor cannot verify somebody else's challenge.
+The challenge id lives in the server-side session only; the browser cannot verify
+somebody else's challenge.
 """
 
 from __future__ import annotations
 
 import logging
 
-from django.contrib.auth import logout as auth_logout
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.http import Http404, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -32,14 +33,18 @@ from django.views.generic import FormView, TemplateView
 
 from accounts import services
 from accounts.forms import (
-    PhoneNumberForm,
+    GENERIC_LOGIN_ERROR,
+    LoginIdentifierForm,
+    PasswordLoginForm,
+    PasswordSettingsForm,
     ProfileForm,
-    RegistrationDetailsForm,
+    RegistrationForm,
     VerificationCodeForm,
+    resolve_member_by_identifier,
 )
-from accounts.models import OTPChallenge, User
+from accounts.models import OTPChallenge
 from core.exceptions import DomainError, RateLimitedError
-from core.logging_utils import mask_phone
+from core.logging_utils import mask_email, mask_phone
 from locations.selectors import (
     active_emirate_for_slug,
     emirate_from_session,
@@ -49,6 +54,7 @@ from locations.selectors import (
 logger = logging.getLogger("manzilcart.accounts.views")
 
 SESSION_EMIRATE_PENDING = "manzilcart.pending_emirate_slug"
+SESSION_LOGIN_NEXT = "manzilcart.login_next"
 
 
 class RegistrationStepMixin:
@@ -74,6 +80,13 @@ class RegistrationStepMixin:
         phone = self.request.session.get(services.SESSION_PHONE)
         return mask_phone(phone) if phone else ""
 
+    def masked_email(self) -> str:
+        challenge = self.get_challenge()
+        user = getattr(challenge, "user", None)
+        if user is None:
+            return ""
+        return mask_email(user.primary_email)
+
 
 def get_post_login_redirect_url(request, user=None) -> str:
     """Determine the home redirect URL for a signed-in member.
@@ -95,63 +108,151 @@ def get_post_login_redirect_url(request, user=None) -> str:
     return reverse("locations:landing")
 
 
-class PhoneEntryView(RegistrationStepMixin, FormView):
-    """
-    Step 1 - the single entry point for both registration and sign-in.
+class LoginStartView(RegistrationStepMixin, FormView):
+    """Default sign-in: phone/email first, then a one-time code."""
 
-    Returning members and new members receive exactly the same response, which is how
-    the platform avoids disclosing whether a number has an account.
-    """
-
-    form_class = PhoneNumberForm
+    form_class = LoginIdentifierForm
     template_name = "accounts/phone_entry.html"
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect(get_post_login_redirect_url(request))
-        # The emirate can be supplied by the marketplace URL (…/join/) or inherited
-        # from the session.
-        slug = kwargs.get("emirate_slug")
-        if slug:
-            emirate = active_emirate_for_slug(slug)
-            if emirate is None:
-                raise Http404("Marketplace not found.")
-            request.session[SESSION_EMIRATE_PENDING] = emirate.slug
-        self.emirate = active_emirate_for_slug(
-            request.session.get(SESSION_EMIRATE_PENDING)
-        ) or emirate_from_session(request) or getattr(request, "emirate", None)
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["flow"] = "login"
+        context["next"] = (
+            self.request.GET.get("next") or self.request.POST.get("next") or ""
+        )
+        return context
+
+    def form_valid(self, form):
+        member = resolve_member_by_identifier(form.cleaned_data["identifier"])
+        # Unknown or inactive identifiers take the same path as a real member: a
+        # verification challenge is created and the visitor sees the same next step.
+        # Only an active member's challenge is dispatched to any channel.
+        try:
+            if member is None or not member.is_active:
+                challenge = services.start_decoy_verification(request=self.request)
+            else:
+                challenge = services.start_login_verification(
+                    user=member, request=self.request
+                )
+        except RateLimitedError as exc:
+            form.add_error(None, exc.message)
+            return self.form_invalid(form)
+        except DomainError:
+            form.add_error(None, GENERIC_LOGIN_ERROR)
+            return self.form_invalid(form)
+
+        target = self.request.GET.get("next") or self.request.POST.get("next")
+        if target and url_has_allowed_host_and_scheme(
+            target, {self.request.get_host()}, require_https=self.request.is_secure()
+        ):
+            self.request.session[SESSION_LOGIN_NEXT] = target
+        else:
+            self.request.session.pop(SESSION_LOGIN_NEXT, None)
+
+        self.store_challenge(challenge)
+        return redirect("accounts:verify")
+
+
+class RegisterView(RegistrationStepMixin, FormView):
+    """Create an account immediately with phone, optional email and password."""
+
+    form_class = RegistrationForm
+    template_name = "accounts/register.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(get_post_login_redirect_url(request))
+        self.emirate = (
+            active_emirate_for_slug(request.session.get(SESSION_EMIRATE_PENDING))
+            or emirate_from_session(request)
+            or getattr(request, "emirate", None)
+        )
+        if self.emirate is None or not self.emirate.is_active:
+            # The signup form needs a supported marketplace for the area selector.
+            return redirect("locations:landing")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["emirate"] = self.emirate
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         context["emirate"] = self.emirate
-        context["flow"] = "start"
+        context["flow"] = "register"
         return context
 
     def form_valid(self, form):
         try:
-            services.start_verification(
-                raw_phone=form.cleaned_data["phone"],
+            user = services.register_member(
+                phone=form.cleaned_data["phone"],
+                email=form.cleaned_data.get("email", ""),
+                password=form.cleaned_data["password1"],
+                display_name=form.cleaned_data["display_name"],
+                emirate_slug=self.emirate.slug,
+                service_area_slug=form.cleaned_data["service_area"].slug,
                 request=self.request,
-                emirate=self.emirate if self.emirate and self.emirate.is_active else None,
             )
-        except RateLimitedError as exc:
+        except DomainError as exc:
             form.add_error(None, exc.message)
             return self.form_invalid(form)
+
+        self.request.session.pop(SESSION_EMIRATE_PENDING, None)
+        auth_login(self.request, user)
+        return redirect(get_post_login_redirect_url(self.request, user=user))
+
+
+class PasswordLoginView(FormView):
+    """Sign in with the mobile number and the password set by the member."""
+
+    form_class = PasswordLoginForm
+    template_name = "accounts/password_login.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(get_post_login_redirect_url(request))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["next"] = (
+            self.request.GET.get("next") or self.request.POST.get("next") or ""
+        )
+        return context
+
+    def form_valid(self, form):
+        user = form.get_user()
+        try:
+            services.sign_in_with_password(
+                user=user,
+                request=self.request,
+                backend=form.user_cache.backend,
+            )
         except DomainError as exc:
-            form.add_error("phone", exc.message)
+            form.add_error(None, exc.message)
             return self.form_invalid(form)
 
-        # The challenge id lives in the session only.
-        challenge = services.OTPChallenge.objects.filter(
-            phone=form.cleaned_data["phone"]
-        ).order_by("-created_at").first()
-        if challenge is None:  # pragma: no cover - defensive
-            form.add_error(None, "We could not start verification. Please try again.")
-            return self.form_invalid(form)
+        form.reset_throttle()
+        return redirect(self.get_success_url(user))
 
-        self.store_challenge(challenge)
-        return redirect("accounts:verify")
+    def get_success_url(self, user) -> str:
+        target = self.request.GET.get("next") or self.request.POST.get("next")
+        if target and url_has_allowed_host_and_scheme(
+            target, {self.request.get_host()}, require_https=self.request.is_secure()
+        ):
+            return target
+        return get_post_login_redirect_url(self.request, user=user)
 
 
 class VerifyCodeView(RegistrationStepMixin, FormView):
@@ -163,13 +264,16 @@ class VerifyCodeView(RegistrationStepMixin, FormView):
     def dispatch(self, request, *args, **kwargs):
         self.challenge = self.get_challenge()
         if self.challenge is None:
-            return redirect("accounts:start")
+            return redirect("accounts:login")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["masked_phone"] = self.masked_phone()
+        context["masked_email"] = self.masked_email()
+        context["has_email"] = bool(context["masked_email"])
         context["expires_seconds"] = max(0, int(self.challenge.expiry.total_seconds()))
+        context["resend_cooldown_seconds"] = settings.OTP_RESEND_COOLDOWN_SECONDS
         context["flow"] = "verify"
         return context
 
@@ -182,27 +286,32 @@ class VerifyCodeView(RegistrationStepMixin, FormView):
             self.clear_challenge()
             form.add_error(None, exc.message)
             return self.form_invalid(form)
-        except DomainError as exc:
-            form.add_error("code", exc.message)
+        except DomainError:
+            form.add_error("code", GENERIC_LOGIN_ERROR)
             return self.form_invalid(form)
 
-        if challenge.purpose == OTPChallenge.Purpose.LOGIN:
-            try:
-                services.sign_in_with_verified_challenge(
-                    challenge=challenge, request=self.request
-                )
-            except DomainError as exc:
-                self.clear_challenge()
-                form.add_error(None, exc.message)
-                return self.form_invalid(form)
+        if challenge.purpose != OTPChallenge.Purpose.LOGIN:
             self.clear_challenge()
-            self.request.session.pop(SESSION_EMIRATE_PENDING, None)
-            return redirect(self.get_success_url())
+            return redirect("accounts:login")
 
-        # New member: pick a residential area before the account is created.
-        return redirect("accounts:details")
+        try:
+            services.sign_in_with_verified_challenge(
+                challenge=challenge, request=self.request
+            )
+        except DomainError:
+            self.clear_challenge()
+            form.add_error(None, GENERIC_LOGIN_ERROR)
+            return self.form_invalid(form)
+        self.clear_challenge()
+        self.request.session.pop(SESSION_EMIRATE_PENDING, None)
+        return redirect(self.get_success_url())
 
     def get_success_url(self) -> str:
+        target = self.request.session.pop(SESSION_LOGIN_NEXT, None)
+        if target and url_has_allowed_host_and_scheme(
+            target, {self.request.get_host()}, require_https=self.request.is_secure()
+        ):
+            return target
         target = self.request.GET.get("next") or self.request.POST.get("next")
         if target and url_has_allowed_host_and_scheme(
             target, {self.request.get_host()}, require_https=self.request.is_secure()
@@ -217,83 +326,29 @@ class ResendCodeView(RegistrationStepMixin, View):
     def post(self, request, *args, **kwargs):
         challenge = self.get_challenge()
         if challenge is None:
-            return redirect("accounts:start")
+            return redirect("accounts:login")
         try:
             services.resend_verification(challenge=challenge, request=request)
         except RateLimitedError as exc:
+            masked_email = self.masked_email()
             return render(
                 request,
                 "accounts/verify_code.html",
                 {
                     "form": VerificationCodeForm(),
                     "masked_phone": self.masked_phone(),
+                    "masked_email": masked_email,
+                    "has_email": bool(masked_email),
                     "expires_seconds": max(0, int(challenge.expiry.total_seconds())),
+                    "resend_cooldown_seconds": settings.OTP_RESEND_COOLDOWN_SECONDS,
                     "resend_error": exc.message,
                     "flow": "verify",
                 },
             )
-        except DomainError as exc:
+        except DomainError:
             self.clear_challenge()
-            return redirect("accounts:start")
+            return redirect("accounts:login")
         return redirect("accounts:verify")
-
-
-class RegistrationDetailsView(RegistrationStepMixin, FormView):
-    """Step 3 - name, optional email and supported service area."""
-
-    form_class = RegistrationDetailsForm
-    template_name = "accounts/registration_details.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        self.challenge = self.get_challenge()
-        if self.challenge is None or not self.challenge.is_verified:
-            return redirect("accounts:start")
-        if self.challenge.is_consumed:
-            return redirect("accounts:start")
-
-        self.emirate = (
-            active_emirate_for_slug(request.session.get(SESSION_EMIRATE_PENDING))
-            or emirate_from_session(request)
-            or getattr(request, "emirate", None)
-        )
-        if self.emirate is None or not self.emirate.is_active:
-            # Registration cannot proceed without a supported marketplace.
-            return redirect("locations:landing")
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["emirate"] = self.emirate
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["emirate"] = self.emirate
-        context["masked_phone"] = self.masked_phone()
-        context["flow"] = "details"
-        return context
-
-    def form_valid(self, form):
-        try:
-            user = services.complete_registration(
-                challenge=self.challenge,
-                emirate_slug=self.emirate.slug,
-                service_area_slug=form.cleaned_data["service_area"].slug,
-                display_name=form.cleaned_data["display_name"],
-                email=form.cleaned_data.get("email", ""),
-                request=self.request,
-            )
-        except DomainError as exc:
-            form.add_error(None, exc.message)
-            return self.form_invalid(form)
-
-        self.clear_challenge()
-        self.request.session.pop(SESSION_EMIRATE_PENDING, None)
-
-        from django.contrib.auth import login as auth_login
-
-        auth_login(self.request, user)
-        return redirect(get_post_login_redirect_url(self.request, user=user))
 
 
 class LogoutView(View):
@@ -350,15 +405,21 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class SettingsView(LoginRequiredMixin, TemplateView):
+class SettingsView(LoginRequiredMixin, FormView):
     """
-    Account settings: interface language, appearance, browsing marketplace and
-    sign-out. Verified details (name, email, area) remain on the profile page;
-    this page only offers choices that need no verification.
+    Account settings: interface language, appearance, password, browsing
+    marketplace and sign-out. Verified details (name, email, area) remain on the
+    profile page; this page only offers choices that need no verification.
     """
 
+    form_class = PasswordSettingsForm
     template_name = "accounts/settings.html"
     login_url = "accounts:login"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -368,6 +429,16 @@ class SettingsView(LoginRequiredMixin, TemplateView):
         )
         context["service_area"] = self.request.user.service_area
         return context
+
+    def form_valid(self, form):
+        services.update_password(
+            user=self.request.user,
+            password=form.cleaned_data["new_password1"],
+            request=self.request,
+        )
+
+        messages.success(self.request, "Your password has been updated.")
+        return redirect("accounts:settings")
 
 
 class ProfileView(LoginRequiredMixin, FormView):

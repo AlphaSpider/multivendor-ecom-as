@@ -319,8 +319,8 @@ class SellerMessagesTabTests(GovernanceBase):
         self.assertContains(response, "Walnut desk")
         self.assertContains(response, "Marketplace team")
         self.assertContains(response, reverse("governance:support_thread", args=[thread.pk]))
-        # One unread staff reply → the "new" badge.
-        self.assertContains(response, 'class="badge"')
+        # One unread staff reply → the unread badge.
+        self.assertContains(response, 'class="wa-unread-badge"')
 
     def test_no_support_threads_for_non_sellers(self):
         # The thread belongs to the listing's seller; a stranger must not see it.

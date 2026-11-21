@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Settings — ManzilCart{% endblock %}
 
@@ -72,13 +73,55 @@
     <dl class="detail-list">
       <div><dt data-i18n="display_name">Display name</dt><dd>{% if member.display_name %}{{ member.display_name }}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
       <div><dt data-i18n="mobile_number">Mobile number</dt><dd>{{ member.phone }}{% if member.is_mobile_verified %} <span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}</dd></div>
-      <div><dt data-i18n="email_label">Email</dt><dd>{% if member.email %}{{ member.email }}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
+      <div><dt data-i18n="email_label">Email</dt><dd>{% if member.primary_email %}{{ member.primary_email }}{% if member.is_email_verified %} <span class="status-pill status-approved" data-i18n="status_verified">Verified</span>{% endif %}{% else %}<span data-i18n="not_provided">Not provided</span>{% endif %}</dd></div>
       <div><dt data-i18n="member_since">Member since</dt><dd>{{ member.date_joined|date:"j F Y" }}</dd></div>
       <div><dt data-i18n="settings_area">Area</dt><dd>{% if service_area %}<span data-area-name="{{ service_area.name }}">{{ service_area.name }}</span>, <span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span>{% else %}<span data-i18n="no_marketplace_set">No marketplace set</span>{% endif %}</dd></div>
     </dl>
     <div class="form-actions">
       <a class="btn btn-primary" href="{% url 'accounts:profile' %}" data-i18n="edit_profile">Edit profile</a>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2 data-i18n="settings_password">Password</h2>
+    <p class="muted small">
+      {% if member.has_usable_password %}
+        Password sign-in is enabled for this account. Enter your current password to choose a new one.
+      {% else %}
+        Set a password to sign in without waiting for a one-time code. You can still sign in with a code at any time.
+      {% endif %}
+    </p>
+    <form method="post" action="{% url 'accounts:settings' %}" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+      {% if form.current_password %}
+        {% include "partials/field.html" with field=form.current_password %}
+      {% endif %}
+      {% include "partials/field.html" with field=form.new_password1 %}
+      <div class="password-rules" data-password-rules data-password-input="{{ form.new_password1.id_for_label }}" data-password-confirm="{{ form.new_password2.id_for_label }}" data-complete="false" aria-live="polite">
+        <p class="password-rules-title" data-i18n="password_rules_title">Password must include:</p>
+        <ul class="password-rule-list">
+          <li data-rule="length" data-i18n="password_rule_length">At least 8 characters</li>
+          <li data-rule="uppercase" data-i18n="password_rule_uppercase">One uppercase letter</li>
+          <li data-rule="digit" data-i18n="password_rule_digit">One digit</li>
+          <li data-rule="special" data-i18n="password_rule_special">One special character</li>
+          <li data-rule="match" data-i18n="password_rule_match">Passwords match</li>
+        </ul>
+      </div>
+      {% include "partials/field.html" with field=form.new_password2 %}
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">
+          {% if member.has_usable_password %}Update password{% else %}Set password{% endif %}
+        </button>
+      </div>
+    </form>
+    <p class="field-help">
+      If you forget your password, sign in with a one-time code and set a new one here.
+    </p>
   </div>
 
   <div class="panel">
@@ -90,4 +133,8 @@
     </form>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/auth.js' %}?v=1.0" defer></script>
 {% endblock %}

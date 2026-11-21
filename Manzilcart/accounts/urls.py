@@ -8,6 +8,7 @@ conversations and deals can legitimately span more than one marketplace.
 """
 
 from django.urls import path
+from django.views.generic import RedirectView
 
 from accounts import views
 from catalog.views import MyListingsView, MyWishlistView
@@ -15,12 +16,22 @@ from catalog.views import MyListingsView, MyWishlistView
 app_name = "accounts"
 
 urlpatterns = [
-    # Verification / sign-in flow.
-    path("accounts/start/", views.PhoneEntryView.as_view(), name="start"),
-    path("accounts/login/", views.PhoneEntryView.as_view(), name="login"),
+    # Sign-up / sign-in flow.
+    path("accounts/start/", views.LoginStartView.as_view(), name="start"),
+    path("accounts/register/", views.RegisterView.as_view(), name="register"),
+    path("accounts/login/", views.LoginStartView.as_view(), name="login"),
+    path(
+        "accounts/password/",
+        views.PasswordLoginView.as_view(),
+        name="password_login",
+    ),
     path("accounts/verify/", views.VerifyCodeView.as_view(), name="verify"),
     path("accounts/resend/", views.ResendCodeView.as_view(), name="resend"),
-    path("accounts/details/", views.RegistrationDetailsView.as_view(), name="details"),
+    path(
+        "accounts/details/",
+        RedirectView.as_view(pattern_name="accounts:register", permanent=False),
+        name="details",
+    ),
     path("accounts/logout/", views.LogoutView.as_view(), name="logout"),
     # Member area.
     path("my/", views.DashboardView.as_view(), name="dashboard"),

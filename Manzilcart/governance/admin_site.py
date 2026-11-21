@@ -7,11 +7,9 @@ swaps the *class* of that instance, preserving every registration while adding
 the governance pages and navigation below. This keeps one admin URL namespace
 (``admin:``) for everything.
 
-Authentication: ManzilCart accounts are OTP-only (there is no usable password),
-so the stock admin username/password login can never succeed for staff. The
-site therefore ships its own OTP login - staff enter their mobile number, get
-a WhatsApp one-time code, and are signed in exactly like on the storefront.
-A collapsible password panel remains for superuser accounts created with
+Authentication: staff sign in with a WhatsApp one-time code, exactly like on
+the storefront, so the login page ships its own OTP flow. A collapsible
+password panel remains for command-line superuser accounts created with
 ``createsuperuser``.
 """
 

@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env*/
+.env
+
+# Tests and coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Local databases & uploads
+*.sqlite3
+*.db
+media/
+staticfiles/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+*.log
+
+# Documentation & notes
+docs/
+implementation_plan.md
+progress.md

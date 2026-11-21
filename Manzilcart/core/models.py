@@ -46,8 +46,10 @@ class AuditEvent(models.Model):
         # Accounts
         ACCOUNT_CREATED = "account.created", "Account created"
         PHONE_VERIFIED = "account.phone_verified", "Mobile number verified"
+        EMAIL_VERIFIED = "account.email_verified", "Email address verified"
         LOGIN_SUCCEEDED = "account.login_succeeded", "Login succeeded"
         LOGIN_FAILED = "account.login_failed", "Login failed"
+        PASSWORD_CHANGED = "account.password_changed", "Password changed"
         PROFILE_UPDATED = "account.profile_updated", "Profile updated"
         # Deals
         DEAL_ACCEPTED = "deal.accepted", "Deal accepted"

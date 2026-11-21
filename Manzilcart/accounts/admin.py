@@ -5,7 +5,15 @@ from __future__ import annotations
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from accounts.models import OTPChallenge, User
+from accounts.models import EmailSender, MemberEmail, OTPChallenge, User
+
+
+class MemberEmailInline(admin.StackedInline):
+    model = MemberEmail
+    extra = 0
+    max_num = 1
+    can_delete = True
+    readonly_fields = ("verified_at",)
 
 
 @admin.register(User)
@@ -13,8 +21,8 @@ class UserAdmin(BaseUserAdmin):
     """
     Member administration.
 
-    Members authenticate with an OTP rather than a password, so the password fields are
-    only meaningful for staff accounts.
+    Members can authenticate with a WhatsApp OTP or an optional password. The password
+    fields are therefore meaningful for both member and staff accounts.
     """
 
     ordering = ("-date_joined",)
@@ -37,15 +45,21 @@ class UserAdmin(BaseUserAdmin):
         "service_area",
         "phone_verified_at",
     )
-    search_fields = ("phone", "display_name", "email")
+    search_fields = (
+        "phone",
+        "display_name",
+        "email",
+        "member_email__email",
+    )
     list_select_related = ("emirate", "service_area")
     autocomplete_fields = ("emirate", "service_area")
     readonly_fields = ("date_joined", "last_login", "phone_verified_at", "created_at", "updated_at")
     filter_horizontal = ("groups", "user_permissions")
+    inlines = (MemberEmailInline,)
 
     fieldsets = (
         (None, {"fields": ("phone", "password")}),
-        ("Member", {"fields": ("display_name", "first_name", "last_name", "email")}),
+        ("Member", {"fields": ("display_name", "first_name", "last_name")}),
         ("Marketplace", {"fields": ("emirate", "service_area", "seller_status")}),
         ("Verification", {"fields": ("phone_verified_at",)}),
         (
@@ -82,6 +96,58 @@ class UserAdmin(BaseUserAdmin):
             # Changing a verified number must go through the OTP flow.
             readonly.append("phone")
         return readonly
+
+
+@admin.register(MemberEmail)
+class MemberEmailAdmin(admin.ModelAdmin):
+    """Canonical member email addresses, one per account."""
+
+    list_display = ("email", "user", "verified_at", "created_at")
+    search_fields = ("email", "user__phone", "user__display_name")
+    list_select_related = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(EmailSender)
+class EmailSenderAdmin(admin.ModelAdmin):
+    """Manage the SMTP account used for verification-code emails."""
+
+    list_display = (
+        "sender_email",
+        "smtp_host",
+        "smtp_port",
+        "use_tls",
+        "smtp_username",
+        "is_active",
+    )
+    list_filter = ("is_active", "use_tls")
+    search_fields = ("sender_email", "smtp_host", "smtp_username")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "sender_email",
+                    "smtp_host",
+                    "smtp_port",
+                    "use_tls",
+                    "smtp_username",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            "Password",
+            {
+                "description": (
+                    "Set OTP_EMAIL_SMTP_PASSWORD in the environment. The password is "
+                    "never stored in the database."
+                ),
+                "fields": ("created_at", "updated_at"),
+            },
+        ),
+    )
 
 
 @admin.register(OTPChallenge)

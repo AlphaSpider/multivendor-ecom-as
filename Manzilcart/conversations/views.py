@@ -113,7 +113,7 @@ class ConversationListView(LoginRequiredMixin, TemplateView):
                     "url": row["url"],
                     "title": row["title"],
                     "thumb_url": row["cover_url"],
-                    "with_label": "Marketplace Support",
+                    "with_label": "Marketplace team",
                     "status_label": row["status_label"],
                     "unread": row["unread"],
                     "last_message_at": row["last_message_at"],

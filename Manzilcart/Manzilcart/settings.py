@@ -34,7 +34,7 @@ def env(name: str, default: str | None = None) -> str | None:
     value = os.environ.get(name)
     if value is None:
         return default
-    value = value.strip()
+    value = value.strip().strip("'\"")
     return value if value != "" else default
 
 
@@ -216,7 +216,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": 8},
+    },
+    {
+        "NAME": "accounts.validators.ComplexityPasswordValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -525,6 +528,8 @@ OTP_MAX_ATTEMPTS = env_int("OTP_MAX_ATTEMPTS", 5)
 OTP_RESEND_COOLDOWN_SECONDS = env_int("OTP_RESEND_COOLDOWN_SECONDS", 60)
 OTP_MAX_SENDS_PER_PHONE_PER_HOUR = env_int("OTP_MAX_SENDS_PER_PHONE_PER_HOUR", 5)
 OTP_MAX_SENDS_PER_IP_PER_HOUR = env_int("OTP_MAX_SENDS_PER_IP_PER_HOUR", 20)
+PASSWORD_LOGIN_MAX_ATTEMPTS = env_int("PASSWORD_LOGIN_MAX_ATTEMPTS", 8)
+PASSWORD_LOGIN_WINDOW_SECONDS = env_int("PASSWORD_LOGIN_WINDOW_SECONDS", 15 * 60)
 
 # --- Notifications ---------------------------------------------------------
 # "mock" records notifications without contacting any provider (development /

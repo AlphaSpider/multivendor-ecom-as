@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.contrib.auth import login as auth_login
+from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from accounts.models import OTPChallenge, User
+from accounts.models import MemberEmail, OTPChallenge, User
 from core.audit import record_audit
 from core.exceptions import DomainError, RateLimitedError
 from core.logging_utils import mask_phone
@@ -24,6 +24,10 @@ logger = logging.getLogger("manzilcart.accounts")
 # Session keys for the sign-up wizard. The challenge id never comes from the browser.
 SESSION_CHALLENGE_ID = "manzilcart.otp_challenge_id"
 SESSION_PHONE = "manzilcart.otp_phone"
+
+# Sentinel phone for non-deliverable challenges used when an identifier has no active
+# account. Keeping one shared value also rate-limits unknown-identifier probing.
+DECOY_PHONE = "+000000000000"
 
 
 class StartResult:
@@ -75,6 +79,51 @@ def _enforce_send_limits(*, phone: str, request) -> None:
         )
 
 
+def _member_email(user: User | None) -> str:
+    if user is None:
+        return ""
+    try:
+        return user.member_email.email
+    except MemberEmail.DoesNotExist:
+        return (user.email or "").strip().lower()
+
+
+def _dispatch_otp(
+    *, challenge: OTPChallenge, code: str, idempotency_key: str
+) -> None:
+    """Deliver a code to every configured channel without letting one failure stop another."""
+    from accounts.otp_delivery import send_otp_email, send_otp_whatsapp
+
+    if challenge.phone == DECOY_PHONE:
+        # No account matched the identifier; never deliver a code to the sentinel.
+        return
+
+    try:
+        send_otp_whatsapp(
+            challenge.phone,
+            code,
+            idempotency_key=idempotency_key,
+            user=challenge.user,
+        )
+    except Exception:  # noqa: BLE001 - never leak provider detail to the visitor
+        logger.exception(
+            "Failed to dispatch WhatsApp OTP for challenge %s (phone %s)",
+            challenge.pk,
+            mask_phone(challenge.phone),
+        )
+
+    email = _member_email(challenge.user)
+    if not email:
+        return
+    try:
+        send_otp_email(email=email, otp=code)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Failed to dispatch email OTP for challenge %s (recipient redacted)",
+            challenge.pk,
+        )
+
+
 def start_verification(*, raw_phone: str, request, emirate=None) -> StartResult:
     """
     Begin registration or sign-in for ``raw_phone``.
@@ -117,21 +166,11 @@ def start_verification(*, raw_phone: str, request, emirate=None) -> StartResult:
 
     # Outside the transaction's critical section: a messaging outage must not prevent
     # the challenge row from existing, and the visitor can ask for a resend.
-    try:
-        from notifications.services import send_otp
-
-        send_otp(
-            phone=phone,
-            code=code,
-            ttl_seconds=settings.OTP_TTL_SECONDS,
-            idempotency_key=f"otp:{challenge.pk}",
-        )
-    except Exception:  # noqa: BLE001 - never leak provider detail to the visitor
-        logger.exception(
-            "Failed to dispatch OTP for challenge %s (phone %s)",
-            challenge.pk,
-            mask_phone(phone),
-        )
+    _dispatch_otp(
+        challenge=challenge,
+        code=code,
+        idempotency_key=f"otp:{challenge.pk}",
+    )
 
     logger.info(
         "OTP challenge %s started for %s (purpose=%s)",
@@ -140,6 +179,81 @@ def start_verification(*, raw_phone: str, request, emirate=None) -> StartResult:
         purpose,
     )
     return StartResult(challenge, is_returning_member=existing_user is not None)
+
+
+def start_login_verification(*, user: User, request) -> OTPChallenge:
+    """Start a one-time-code sign-in for an existing member."""
+    if not user.is_active:
+        raise DomainError("This account is not available. Please contact support.")
+
+    phone = user.phone
+    _enforce_send_limits(phone=phone, request=request)
+
+    code = generate_code()
+    now = timezone.now()
+
+    with transaction.atomic():
+        OTPChallenge.objects.filter(
+            phone=phone, consumed_at__isnull=True
+        ).update(consumed_at=now)
+
+        challenge = OTPChallenge.objects.create(
+            phone=phone,
+            code_hash=hash_code(code, scope=phone),
+            purpose=OTPChallenge.Purpose.LOGIN,
+            emirate=user.emirate,
+            user=user,
+            expires_at=now + timezone.timedelta(seconds=settings.OTP_TTL_SECONDS),
+            max_attempts=settings.OTP_MAX_ATTEMPTS,
+            last_sent_at=now,
+            request_ip=client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT", "") if request else "")[
+                :255
+            ],
+        )
+
+    _dispatch_otp(
+        challenge=challenge,
+        code=code,
+        idempotency_key=f"otp:{challenge.pk}",
+    )
+
+    logger.info(
+        "OTP challenge %s started for sign-in (phone %s)",
+        challenge.pk,
+        mask_phone(phone),
+    )
+    return challenge
+
+
+def start_decoy_verification(*, request) -> OTPChallenge:
+    """
+    Create a non-deliverable challenge for an identifier with no active account.
+
+    The HTTP response is identical to a real OTP sign-in: the visitor is sent to the
+    verification step. No message is dispatched, and every submitted code fails, so
+    the endpoint cannot be used to discover which phone numbers or emails are members.
+    """
+    phone = DECOY_PHONE
+    _enforce_send_limits(phone=phone, request=request)
+
+    code = generate_code()
+    now = timezone.now()
+    with transaction.atomic():
+        OTPChallenge.objects.filter(
+            phone=phone, consumed_at__isnull=True
+        ).update(consumed_at=now)
+        challenge = OTPChallenge.objects.create(
+            phone=phone,
+            code_hash=hash_code(code, scope=phone),
+            purpose=OTPChallenge.Purpose.LOGIN,
+            expires_at=now + timezone.timedelta(seconds=settings.OTP_TTL_SECONDS),
+            max_attempts=settings.OTP_MAX_ATTEMPTS,
+            last_sent_at=now,
+            request_ip=client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT", "") if request else "")[:255],
+        )
+    return challenge
 
 
 def resend_verification(*, challenge: OTPChallenge, request) -> OTPChallenge:
@@ -172,17 +286,11 @@ def resend_verification(*, challenge: OTPChallenge, request) -> OTPChallenge:
             ]
         )
 
-    try:
-        from notifications.services import send_otp
-
-        send_otp(
-            phone=locked.phone,
-            code=code,
-            ttl_seconds=settings.OTP_TTL_SECONDS,
-            idempotency_key=f"otp:{locked.pk}:resend:{locked.sends}",
-        )
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to resend OTP for challenge %s", locked.pk)
+    _dispatch_otp(
+        challenge=locked,
+        code=code,
+        idempotency_key=f"otp:{locked.pk}:resend:{locked.sends}",
+    )
 
     # The pre-verification IP counter should not block a legitimate resend, but the
     # per-phone limit above still applies.
@@ -240,6 +348,66 @@ def verify_challenge_code(*, challenge: OTPChallenge, submitted_code: str) -> OT
     return locked
 
 
+def register_member(
+    *,
+    phone: str,
+    email: str,
+    password: str,
+    display_name: str,
+    emirate_slug: str,
+    service_area_slug: str,
+    request=None,
+) -> User:
+    """
+    Create a member immediately, with password sign-in available from the start.
+
+    Phone and email start unverified. The first successful OTP sign-in marks both
+    verified; seller/bid eligibility already checks ``is_mobile_verified``.
+    """
+    phone = normalise_phone(phone).e164
+    email = (email or "").strip().lower()
+    emirate, service_area = validate_registration_location(
+        emirate_slug, service_area_slug
+    )
+
+    with transaction.atomic():
+        if User.objects.filter(phone=phone).exists():
+            raise DomainError(
+                "This mobile number is already registered. Please sign in instead."
+            )
+        if email and MemberEmail.objects.filter(email__iexact=email).exists():
+            raise DomainError("This email already belongs to another account.")
+
+        try:
+            user = User.objects.create_user(
+                phone=phone,
+                password=password,
+                display_name=display_name.strip()[:64],
+                email=email,
+                emirate=emirate,
+                service_area=service_area,
+            )
+            if email:
+                MemberEmail.objects.create(user=user, email=email)
+
+            record_audit(
+                action=AuditEvent.Action.ACCOUNT_CREATED,
+                actor=user,
+                entity=user,
+                emirate=emirate,
+                summary="Member account created",
+                metadata={"service_area": service_area.slug},
+                request=request,
+            )
+        except IntegrityError as exc:  # pragma: no cover - defence in depth
+            raise DomainError(
+                "This mobile number or email is already registered. Please sign in instead."
+            ) from exc
+
+    logger.info("Account created for %s", mask_phone(phone))
+    return user
+
+
 def complete_registration(
     *,
     challenge: OTPChallenge,
@@ -247,6 +415,7 @@ def complete_registration(
     service_area_slug: str,
     display_name: str = "",
     email: str = "",
+    password: str | None = None,
     request=None,
 ) -> User:
     """
@@ -289,6 +458,7 @@ def complete_registration(
             try:
                 user = User.objects.create_user(
                     phone=locked.phone,
+                    password=password or None,
                     display_name=display_name.strip()[:64],
                     email=email.strip()[:254],
                     emirate=emirate,
@@ -301,6 +471,10 @@ def complete_registration(
 
             user.phone_verified_at = timezone.now()
             user.save(update_fields=["phone_verified_at", "updated_at"])
+
+            email = (email or "").strip().lower()
+            if email:
+                MemberEmail.objects.create(user=user, email=email)
 
             locked.emirate = emirate
             locked.service_area = service_area
@@ -344,7 +518,7 @@ def sign_in_with_verified_challenge(*, challenge: OTPChallenge, request) -> User
 
     Any challenge row for this phone is consumed so a code cannot be replayed.
     """
-    user = User.objects.filter(phone=challenge.phone).first()
+    user = challenge.user or User.objects.filter(phone=challenge.phone).first()
     if user is None:
         # Do not disclose which step failed; the operator can see the audit trail.
         challenge.mark_consumed()
@@ -356,49 +530,147 @@ def sign_in_with_verified_challenge(*, challenge: OTPChallenge, request) -> User
 
     challenge.mark_consumed()
 
-    if user.phone_verified_at is None:
-        user.phone_verified_at = timezone.now()
+    now = timezone.now()
+    phone_newly_verified = user.phone_verified_at is None
+    if phone_newly_verified:
+        user.phone_verified_at = now
         user.save(update_fields=["phone_verified_at", "updated_at"])
+
+    email_newly_verified = False
+    email_row = MemberEmail.objects.filter(user=user).first()
+    if email_row is not None and email_row.verified_at is None:
+        email_row.verified_at = now
+        email_row.save(update_fields=["verified_at", "updated_at"])
+        email_newly_verified = True
 
     # Rotate the session identifier on privilege change.
     auth_login(request, user)
     reset(f"otp-ip:{client_ip(request)}")
+
+    if phone_newly_verified:
+        record_audit(
+            action=AuditEvent.Action.PHONE_VERIFIED,
+            actor=user,
+            entity=user,
+            emirate=user.emirate,
+            summary="Mobile number verified",
+            request=request,
+        )
+    if email_newly_verified:
+        record_audit(
+            action=AuditEvent.Action.EMAIL_VERIFIED,
+            actor=user,
+            entity=user,
+            emirate=user.emirate,
+            summary="Email address verified",
+            request=request,
+        )
 
     record_audit(
         action=AuditEvent.Action.LOGIN_SUCCEEDED,
         actor=user,
         entity=user,
         emirate=user.emirate,
-        summary="Signed in with mobile OTP",
+        summary="Signed in with a one-time code",
         request=request,
     )
     return user
 
 
-def update_profile(*, user: User, display_name: str, emirate_slug: str, service_area_slug: str, email: str = "", request=None) -> User:
+def sign_in_with_password(*, user: User, request, backend=None) -> User:
+    """Complete a phone-number + password sign-in and audit the event."""
+    if not user.is_active:
+        raise DomainError("This account is not available. Please contact support.")
+
+    auth_login(request, user, backend=backend)
+
+    record_audit(
+        action=AuditEvent.Action.LOGIN_SUCCEEDED,
+        actor=user,
+        entity=user,
+        emirate=user.emirate,
+        summary="Signed in with password",
+        request=request,
+    )
+    return user
+
+
+def update_password(*, user: User, password: str, request=None) -> User:
+    """Set a new password for a signed-in member and record the change."""
+    user.set_password(password)
+    user.save(update_fields=["password", "updated_at"])
+    if request is not None:
+        update_session_auth_hash(request, user)
+
+    record_audit(
+        action=AuditEvent.Action.PASSWORD_CHANGED,
+        actor=user,
+        entity=user,
+        emirate=user.emirate,
+        summary="Password updated",
+        request=request,
+    )
+    return user
+
+
+def update_profile(
+    *,
+    user: User,
+    display_name: str,
+    emirate_slug: str,
+    service_area_slug: str,
+    email: str = "",
+    request=None,
+) -> User:
     """
     Update a member's profile.
 
     Location changes go through the same validation as registration, so a member cannot
-    move themselves into an unsupported area by posting a crafted form.
+    move themselves into an unsupported area by posting a crafted form. Changing the
+    email resets its verification state until the next successful OTP sign-in.
     """
-    emirate, service_area = validate_registration_location(emirate_slug, service_area_slug)
-
-    user.display_name = display_name.strip()[:64]
-    user.email = email.strip()[:254]
-    user.emirate = emirate
-    user.service_area = service_area
-
-    user.full_clean(exclude=["password", "last_login"])
-    user.save(
-        update_fields=[
-            "display_name",
-            "email",
-            "emirate",
-            "service_area",
-            "updated_at",
-        ]
+    emirate, service_area = validate_registration_location(
+        emirate_slug, service_area_slug
     )
+    email = (email or "").strip().lower()
+
+    with transaction.atomic():
+        current_email = MemberEmail.objects.filter(user=user).first()
+        if current_email is not None:
+            if not email:
+                current_email.delete()
+            elif current_email.email != email:
+                if (
+                    MemberEmail.objects.filter(email__iexact=email)
+                    .exclude(pk=current_email.pk)
+                    .exists()
+                ):
+                    raise DomainError("This email already belongs to another account.")
+                current_email.email = email
+                current_email.verified_at = None
+                current_email.save(
+                    update_fields=["email", "verified_at", "updated_at"]
+                )
+        elif email:
+            if MemberEmail.objects.filter(email__iexact=email).exists():
+                raise DomainError("This email already belongs to another account.")
+            MemberEmail.objects.create(user=user, email=email)
+
+        user.display_name = display_name.strip()[:64]
+        user.email = email
+        user.emirate = emirate
+        user.service_area = service_area
+
+        user.full_clean(exclude=["password", "last_login"])
+        user.save(
+            update_fields=[
+                "display_name",
+                "email",
+                "emirate",
+                "service_area",
+                "updated_at",
+            ]
+        )
 
     record_audit(
         action=AuditEvent.Action.PROFILE_UPDATED,

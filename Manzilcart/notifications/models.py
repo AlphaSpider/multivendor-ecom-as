@@ -49,7 +49,7 @@ class Notification(TimeStampedModel):
         EMAIL = "email", "Email"
 
     class Kind(models.TextChoices):
-        OTP = "otp", "Mobile verification code"
+        OTP = "otp", "Verification code"
         AUCTION_SELECTION = "auction_selection", "Auction: bid selected"
         AUCTION_FALLBACK = "auction_fallback", "Auction: fallback invitation"
         AUCTION_OUTCOME = "auction_outcome", "Auction: outcome"

@@ -5,7 +5,7 @@
 {% block body_class %}messages-page{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/conversations.css' %}?v=2.2">
+<link rel="stylesheet" href="{% static 'css/conversations.css' %}?v=2.3">
 {% endblock %}
 
 {% block content %}
@@ -36,7 +36,7 @@
               <div class="wa-chat-top">
                 <span class="wa-contact-name">
                   {% if entry.kind == 'support' %}
-                    Marketplace Support
+                    Marketplace team
                   {% else %}
                     {{ entry.with_label }}
                   {% endif %}
@@ -48,6 +48,8 @@
 
               <div class="wa-chat-bottom">
                 <p class="wa-snippet">
+                  <span class="wa-item-title">{{ entry.title }}</span>
+                  <span class="wa-sep" aria-hidden="true">·</span>
                   {% if entry.last_message_body %}
                     {% if entry.last_message_is_mine %}
                       <span class="wa-ticks" title="Sent by you" aria-hidden="true">

@@ -186,9 +186,16 @@ def retry_notification(notification: Notification, *, actor=None, request=None) 
 # ---------------------------------------------------------------------------
 
 
-def send_otp(*, phone: str, code: str, ttl_seconds: int, idempotency_key: str | None = None):
+def send_otp(
+    *,
+    phone: str,
+    code: str,
+    ttl_seconds: int,
+    idempotency_key: str | None = None,
+    user=None,
+):
     """
-    Send a mobile verification code over WhatsApp (the primary channel).
+    Send a verification code over WhatsApp (the primary channel).
 
     The body contains the code because that is the whole point of the message. It is
     never logged and never stored on the ``Notification`` row in mock mode... except
@@ -206,6 +213,32 @@ def send_otp(*, phone: str, code: str, ttl_seconds: int, idempotency_key: str | 
             f"{code} is your ManzilCart verification code. "
             f"It expires in {minutes} minute(s). Do not share it with anyone."
         ),
+        user=user,
+        emirate=getattr(user, "emirate", None),
+        idempotency_key=idempotency_key,
+    )
+
+
+def send_otp_email(
+    *,
+    email: str,
+    code: str,
+    ttl_seconds: int,
+    idempotency_key: str | None = None,
+    user=None,
+):
+    """Send the same verification code to the member's canonical email address."""
+    minutes = max(1, ttl_seconds // 60)
+    return send_email(
+        kind=Notification.Kind.OTP,
+        recipient=email,
+        subject="Your ManzilCart verification code",
+        body=(
+            f"{code} is your ManzilCart verification code. "
+            f"It expires in {minutes} minute(s). Do not share it with anyone."
+        ),
+        user=user,
+        emirate=getattr(user, "emirate", None),
         idempotency_key=idempotency_key,
     )
 

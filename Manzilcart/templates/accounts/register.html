@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create your account — ManzilCart{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<section class="container auth-layout">
+  <div class="auth-card">
+    <p class="eyebrow">{% if emirate %}<span data-emirate-name="{{ emirate.name }}">{{ emirate.name }}</span> <span data-i18n="marketplace_label">marketplace</span>{% else %}ManzilCart{% endif %}</p>
+    <h1 data-i18n="register_title">Create your account</h1>
+    <p class="muted" data-i18n="register_desc">
+      Enter your mobile number, an optional email and a password. No code is needed now — we will ask for one when you sign in.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="form-alert" role="alert">
+          {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.display_name %}
+      {% include "partials/field.html" with field=form.phone %}
+      {% include "partials/field.html" with field=form.email %}
+      {% include "partials/field.html" with field=form.service_area %}
+      {% include "partials/field.html" with field=form.password1 %}
+      <div class="password-rules" data-password-rules data-password-input="{{ form.password1.id_for_label }}" data-password-confirm="{{ form.password2.id_for_label }}" data-complete="false" aria-live="polite">
+        <p class="password-rules-title" data-i18n="password_rules_title">Password must include:</p>
+        <ul class="password-rule-list">
+          <li data-rule="length" data-i18n="password_rule_length">At least 8 characters</li>
+          <li data-rule="uppercase" data-i18n="password_rule_uppercase">One uppercase letter</li>
+          <li data-rule="digit" data-i18n="password_rule_digit">One digit</li>
+          <li data-rule="special" data-i18n="password_rule_special">One special character</li>
+          <li data-rule="match" data-i18n="password_rule_match">Passwords match</li>
+        </ul>
+      </div>
+      {% include "partials/field.html" with field=form.password2 %}
+
+      <button class="btn btn-primary btn-block" type="submit" data-i18n="btn_create_account">Create account</button>
+    </form>
+
+    <div class="auth-actions">
+      <a href="{% url 'accounts:login' %}" data-i18n="already_have_account">Already have an account? Sign in</a>
+    </div>
+
+    <p class="auth-footnote" data-i18n="register_footnote">
+      Your mobile number is required. Email is optional but lets us send sign-in codes there too. Selling and bidding need a verified mobile number.
+    </p>
+  </div>
+
+  <aside class="auth-aside" aria-label="Creating your account">
+    <h2 data-i18n="register_aside_title">What happens next</h2>
+    <ol class="step-list">
+      <li data-i18n="register_step_1"><strong>Start browsing.</strong> Your account is ready as soon as you create it.</li>
+      <li data-i18n="register_step_2"><strong>Sign in your way.</strong> Use a one-time code or your password.</li>
+      <li data-i18n="register_step_3"><strong>Verify when you sell or bid.</strong> The first successful code sign-in verifies your phone and email.</li>
+    </ol>
+  </aside>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/auth.js' %}?v=1.0" defer></script>
+{% endblock %}

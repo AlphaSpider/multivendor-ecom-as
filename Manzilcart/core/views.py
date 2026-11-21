@@ -5,10 +5,10 @@ from __future__ import annotations
 from django.db import connection
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_safe 
 
 
-@require_GET
+@require_safe 
 @never_cache
 def healthz(request):
     """
