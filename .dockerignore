@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env*/
+
+
+# Tests and coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Local databases & uploads
+*.sqlite3
+*.db
+Manzilcart/media/
+Manzilcart/staticfiles/
+
+# Node.js
+node_modules/
+Manzilcart/node_modules/
+package-lock.json
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+*.log
+
+# Documentation & notes
+prompt and doc/
+Manzilcart/docs/
+Manzilcart/implementation_plan.md
+Manzilcart/progress.md

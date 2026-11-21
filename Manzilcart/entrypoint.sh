@@ -24,12 +24,8 @@ for i in range(1, max_retries + 1):
             conn = psycopg.connect(db_url, connect_timeout=3)
         else:
             conn = psycopg.connect(
-                host=host,
-                port=port,
-                user=user,
-                password=password,
-                dbname=dbname,
-                connect_timeout=3
+                host=host, port=port, user=user,
+                password=password, dbname=dbname, connect_timeout=3
             )
         conn.close()
         print("Database connected successfully!")

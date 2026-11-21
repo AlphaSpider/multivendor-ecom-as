@@ -1,0 +1,57 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manzilcart_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_ENV=development
+      - DJANGO_DEBUG=true
+      - DJANGO_SECRET_KEY=dev-insecure-secret-key-for-docker-compose-000000
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,web
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/manzilcart
+      - REDIS_URL=redis://redis:6379/0
+      - WAIT_FOR_DB=true
+      - AUTO_MIGRATE=true
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:17-alpine
+    container_name: manzilcart_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=manzilcart
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d manzilcart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: manzilcart_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:

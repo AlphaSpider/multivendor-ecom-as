@@ -8,18 +8,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system dependencies (curl for healthcheck, netcat/libpq if needed)
+# Install system dependencies (curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first for caching
-COPY requirements.txt ./
+COPY Manzilcart/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code
-COPY . .
+COPY Manzilcart/ ./
 
 # Ensure entrypoint script has Unix line endings and executable permissions
 RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
